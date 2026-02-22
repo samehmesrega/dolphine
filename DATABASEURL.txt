@@ -1,0 +1,3 @@
+INTERNAL DATABASE URL : postgresql://dolphine_db_user:JvgiGbq65wkhz1kQsf5FFaXZUX831jHW@dpg-d6dkf77fte5s73dfamd0-a/dolphine_db
+
+EXTERNAL DATABASE URL : postgresql://dolphine_db_user:JvgiGbq65wkhz1kQsf5FFaXZUX831jHW@dpg-d6dkf77fte5s73dfamd0-a.oregon-postgres.render.com/dolphine_db

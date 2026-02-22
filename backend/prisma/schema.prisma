@@ -1,0 +1,377 @@
+// دولفين - Dolphin - نظام إدارة الليدز والمبيعات
+// Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ المستخدمون والأدوار ============
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  name          String
+  isActive      Boolean   @default(true) @map("is_active")
+  roleId        String    @map("role_id")
+  role          Role      @relation(fields: [roleId], references: [id])
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  assignedLeads     Lead[]           @relation("AssignedLeads")
+  communications   Communication[]
+  responseRequests  ResponseRequest[] @relation("RequestedFrom")
+  userPermissions  UserPermission[]
+  auditLogs       AuditLog[]
+  shiftMembers    ShiftMember[]
+  notifications   Notification[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  rolePermissions RolePermission[]
+  users       User[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  module      String
+  description String?
+  rolePermissions RolePermission[]
+  userPermissions UserPermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+  role         Role   @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserPermission {
+  userId       String @map("user_id")
+  permissionId String @map("permission_id")
+  grant        Boolean @default(true)
+  user         User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, permissionId])
+  @@map("user_permissions")
+}
+
+// ============ العملاء (حسب رقم الفون) ============
+
+model Customer {
+  id          String   @id @default(uuid())
+  name        String
+  phone       String   @unique
+  whatsapp    String?
+  email       String?
+  address     String?
+  customFields Json?    @map("custom_fields")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  leads   Lead[]
+  orders  Order[]
+
+  @@map("customers")
+}
+
+// ============ الليدز ============
+
+model Lead {
+  id              String    @id @default(uuid())
+  name            String
+  phone           String
+  phoneNormalized String    @map("phone_normalized")
+  whatsapp        String?
+  email           String?
+  address         String?
+  customFields    Json?     @map("custom_fields")
+  source          String
+  sourceDetail    String?   @map("source_detail")
+  statusId        String    @map("status_id")
+  status          LeadStatus @relation(fields: [statusId], references: [id])
+  assignedToId    String?   @map("assigned_to_id")
+  assignedTo      User?    @relation("AssignedLeads", fields: [assignedToId], references: [id])
+  customerId      String?   @map("customer_id")
+  customer        Customer? @relation(fields: [customerId], references: [id])
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  communications   Communication[]
+  responseRequests ResponseRequest[]
+  orders           Order[]
+  productInterests ProductInterest[]
+
+  @@index([phoneNormalized])
+  @@index([statusId])
+  @@index([assignedToId])
+  @@index([createdAt])
+  @@map("leads")
+}
+
+model LeadStatus {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  color     String?
+  orderNum  Int      @default(0) @map("order_num")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  leads Lead[]
+
+  @@map("lead_statuses")
+}
+
+model ProductInterest {
+  id          String  @id @default(uuid())
+  leadId      String  @map("lead_id")
+  lead        Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  productId   String? @map("product_id")
+  product     Product? @relation(fields: [productId], references: [id])
+  variation   Json?
+  customFields Json?  @map("custom_fields")
+  quantity    Int     @default(1)
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("product_interests")
+}
+
+// ============ التواصل وطلبات الرد ============
+
+model Communication {
+  id          String   @id @default(uuid())
+  leadId      String   @map("lead_id")
+  lead        Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  userId      String   @map("user_id")
+  user        User     @relation(fields: [userId], references: [id])
+  type        String
+  notes       String?
+  statusId    String?  @map("status_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([leadId])
+  @@index([createdAt])
+  @@map("communications")
+}
+
+model ResponseRequest {
+  id           String    @id @default(uuid())
+  leadId       String    @map("lead_id")
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  requestedFromId String @map("requested_from_id")
+  requestedFrom   User   @relation("RequestedFrom", fields: [requestedFromId], references: [id])
+  communicationId String? @map("communication_id")
+  response     String?
+  respondedAt  DateTime? @map("responded_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@index([requestedFromId])
+  @@map("response_requests")
+}
+
+// ============ مصادرة الليدز ============
+
+model LeadSource {
+  id          String   @id @default(uuid())
+  name        String
+  type        String
+  config      Json
+  fieldMapping Json?   @map("field_mapping")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("lead_sources")
+}
+
+// ============ الشيفتات ============
+
+model Shift {
+  id          String   @id @default(uuid())
+  name        String
+  startTime   String   @map("start_time")
+  endTime     String   @map("end_time")
+  daysOfWeek  Json     @map("days_of_week")
+  roundRobin  Boolean  @default(false) @map("round_robin")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  shiftMembers ShiftMember[]
+
+  @@map("shifts")
+}
+
+model ShiftMember {
+  id        String @id @default(uuid())
+  shiftId   String @map("shift_id")
+  shift     Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  userId    String @map("user_id")
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderNum  Int    @default(0) @map("order_num")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([shiftId, userId])
+  @@map("shift_members")
+}
+
+// ============ المنتجات (من ووكومرس) ============
+
+model Product {
+  id            String   @id @default(uuid())
+  wooCommerceId Int      @unique @map("woo_commerce_id")
+  name          String
+  slug          String?
+  data          Json
+  variations    Json?
+  isActive      Boolean  @default(true) @map("is_active")
+  syncedAt      DateTime @default(now()) @map("synced_at")
+
+  productInterests ProductInterest[]
+  orderItems    OrderItem[]
+
+  @@map("products")
+}
+
+// ============ الطلبات ============
+
+model Order {
+  id              String    @id @default(uuid())
+  leadId          String    @map("lead_id")
+  lead            Lead      @relation(fields: [leadId], references: [id])
+  customerId      String    @map("customer_id")
+  customer        Customer  @relation(fields: [customerId], references: [id])
+  wooCommerceId   Int?      @unique @map("woo_commerce_id")
+  status          String
+  paymentType    String    @map("payment_type")
+  transferImage   String?   @map("transfer_image")
+  shippingName    String    @map("shipping_name")
+  shippingPhone   String    @map("shipping_phone")
+  shippingAddress String?   @map("shipping_address")
+  notes           String?
+  accountsConfirmed Boolean @default(false) @map("accounts_confirmed")
+  accountsConfirmedAt DateTime? @map("accounts_confirmed_at")
+  accountsConfirmedBy String? @map("accounts_confirmed_by")
+  rejectedReason  String?   @map("rejected_reason")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  orderItems OrderItem[]
+
+  @@index([status])
+  @@index([leadId])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String   @map("order_id")
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String?  @map("product_id")
+  product     Product? @relation(fields: [productId], references: [id])
+  productName String?  @map("product_name")
+  variation   Json?
+  quantity    Int      @default(1)
+  price       Float
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("order_items")
+}
+
+// ============ إعدادات التكامل (ووكومرس من الواجهة) ============
+
+model IntegrationSetting {
+  id    String @id @default(uuid())
+  key   String @unique
+  value String
+  @@map("integration_settings")
+}
+
+// ============ اتصالات النماذج (ووردبريس → دولفين) ============
+
+model FormConnection {
+  id        String   @id @default(uuid())
+  name      String   // اسم توضيحي، يظهر كمصدر الليد
+  shortcode String?  @map("shortcode") // مثلاً [contact-form-7 id="123"] للتوثيق فقط
+  token     String   @unique // يُستخدم في رابط الويب هوك
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("form_connections")
+}
+
+// ============ إعدادات الحقول المخصصة ============
+
+model CustomFieldConfig {
+  id        String   @id @default(uuid())
+  entity    String
+  name      String
+  slug      String
+  orderNum  Int      @default(0) @map("order_num")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([entity, slug])
+  @@map("custom_field_configs")
+}
+
+// ============ التدقيق والإشعارات ============
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entity    String
+  entityId  String   @map("entity_id")
+  oldData   Json?    @map("old_data")
+  newData   Json?    @map("new_data")
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String?
+  type      String
+  entity    String?
+  entityId  String?   @map("entity_id")
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}

@@ -1,0 +1,26 @@
+# دولفين - Dolphin
+# PostgreSQL و Redis للتطوير المحلي
+
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dolphin-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dolphin
+    ports:
+      - "5432:5432"
+    volumes:
+      - dolphin_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: dolphin-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  dolphin_pgdata:
