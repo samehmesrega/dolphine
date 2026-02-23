@@ -36,19 +36,24 @@ export async function getNextAssignedUserId(): Promise<string | null> {
     },
   });
 
+  // جمع المرشحين مع إزالة التكرار لمنع تحيّز المستخدمين في شيفتات متعددة
+  const seenUserIds = new Set<string>();
   const candidateUserIds: string[] = [];
   for (const shift of shifts) {
     const days = shift.daysOfWeek as number[] | null;
     if (!Array.isArray(days) || !days.includes(dayOfWeek)) continue;
     if (!isTimeBetween(time, shift.startTime, shift.endTime)) continue;
     for (const m of shift.shiftMembers) {
-      candidateUserIds.push(m.userId);
+      if (!seenUserIds.has(m.userId)) {
+        seenUserIds.add(m.userId);
+        candidateUserIds.push(m.userId);
+      }
     }
   }
 
   if (candidateUserIds.length === 0) return null;
 
-  // عد الليدز المعيّنة لكل مستخدم (بدون حد زمني بسيط)
+  // عد الليدز المعيّنة لكل مستخدم
   const counts = await prisma.lead.groupBy({
     by: ['assignedToId'],
     where: { assignedToId: { in: candidateUserIds } },
@@ -61,7 +66,7 @@ export async function getNextAssignedUserId(): Promise<string | null> {
     if (row.assignedToId) countByUser.set(row.assignedToId, row._count.id);
   }
 
-  // الاختيار: الأقل عدداً مع الحفاظ على ترتيب الشيفت (أول من يظهر بأقل عدد)
+  // الاختيار: الأقل عدداً مع الحفاظ على ترتيب الشيفت
   let minCount = Infinity;
   let chosen: string | null = null;
   for (const uid of candidateUserIds) {

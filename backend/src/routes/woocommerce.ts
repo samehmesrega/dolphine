@@ -81,6 +81,8 @@ router.post('/config', async (req: Request, res: Response) => {
   }
 });
 
+const MAX_SYNC_PAGES = 50;
+
 router.post('/sync-products', async (_req: Request, res: Response) => {
   const configured = await isConfigured();
   if (!configured) {
@@ -115,7 +117,7 @@ router.post('/sync-products', async (_req: Request, res: Response) => {
       }
       if (list.length < perPage) break;
       page++;
-    } while (true);
+    } while (page <= MAX_SYNC_PAGES);
     res.json({ success: true, synced: total });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'خطأ غير متوقع';

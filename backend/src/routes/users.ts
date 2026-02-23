@@ -114,7 +114,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     }
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) {
-      const msg = parsed.error.errors.map((e) => e.message).join('؛ ');
+      const msg = (parsed.error as { issues: { message?: string }[] }).issues.map((e: { message?: string }) => e.message ?? '').join('؛ ');
       res.status(400).json({ error: msg });
       return;
     }

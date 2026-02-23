@@ -1,0 +1,9 @@
+DATABASEURL.txt
+*.txt
+node_modules/
+dist/
+.env
+.env.local
+uploads/
+*.log
+.DS_Store

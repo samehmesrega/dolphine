@@ -2,6 +2,15 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+// تحذير في بيئة الإنتاج إذا لم يُضبط JWT_SECRET
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error(
+    '[SECURITY] خطر: JWT_SECRET غير مضبوط في بيئة الإنتاج! ' +
+    'استخدام القيمة الافتراضية يعرّض النظام للاختراق.'
+  );
+  process.exit(1);
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '3001', 10),
   nodeEnv: process.env.NODE_ENV || 'development',

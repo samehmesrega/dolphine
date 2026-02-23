@@ -17,35 +17,55 @@ const createSchema = z.object({
 
 // قائمة اتصالات النماذج
 router.get('/', async (_req: Request, res: Response) => {
-  const connections = await prisma.formConnection.findMany({
-    orderBy: { createdAt: 'desc' },
-  });
-  res.json({ connections });
+  try {
+    const connections = await prisma.formConnection.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ connections });
+  } catch (err: unknown) {
+    console.error('Form connections list error:', err);
+    res.status(500).json({ error: 'خطأ في تحميل اتصالات النماذج' });
+  }
 });
 
 // إنشاء اتصال جديد → يُنشأ token ويُرجع الاتصال مع رابط الويب هوك
 router.post('/', async (req: Request, res: Response) => {
-  const parsed = createSchema.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: 'بيانات غير صحيحة', details: parsed.error.flatten() });
-    return;
+  try {
+    const parsed = createSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'بيانات غير صحيحة', details: parsed.error.flatten() });
+      return;
+    }
+    const token = crypto.randomBytes(24).toString('hex');
+    const connection = await prisma.formConnection.create({
+      data: {
+        name: parsed.data.name,
+        shortcode: parsed.data.shortcode || null,
+        token,
+      },
+    });
+    res.status(201).json({ connection });
+  } catch (err: unknown) {
+    console.error('Create form connection error:', err);
+    res.status(500).json({ error: 'خطأ في إنشاء اتصال النموذج' });
   }
-  const token = crypto.randomBytes(24).toString('hex');
-  const connection = await prisma.formConnection.create({
-    data: {
-      name: parsed.data.name,
-      shortcode: parsed.data.shortcode || null,
-      token,
-    },
-  });
-  res.status(201).json({ connection });
 });
 
 // حذف اتصال
 router.delete('/:id', async (req: Request, res: Response) => {
-  const id = req.params.id;
-  await prisma.formConnection.deleteMany({ where: { id } });
-  res.status(204).send();
+  try {
+    const id = String(req.params.id);
+    const existing = await prisma.formConnection.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'الاتصال غير موجود' });
+      return;
+    }
+    await prisma.formConnection.delete({ where: { id } });
+    res.status(204).send();
+  } catch (err: unknown) {
+    console.error('Delete form connection error:', err);
+    res.status(500).json({ error: 'خطأ في حذف الاتصال' });
+  }
 });
 
 export default router;

@@ -1,5 +1,4 @@
 import type { PrismaClient } from '@prisma/client';
-import { prisma } from '../db';
 
 export async function auditLog(
   db: PrismaClient,

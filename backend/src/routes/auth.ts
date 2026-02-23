@@ -21,7 +21,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: email.trim().toLowerCase() },
+      where: { email: String(email).trim().toLowerCase() },
       include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
     });
     if (!user || !user.isActive) {
@@ -29,7 +29,7 @@ router.post('/login', async (req: Request, res: Response) => {
       return;
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    const valid = await bcrypt.compare(String(password), user.passwordHash);
     if (!valid) {
       res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
       return;
@@ -67,9 +67,13 @@ router.post('/login', async (req: Request, res: Response) => {
   }
 });
 
-// المستخدم الحالي + الصلاحيات (بعد تسجيل الدخول)
+/**
+ * المستخدم الحالي + الصلاحيات
+ * authMiddleware يضمن المستخدم نشط قبل الوصول لهذه النقطة
+ */
 router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
   try {
+    // نجلب الاسم والدور فقط (authMiddleware يضمن أن الحساب نشط)
     const user = await prisma.user.findUnique({
       where: { id: req.user!.userId },
       select: {

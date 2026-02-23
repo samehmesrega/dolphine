@@ -4,8 +4,10 @@
  * Backend API
  */
 
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 import fs from 'fs';
 
@@ -28,23 +30,83 @@ import { authMiddleware, requirePermission } from './middleware/auth';
 
 const app = express();
 
-app.use(cors());
+// ===== Security Headers =====
+app.use(helmet());
+
+// ===== CORS =====
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // السماح بطلبات بلا origin (Postman / server-to-server) أو في بيئة التطوير
+      if (!origin || config.nodeEnv === 'development') {
+        callback(null, true);
+        return;
+      }
+      if (allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`CORS: الأصل غير مسموح: ${origin}`));
+      }
+    },
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// ===== Rate Limiting =====
+
+// حد عام لكل الـ API
+const generalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 دقيقة
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'طلبات كثيرة جداً، حاول بعد قليل' },
+});
+
+// حد أشد لتسجيل الدخول لمنع brute force
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'محاولات تسجيل دخول كثيرة، حاول بعد 15 دقيقة' },
+});
+
+// حد للويب هوك لمنع إنشاء ليدز spam
+const webhookLimiter = rateLimit({
+  windowMs: 60 * 1000, // دقيقة واحدة
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'طلبات ويب هوك كثيرة جداً' },
+});
+
+app.use('/api', generalLimiter);
+
+// ===== Static Uploads =====
 const uploadDir = path.resolve(config.upload.dir);
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 app.use('/uploads', express.static(uploadDir));
 
-app.get('/health', (_, res) => {
+// ===== Health Check =====
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', app: 'dolphin', version: '1.0.0' });
 });
 
-app.use('/api/auth', authRoutes);
-// ويب هوك استقبال الليدز من ووردبريس (بدون مصادقة)
-app.use('/api/webhooks', webhooksRoutes);
+// ===== Routes =====
+app.use('/api/auth', authLimiter, authRoutes);
+// ويب هوك استقبال الليدز من ووردبريس (بدون مصادقة - الاعتماد على token في الرابط)
+app.use('/api/webhooks', webhookLimiter, webhooksRoutes);
 app.use('/api/lead-statuses', authMiddleware, leadStatusesRoutes);
 app.use('/api/leads', authMiddleware, leadsRoutes);
 app.use('/api/users', authMiddleware, requirePermission('users.manage'), usersRoutes);
@@ -57,6 +119,16 @@ app.use('/api/woocommerce', authMiddleware, woocommerceRoutes);
 app.use('/api/form-connections', authMiddleware, formConnectionsRoutes);
 app.use('/api/notifications', authMiddleware, notificationsRoutes);
 app.use('/api/audit-logs', authMiddleware, auditLogsRoutes);
+
+// ===== Global Error Handler =====
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
+  console.error('[Global Error]', err.message);
+  if (err.message.startsWith('CORS:')) {
+    res.status(403).json({ error: err.message });
+    return;
+  }
+  res.status(500).json({ error: 'خطأ داخلي في الخادم' });
+});
 
 app.listen(config.port, () => {
   console.log(`دولفين API يعمل على المنفذ ${config.port}`);

@@ -100,20 +100,27 @@ export async function isConfigured(): Promise<boolean> {
   return !!c;
 }
 
-function authParams(cfg: WooCommerceConfig): URLSearchParams {
-  const p = new URLSearchParams();
-  p.set('consumer_key', cfg.consumerKey);
-  p.set('consumer_secret', cfg.consumerSecret);
-  return p;
+/**
+ * بناء Basic Auth header بدل إرسال credentials في URL
+ * هذا أأمن لأن credentials لا تظهر في server logs أو browser history
+ */
+function buildAuthHeader(cfg: WooCommerceConfig): string {
+  const credentials = Buffer.from(`${cfg.consumerKey}:${cfg.consumerSecret}`).toString('base64');
+  return `Basic ${credentials}`;
 }
 
 async function wcFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const cfg = await getWooCommerceConfig();
   if (!cfg) throw new Error('إعدادات ووكومرس غير مكتملة (أدخل البيانات من صفحة الربط أو متغيرات البيئة)');
-  const url = `${cfg.baseUrl}/wp-json/wc/v3${path}${path.includes('?') ? '&' : '?'}${authParams(cfg).toString()}`;
+
+  const url = `${cfg.baseUrl}/wp-json/wc/v3${path}`;
   const res = await fetch(url, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': buildAuthHeader(cfg),
+      ...options.headers,
+    },
   });
   if (!res.ok) {
     const text = await res.text();
