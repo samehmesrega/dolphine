@@ -13,7 +13,7 @@ const userSelect = {
   email: true,
   isActive: true,
   role: { select: { id: true, name: true, slug: true } },
-} as const;
+};
 
 // قائمة المستخدمين (اختياري: تضمين المعطّلين)
 router.get('/', async (req: AuthRequest, res: Response) => {
@@ -47,7 +47,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) {
-      const msg = parsed.error.errors.map((e) => e.message).join('؛ ');
+      const msg = parsed.error.issues.map((e) => e.message).join('؛ ');
       res.status(400).json({ error: msg });
       return;
     }
@@ -83,7 +83,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 
 // مستخدم واحد (للتعديل)
 router.get('/:id', async (req: AuthRequest, res: Response) => {
-  const id = req.params.id;
+  const id = String(req.params.id);
   const user = await prisma.user.findUnique({
     where: { id },
     select: userSelect,
@@ -106,7 +106,7 @@ const updateUserSchema = z.object({
 // تحديث مستخدم (تعديل / تعطيل)
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = String(req.params.id);
     const existing = await prisma.user.findUnique({ where: { id } });
     if (!existing) {
       res.status(404).json({ error: 'المستخدم غير موجود' });
