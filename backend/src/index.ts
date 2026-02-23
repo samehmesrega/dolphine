@@ -31,7 +31,7 @@ import { authMiddleware, requirePermission } from './middleware/auth';
 const app = express();
 
 // ===== Security Headers =====
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false }));
 
 // ===== CORS =====
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
