@@ -57,7 +57,7 @@ export default function ProductsPage() {
       }
       return { prevActive, prevHidden };
     },
-    onSuccess: (_data, id) => {
+    onSuccess: () => {
       invalidateProducts();
       // تأكد من إعادة جلب القوائم بعد النجاح
       qc.refetchQueries({ queryKey: ['products'] });
@@ -68,16 +68,6 @@ export default function ProductsPage() {
       if (context?.prevHidden != null) qc.setQueryData(['products-hidden'], context.prevHidden);
     },
   });
-
-  function getHideErrorMessage(): string {
-    const err = hideMutation.error as { response?: { status?: number; data?: { error?: string } }; message?: string } | undefined;
-    if (!err) return '';
-    const msg = err.response?.data?.error;
-    if (msg) return msg;
-    const status = err.response?.status;
-    if (status) return `فشل الطلب (${status})`;
-    return err.message || 'فشل تحويل المنتج لغير نشط. تحقق من الاتصال أو الصلاحيات.';
-  }
 
   const restoreMutation = useMutation({
     mutationFn: (id: string) => api.post(`/products/${id}/restore`),

@@ -124,7 +124,7 @@ export default function Dashboard() {
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                 <Tooltip
-                  formatter={(value: number) => [value, 'عدد الليدز']}
+                  formatter={(value: number | undefined) => [value ?? 0, 'عدد الليدز']}
                   labelFormatter={(label) => `التاريخ: ${label}`}
                 />
                 <Line type="monotone" dataKey="count" name="ليدز" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
@@ -158,7 +158,7 @@ export default function Dashboard() {
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value: number) => [value, 'العدد']} />
+                <Tooltip formatter={(value: number | undefined) => [value ?? 0, 'العدد']} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>
