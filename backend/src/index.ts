@@ -122,7 +122,11 @@ app.use('/api/audit-logs', authMiddleware, auditLogsRoutes);
 
 // ===== Frontend Static Files (Production) =====
 if (process.env.NODE_ENV === 'production') {
-  const frontendDist = path.join(__dirname, '../../frontend/dist');
+  // استخدام process.cwd() أكثر موثوقية من __dirname على Render
+  const frontendDist = path.join(process.cwd(), 'frontend', 'dist');
+  console.log('[Frontend] cwd:', process.cwd());
+  console.log('[Frontend] dist path:', frontendDist);
+  console.log('[Frontend] exists:', fs.existsSync(frontendDist));
   if (fs.existsSync(frontendDist)) {
     app.use(express.static(frontendDist));
     // SPA fallback — يرجع index.html لكل routes الـ React Router
