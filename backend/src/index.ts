@@ -120,6 +120,18 @@ app.use('/api/form-connections', authMiddleware, formConnectionsRoutes);
 app.use('/api/notifications', authMiddleware, notificationsRoutes);
 app.use('/api/audit-logs', authMiddleware, auditLogsRoutes);
 
+// ===== Frontend Static Files (Production) =====
+if (process.env.NODE_ENV === 'production') {
+  const frontendDist = path.join(__dirname, '../../frontend/dist');
+  if (fs.existsSync(frontendDist)) {
+    app.use(express.static(frontendDist));
+    // SPA fallback — يرجع index.html لكل routes الـ React Router
+    app.get('*', (_req: Request, res: Response) => {
+      res.sendFile(path.join(frontendDist, 'index.html'));
+    });
+  }
+}
+
 // ===== Global Error Handler =====
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[Global Error]', err.message);
