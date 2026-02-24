@@ -35,6 +35,7 @@ type LeadDetail = {
   whatsapp: string | null;
   email: string | null;
   address: string | null;
+  customFields: Record<string, string> | null;
   source: string;
   sourceDetail: string | null;
   createdAt: string;
@@ -348,6 +349,11 @@ export default function LeadDetailPage() {
                 {lead.whatsapp && <div><dt className="text-slate-500">واتساب</dt><dd>{lead.whatsapp}</dd></div>}
                 {lead.email && <div><dt className="text-slate-500">الإيميل</dt><dd>{lead.email}</dd></div>}
                 {lead.address && <div><dt className="text-slate-500">العنوان</dt><dd>{lead.address}</dd></div>}
+                {lead.customFields && Object.keys(lead.customFields).length > 0 && (
+                  Object.entries(lead.customFields).map(([key, val]) => (
+                    <div key={key}><dt className="text-slate-500">{key}</dt><dd>{String(val)}</dd></div>
+                  ))
+                )}
                 <div><dt className="text-slate-500">المصدر</dt><dd>{lead.source}</dd></div>
                 <div><dt className="text-slate-500">الحالة</dt><dd>{lead.status?.name}</dd></div>
                 <div>
