@@ -94,15 +94,15 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
 
     const phoneRaw = pickPhone(raw);
     if (!phoneRaw) {
-      console.log('[webhook] فشل: لم يُعثر على رقم هاتف. البيانات:', JSON.stringify(raw));
-      res.status(400).json({ error: 'رقم الهاتف مطلوب في بيانات النموذج' });
+      console.log('[webhook] تجاهل: لم يُعثر على رقم هاتف. البيانات:', JSON.stringify(raw));
+      res.status(200).json({ success: true, skipped: true, reason: 'no_phone' });
       return;
     }
 
     const phoneNormalized = normalizePhone(phoneRaw);
     if (!phoneNormalized) {
-      console.log('[webhook] فشل: رقم هاتف غير صالح:', phoneRaw);
-      res.status(400).json({ error: 'رقم هاتف غير صالح' });
+      console.log('[webhook] تجاهل: رقم هاتف غير صالح:', phoneRaw);
+      res.status(200).json({ success: true, skipped: true, reason: 'invalid_phone' });
       return;
     }
 
