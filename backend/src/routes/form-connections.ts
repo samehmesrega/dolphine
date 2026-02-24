@@ -5,6 +5,7 @@
 
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
+import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import crypto from 'crypto';
 
@@ -51,7 +52,7 @@ router.post('/', async (req: Request, res: Response) => {
         name: parsed.data.name,
         shortcode: parsed.data.shortcode || null,
         token,
-        fieldMapping: parsed.data.fieldMapping ?? null,
+        fieldMapping: (parsed.data.fieldMapping ?? Prisma.JsonNull) as Prisma.InputJsonValue,
       },
     });
     res.status(201).json({ connection });
@@ -77,7 +78,7 @@ router.patch('/:id/mapping', async (req: Request, res: Response) => {
     }
     const connection = await prisma.formConnection.update({
       where: { id },
-      data: { fieldMapping: parsed.data ?? null },
+      data: { fieldMapping: (parsed.data ?? Prisma.JsonNull) as Prisma.InputJsonValue },
     });
     res.json({ connection });
   } catch (err: unknown) {
