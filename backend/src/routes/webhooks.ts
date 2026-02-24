@@ -110,6 +110,14 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
     const email = pickEmail(raw);
     const address = pickAddress(raw);
 
+    // حفظ كل الحقول القادمة من الفورم في customFields
+    const customFields: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      if (v !== null && v !== undefined && String(v).trim() !== '') {
+        customFields[k] = v;
+      }
+    }
+
     const status = await prisma.leadStatus.findUnique({ where: { slug: 'new' } });
     if (!status) {
       console.error('[webhook] حالة الليد الافتراضية "new" غير موجودة في قاعدة البيانات');
@@ -141,6 +149,7 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
         phoneNormalized,
         email,
         address,
+        customFields,
         source: 'form',
         sourceDetail: connection.shortcode || connection.name,
         statusId: status.id,
