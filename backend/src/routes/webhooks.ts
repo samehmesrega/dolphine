@@ -71,6 +71,12 @@ function pickAddress(obj: Payload): string | undefined {
     const v = obj[k];
     if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 500);
   }
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase().includes('address') || k.toLowerCase().includes('street') || k.includes('عنوان')) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 500);
+    }
+  }
   return undefined;
 }
 
