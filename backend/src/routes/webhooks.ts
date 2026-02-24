@@ -131,8 +131,10 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
       : [];
     for (const def of customFieldDefs) {
       const val = String(raw[def.field] ?? '').trim();
+      console.log(`[webhook] customField: label="${def.label}" field="${def.field}" rawValue=${JSON.stringify(raw[def.field])} result="${val}"`);
       if (val) customFields[def.label] = val;
     }
+    console.log('[webhook] customFields المُجمَّعة:', JSON.stringify(customFields));
 
     const status = await prisma.leadStatus.findUnique({ where: { slug: 'new' } });
     if (!status) {
