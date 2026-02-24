@@ -149,7 +149,7 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
         phoneNormalized,
         email,
         address,
-        customFields,
+        customFields: customFields as object,
         source: 'form',
         sourceDetail: connection.shortcode || connection.name,
         statusId: status.id,
