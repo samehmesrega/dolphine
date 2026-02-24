@@ -11,6 +11,19 @@ const router = Router();
 
 type Payload = Record<string, unknown>;
 
+// Forminator يبعت البيانات كـ { fields: [{name, value}, ...] }
+// هنحوّلها لـ flat object قبل المعالجة
+function normalizeForminatorBody(body: Payload): Payload {
+  if (Array.isArray(body.fields)) {
+    const flat: Payload = {};
+    for (const field of body.fields as Array<{ name?: string; value?: unknown }>) {
+      if (field.name) flat[field.name] = field.value;
+    }
+    return flat;
+  }
+  return body;
+}
+
 function pickPhone(obj: Payload): string | null {
   const v = obj.phone ?? obj['your-phone'] ?? obj.tel ?? obj.mobile ?? obj['phone-1'] ?? obj['tel-1'];
   if (typeof v === 'string' && v.trim().length >= 6) return v.trim();
@@ -26,20 +39,38 @@ function pickPhone(obj: Payload): string | null {
 }
 
 function pickName(obj: Payload): string {
-  const v = obj.name ?? obj['your-name'];
-  if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 200);
+  for (const k of ['name', 'your-name', 'name-1', 'full-name', 'fullname', 'الاسم']) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 200);
+  }
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase().includes('name') || k.includes('اسم')) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 200);
+    }
+  }
   return 'وارد من النموذج';
 }
 
 function pickEmail(obj: Payload): string | undefined {
-  const v = obj.email ?? obj['your-email'];
-  if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 255);
+  for (const k of ['email', 'your-email', 'email-1', 'البريد']) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 255);
+  }
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase().includes('email') || k.includes('بريد')) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 255);
+    }
+  }
   return undefined;
 }
 
 function pickAddress(obj: Payload): string | undefined {
-  const v = obj.address ?? obj['your-address'];
-  if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 500);
+  for (const k of ['address', 'your-address', 'address-1', 'العنوان']) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 500);
+  }
   return undefined;
 }
 
@@ -58,7 +89,7 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
     if (typeof body !== 'object' || body === null) {
       body = {};
     }
-    const raw: Payload = body as Payload;
+    const raw: Payload = normalizeForminatorBody(body as Payload);
     console.log('[webhook] استلام طلب، الحقول:', Object.keys(raw).join(', ') || '(فارغ)');
 
     const phoneRaw = pickPhone(raw);
