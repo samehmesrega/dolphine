@@ -92,7 +92,13 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
     const raw: Payload = normalizeForminatorBody(body as Payload);
     console.log('[webhook] استلام طلب، الحقول:', Object.keys(raw).join(', ') || '(فارغ)');
 
-    const phoneRaw = pickPhone(raw);
+    // استخدام fieldMapping لو موجود، وإلا الكشف التلقائي
+    const mapping = (connection.fieldMapping ?? {}) as Record<string, string>;
+
+    const getField = (key: string): unknown =>
+      mapping[key] ? raw[mapping[key]] : undefined;
+
+    const phoneRaw = (mapping.phone ? String(getField('phone') ?? '').trim() : null) || pickPhone(raw);
     if (!phoneRaw) {
       console.log('[webhook] تجاهل: لم يُعثر على رقم هاتف. البيانات:', JSON.stringify(raw));
       res.status(200).json({ success: true, skipped: true, reason: 'no_phone' });
@@ -106,9 +112,13 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
       return;
     }
 
-    const name = pickName(raw);
-    const email = pickEmail(raw);
-    const address = pickAddress(raw);
+    const mappedName = mapping.name ? String(getField('name') ?? '').trim() : '';
+    const name = mappedName || pickName(raw);
+    const mappedEmail = mapping.email ? String(getField('email') ?? '').trim() : '';
+    const email = (mappedEmail || pickEmail(raw)) || undefined;
+    const mappedAddress = mapping.address ? String(getField('address') ?? '').trim() : '';
+    const address = (mappedAddress || pickAddress(raw)) || undefined;
+    const notes = mapping.notes ? String(getField('notes') ?? '').trim() : undefined;
 
     // حفظ كل الحقول القادمة من الفورم في customFields
     const customFields: Record<string, unknown> = {};
@@ -117,6 +127,7 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
         customFields[k] = v;
       }
     }
+    if (notes) customFields['notes'] = notes;
 
     const status = await prisma.leadStatus.findUnique({ where: { slug: 'new' } });
     if (!status) {

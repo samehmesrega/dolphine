@@ -315,11 +315,12 @@ model IntegrationSetting {
 // ============ اتصالات النماذج (ووردبريس → دولفين) ============
 
 model FormConnection {
-  id        String   @id @default(uuid())
-  name      String   // اسم توضيحي، يظهر كمصدر الليد
-  shortcode String?  @map("shortcode") // مثلاً [contact-form-7 id="123"] للتوثيق فقط
-  token     String   @unique // يُستخدم في رابط الويب هوك
-  createdAt DateTime @default(now()) @map("created_at")
+  id           String   @id @default(uuid())
+  name         String   // اسم توضيحي، يظهر كمصدر الليد
+  shortcode    String?  @map("shortcode") // مثلاً [contact-form-7 id="123"] للتوثيق فقط
+  token        String   @unique // يُستخدم في رابط الويب هوك
+  fieldMapping Json?    @map("field_mapping") // تعيين حقول الفورم: { name: "text-1", phone: "phone-1", ... }
+  createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("form_connections")
 }

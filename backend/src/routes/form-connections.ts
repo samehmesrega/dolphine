@@ -10,9 +10,18 @@ import crypto from 'crypto';
 
 const router = Router();
 
+const fieldMappingSchema = z.object({
+  name:    z.string().optional(),
+  phone:   z.string().optional(),
+  email:   z.string().optional(),
+  address: z.string().optional(),
+  notes:   z.string().optional(),
+}).optional();
+
 const createSchema = z.object({
-  name: z.string().min(1, 'الاسم مطلوب'),
-  shortcode: z.string().optional(),
+  name:         z.string().min(1, 'الاسم مطلوب'),
+  shortcode:    z.string().optional(),
+  fieldMapping: fieldMappingSchema,
 });
 
 // قائمة اتصالات النماذج
@@ -42,12 +51,38 @@ router.post('/', async (req: Request, res: Response) => {
         name: parsed.data.name,
         shortcode: parsed.data.shortcode || null,
         token,
+        fieldMapping: parsed.data.fieldMapping ?? null,
       },
     });
     res.status(201).json({ connection });
   } catch (err: unknown) {
     console.error('Create form connection error:', err);
     res.status(500).json({ error: 'خطأ في إنشاء اتصال النموذج' });
+  }
+});
+
+// تحديث field mapping
+router.patch('/:id/mapping', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const parsed = fieldMappingSchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({ error: 'بيانات غير صحيحة' });
+      return;
+    }
+    const existing = await prisma.formConnection.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'الاتصال غير موجود' });
+      return;
+    }
+    const connection = await prisma.formConnection.update({
+      where: { id },
+      data: { fieldMapping: parsed.data ?? null },
+    });
+    res.json({ connection });
+  } catch (err: unknown) {
+    console.error('Update field mapping error:', err);
+    res.status(500).json({ error: 'خطأ في تحديث الـ mapping' });
   }
 });
 

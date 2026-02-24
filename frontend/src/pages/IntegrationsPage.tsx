@@ -4,11 +4,20 @@ import api from '../services/api';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
+type FieldMapping = {
+  name?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+};
+
 type FormConnection = {
   id: string;
   name: string;
   shortcode: string | null;
   token: string;
+  fieldMapping: FieldMapping | null;
   createdAt: string;
 };
 
@@ -50,6 +59,94 @@ function useWooConfig() {
   });
 }
 
+const MAPPING_FIELDS: { key: keyof FieldMapping; label: string; placeholder: string }[] = [
+  { key: 'name',    label: 'الاسم',         placeholder: 'مثال: text-1 أو name-1' },
+  { key: 'phone',   label: 'التليفون',       placeholder: 'مثال: phone-1' },
+  { key: 'email',   label: 'الإيميل',        placeholder: 'مثال: email-1 (اختياري)' },
+  { key: 'address', label: 'العنوان',        placeholder: 'مثال: textarea-1 (اختياري)' },
+  { key: 'notes',   label: 'حقل مخصص/ملاحظات', placeholder: 'مثال: textarea-2 (اختياري)' },
+];
+
+function MappingEditor({ connection }: { connection: FormConnection }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [mapping, setMapping] = useState<FieldMapping>(connection.fieldMapping ?? {});
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: FieldMapping) => {
+      await api.patch(`/form-connections/${connection.id}/mapping`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['form-connections'] });
+      setOpen(false);
+    },
+  });
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-3">
+      <button
+        type="button"
+        onClick={() => {
+          setMapping(connection.fieldMapping ?? {});
+          setOpen(!open);
+        }}
+        className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+      >
+        {open ? 'إخفاء' : 'ضبط تعيين الحقول'}
+        {connection.fieldMapping && !open && (
+          <span className="mr-1 text-green-600 text-xs">(مضبوط)</span>
+        )}
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-2 max-w-lg">
+          <p className="text-xs text-slate-500 mb-3">
+            اكتب اسم الحقل كما هو في Forminator (الـ Element ID). اتركه فارغاً للكشف التلقائي.
+          </p>
+          {MAPPING_FIELDS.map(({ key, label, placeholder }) => (
+            <div key={key} className="flex items-center gap-2">
+              <label className="text-sm text-slate-700 w-32 shrink-0">{label}</label>
+              <input
+                type="text"
+                value={mapping[key] ?? ''}
+                onChange={(e) => setMapping((prev) => ({ ...prev, [key]: e.target.value }))}
+                placeholder={placeholder}
+                className="border border-slate-300 rounded px-2 py-1 text-sm flex-1 font-mono"
+              />
+            </div>
+          ))}
+          <div className="flex items-center gap-3 mt-3">
+            <button
+              type="button"
+              onClick={() => {
+                const cleaned: FieldMapping = {};
+                for (const { key } of MAPPING_FIELDS) {
+                  const v = mapping[key]?.trim();
+                  if (v) cleaned[key] = v;
+                }
+                saveMutation.mutate(cleaned);
+              }}
+              disabled={saveMutation.isPending}
+              className="bg-slate-700 text-white px-3 py-1.5 rounded text-sm hover:bg-slate-600 disabled:opacity-50"
+            >
+              {saveMutation.isPending ? 'جاري الحفظ...' : 'حفظ التعيين'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="text-sm text-slate-500 hover:text-slate-700"
+            >
+              إلغاء
+            </button>
+          </div>
+          {saveMutation.isSuccess && <p className="text-green-600 text-xs">تم الحفظ.</p>}
+          {saveMutation.isError && <p className="text-red-600 text-xs">حدث خطأ أثناء الحفظ.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function IntegrationsPage() {
   const queryClient = useQueryClient();
   const { data: connections = [], isLoading: loadingConn } = useFormConnections();
@@ -73,7 +170,6 @@ export default function IntegrationsPage() {
     },
   });
 
-  // تعبئة حقول ووكومرس عند تحميل الإعدادات الحالية
   React.useEffect(() => {
     if (wooConfig) {
       setWooBaseUrl(wooConfig.baseUrl);
@@ -113,7 +209,7 @@ export default function IntegrationsPage() {
     <div className="space-y-8">
       <h1 className="text-2xl font-bold text-slate-800">الربط مع ووردبريس وووكومرس</h1>
 
-      {/* ووكومرس - إدخال من الواجهة */}
+      {/* ووكومرس */}
       <section className="bg-white rounded-xl shadow p-6">
         <h2 className="text-lg font-semibold text-slate-800 mb-2">ووكومرس</h2>
         <p className="text-slate-600 text-sm mb-4">
@@ -148,12 +244,12 @@ export default function IntegrationsPage() {
               }}
             >
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">رابط الموقع (اسم السايت)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">رابط الموقع</label>
                 <input
                   type="url"
                   value={wooBaseUrl}
                   onChange={(e) => setWooBaseUrl(e.target.value)}
-                  placeholder="https://printin.org"
+                  placeholder="https://example.com"
                   className="border border-slate-300 rounded-lg px-3 py-2 w-full"
                 />
               </div>
@@ -202,8 +298,6 @@ export default function IntegrationsPage() {
                     const e = saveWooMutation.error as { response?: { data?: { error?: string }; status?: number } };
                     const apiError = e?.response?.data?.error;
                     if (typeof apiError === 'string') return apiError;
-                    if (e?.response?.status === 500)
-                      return 'خطأ في الخادم. شغّل في مجلد الـ Backend: npx prisma db push ثم أعد تشغيل الـ Backend.';
                     return (saveWooMutation.error as Error)?.message || 'حدث خطأ';
                   })()}
                 </p>
@@ -218,23 +312,23 @@ export default function IntegrationsPage() {
       <section className="bg-white rounded-xl shadow p-6">
         <h2 className="text-lg font-semibold text-slate-800 mb-2">نماذج ووردبريس → ليدز</h2>
         <p className="text-slate-600 text-sm mb-4">
-          أنشئ اتصالاً لكل نموذج (مثلاً نموذج اتصل بنا)، ثم انسخ رابط الويب هوك وضعه في بلجن ووردبريس. أي إرسال من النموذج سيظهر كليد في التطبيق تلقائياً.
+          أنشئ اتصالاً لكل نموذج، انسخ رابط الويب هوك وضعه في Forminator، ثم اضبط تعيين الحقول لتحديد أي حقل يقابل أي معلومة في الليد.
         </p>
 
         <div className="mb-6 flex flex-wrap gap-3">
           <input
             type="text"
-            placeholder="اسم الاتصال (مثلاً: نموذج اتصل بنا)"
+            placeholder="اسم الاتصال (مثلاً: لاندنج الكورس)"
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="border border-slate-300 rounded-lg px-3 py-2 w-64"
           />
           <input
             type="text"
-            placeholder="Shortcode الفورم (اختياري، للتوثيق)"
+            placeholder="Shortcode (اختياري)"
             value={shortcode}
             onChange={(e) => setShortcode(e.target.value)}
-            className="border border-slate-300 rounded-lg px-3 py-2 w-64"
+            className="border border-slate-300 rounded-lg px-3 py-2 w-48"
           />
           <button
             type="button"
@@ -255,38 +349,38 @@ export default function IntegrationsPage() {
         {loadingConn ? (
           <p className="text-slate-500">جاري تحميل الاتصالات...</p>
         ) : connections.length === 0 ? (
-          <p className="text-slate-500">لا توجد اتصالات. أضف اتصالاً ثم انسخ الرابط إلى بلجن ووردبريس.</p>
+          <p className="text-slate-500">لا توجد اتصالات. أضف اتصالاً ثم انسخ الرابط إلى Forminator.</p>
         ) : (
           <ul className="space-y-4">
             {connections.map((c) => (
-              <li
-                key={c.id}
-                className="border border-slate-200 rounded-lg p-4 flex flex-wrap items-center gap-3 justify-between"
-              >
-                <div>
-                  <p className="font-medium text-slate-800">{c.name}</p>
-                  {c.shortcode && <p className="text-sm text-slate-500 font-mono">{c.shortcode}</p>}
+              <li key={c.id} className="border border-slate-200 rounded-lg p-4">
+                <div className="flex flex-wrap items-start gap-3 justify-between">
+                  <div>
+                    <p className="font-medium text-slate-800">{c.name}</p>
+                    {c.shortcode && <p className="text-sm text-slate-500 font-mono">{c.shortcode}</p>}
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <code className="text-xs bg-slate-100 px-2 py-1 rounded max-w-xs truncate block">
+                      {webhookUrl(c.token)}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={() => copyUrl(c.id, c.token)}
+                      className="text-sm bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded"
+                    >
+                      {copiedId === c.id ? 'تم النسخ' : 'نسخ الرابط'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => window.confirm('حذف هذا الاتصال؟') && deleteMutation.mutate(c.id)}
+                      disabled={deleteMutation.isPending}
+                      className="text-sm text-red-600 hover:text-red-700"
+                    >
+                      حذف
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <code className="text-xs bg-slate-100 px-2 py-1 rounded max-w-md truncate block">
-                    {webhookUrl(c.token)}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => copyUrl(c.id, c.token)}
-                    className="text-sm bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded"
-                  >
-                    {copiedId === c.id ? 'تم النسخ' : 'نسخ الرابط'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => window.confirm('حذف هذا الاتصال؟') && deleteMutation.mutate(c.id)}
-                    disabled={deleteMutation.isPending}
-                    className="text-sm text-red-600 hover:text-red-700"
-                  >
-                    حذف
-                  </button>
-                </div>
+                <MappingEditor connection={c} />
               </li>
             ))}
           </ul>
