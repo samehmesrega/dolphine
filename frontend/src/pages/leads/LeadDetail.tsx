@@ -25,6 +25,7 @@ type ProductInterest = {
   product: { id: string; name: string } | null;
   quantity: number;
   notes: string | null;
+  customFields: Record<string, string> | null;
   createdAt: string;
 };
 
@@ -578,6 +579,13 @@ export default function LeadDetailPage() {
                   <span className="font-medium">{pi.product?.name ?? 'منتج (بدون ربط)'}</span>
                   <span className="text-slate-500 text-sm mr-2"> × {pi.quantity}</span>
                   {pi.notes && <p className="text-sm text-slate-600 mt-1">{pi.notes}</p>}
+                  {pi.customFields && Object.keys(pi.customFields).length > 0 && (
+                    <div className="mt-1 space-y-0.5">
+                      {Object.entries(pi.customFields).map(([k, v]) => (
+                        <p key={k} className="text-xs text-slate-500"><span className="font-medium text-slate-600">{k}:</span> {String(v)}</p>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"

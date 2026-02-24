@@ -111,6 +111,7 @@ router.post('/sync-products', async (_req: Request, res: Response) => {
             slug: p.slug || null,
             data: { id: p.id, name: p.name, slug: p.slug, price: p.price } as object,
             variations: (p.variations ? { ids: p.variations } : undefined) as object | undefined,
+            isActive: false,
           },
         });
         total++;

@@ -12,6 +12,7 @@ const navItems: { to: string; label: string; permission?: string }[] = [
   { to: '/products', label: 'منتجات', permission: 'products.view' },
   { to: '/shifts', label: 'شيفتات', permission: 'shifts.manage' },
   { to: '/users', label: 'حسابات', permission: 'users.manage' },
+  { to: '/roles', label: 'الأدوار والصلاحيات', permission: 'users.manage' },
   { to: '/integrations', label: 'الربط (ووردبريس / ووكومرس)', permission: 'integrations.manage' },
   { to: '/audit', label: 'سجل التدقيق', permission: 'audit.view' },
 ];

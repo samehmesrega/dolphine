@@ -26,13 +26,53 @@ router.get('/', async (req: AuthRequest, res: Response) => {
   res.json({ users });
 });
 
-// قائمة الأدوار (للقوائم المنسدلة)
+// قائمة الأدوار مع الصلاحيات
 router.get('/roles', async (_req: AuthRequest, res: Response) => {
   const roles = await prisma.role.findMany({
     orderBy: { name: 'asc' },
-    select: { id: true, name: true, slug: true },
+    include: { rolePermissions: { include: { permission: true } } },
   });
   res.json({ roles });
+});
+
+// قائمة كل الصلاحيات المتاحة
+router.get('/permissions', async (_req: AuthRequest, res: Response) => {
+  const permissions = await prisma.permission.findMany({
+    orderBy: [{ module: 'asc' }, { name: 'asc' }],
+  });
+  res.json({ permissions });
+});
+
+// تحديث صلاحيات دور معين
+router.put('/roles/:id/permissions', async (req: AuthRequest, res: Response) => {
+  try {
+    const roleId = String(req.params.id);
+    const { permissionIds } = req.body as { permissionIds: string[] };
+    if (!Array.isArray(permissionIds)) {
+      res.status(400).json({ error: 'permissionIds يجب أن يكون مصفوفة' });
+      return;
+    }
+    const role = await prisma.role.findUnique({ where: { id: roleId } });
+    if (!role) { res.status(404).json({ error: 'الدور غير موجود' }); return; }
+    if (role.slug === 'super_admin') {
+      res.status(403).json({ error: 'لا يمكن تعديل صلاحيات المدير العام' });
+      return;
+    }
+    await prisma.$transaction([
+      prisma.rolePermission.deleteMany({ where: { roleId } }),
+      prisma.rolePermission.createMany({
+        data: permissionIds.map((permissionId) => ({ roleId, permissionId })),
+      }),
+    ]);
+    const updatedRole = await prisma.role.findUnique({
+      where: { id: roleId },
+      include: { rolePermissions: { include: { permission: true } } },
+    });
+    res.json({ role: updatedRole });
+  } catch (err) {
+    console.error('Update role permissions error:', err);
+    res.status(500).json({ error: 'خطأ في تحديث الصلاحيات' });
+  }
 });
 
 const createUserSchema = z.object({

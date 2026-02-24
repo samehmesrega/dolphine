@@ -4,7 +4,7 @@ import api from '../services/api';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
-type CustomFieldDef = { label: string; field: string };
+type CustomFieldDef = { label: string; field: string; type?: 'customer' | 'product' };
 
 type FieldMapping = {
   name?: string;
@@ -20,8 +20,12 @@ type FormConnection = {
   shortcode: string | null;
   token: string;
   fieldMapping: FieldMapping | null;
+  productId: string | null;
+  product: { id: string; name: string } | null;
   createdAt: string;
 };
+
+type Product = { id: string; name: string };
 
 function useFormConnections() {
   return useQuery({
@@ -61,6 +65,16 @@ function useWooConfig() {
   });
 }
 
+function useProducts() {
+  return useQuery({
+    queryKey: ['products'],
+    queryFn: async () => {
+      const { data } = await api.get<{ products: Product[] }>('/products');
+      return data.products;
+    },
+  });
+}
+
 const CORE_FIELDS: { key: keyof Omit<FieldMapping, 'customFields'>; label: string; placeholder: string }[] = [
   { key: 'name',    label: 'الاسم',    placeholder: 'مثال: text-1' },
   { key: 'phone',   label: 'التليفون', placeholder: 'مثال: phone-1' },
@@ -75,6 +89,9 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
   const [customFields, setCustomFields] = useState<CustomFieldDef[]>(
     connection.fieldMapping?.customFields ?? []
   );
+  const [selectedProductId, setSelectedProductId] = useState<string>(connection.productId ?? '');
+
+  const { data: products } = useProducts();
 
   const saveMutation = useMutation({
     mutationFn: async (data: FieldMapping) => {
@@ -83,6 +100,15 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['form-connections'] });
       setOpen(false);
+    },
+  });
+
+  const productMutation = useMutation({
+    mutationFn: async () => {
+      await api.patch(`/form-connections/${connection.id}`, { productId: selectedProductId || null });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['form-connections'] });
     },
   });
 
@@ -107,6 +133,7 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
     const validCustom = customFields.filter((f) => f.label.trim() && f.field.trim());
     if (validCustom.length > 0) cleaned.customFields = validCustom;
     saveMutation.mutate(cleaned);
+    productMutation.mutate();
   };
 
   return (
@@ -116,6 +143,7 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
         onClick={() => {
           setMapping(connection.fieldMapping ?? {});
           setCustomFields(connection.fieldMapping?.customFields ?? []);
+          setSelectedProductId(connection.productId ?? '');
           setOpen(!open);
         }}
         className="text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -124,6 +152,9 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
         {connection.fieldMapping && !open && (
           <span className="mr-1 text-green-600 text-xs">(مضبوط)</span>
         )}
+        {connection.product && !open && (
+          <span className="mr-2 text-purple-600 text-xs">({connection.product.name})</span>
+        )}
       </button>
 
       {open && (
@@ -131,6 +162,25 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
           <p className="text-xs text-slate-500">
             اكتب الـ Element ID للحقل كما هو في Forminator. اتركه فارغاً للكشف التلقائي.
           </p>
+
+          {/* المنتج المرتبط بالفورم */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">المنتج المرتبط</p>
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-slate-700 w-24 shrink-0">المنتج</label>
+              <select
+                value={selectedProductId}
+                onChange={(e) => setSelectedProductId(e.target.value)}
+                className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+              >
+                <option value="">-- بدون منتج --</option>
+                {(products ?? []).map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-xs text-slate-400">اختر المنتج اللي يتسجل اهتمام به تلقائياً عند وصول ليد من هذا الفورم</p>
+          </div>
 
           {/* الحقول الأساسية */}
           <div className="space-y-2">
@@ -169,6 +219,14 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
                   placeholder="ID في Forminator (مثال: text-2)"
                   className="border border-slate-300 rounded px-2 py-1 text-sm flex-1 font-mono"
                 />
+                <select
+                  value={cf.type ?? 'customer'}
+                  onChange={(e) => updateCustomField(i, 'type', e.target.value as 'customer' | 'product')}
+                  className="border border-slate-300 rounded px-2 py-1 text-sm w-36"
+                >
+                  <option value="customer">بيانات عميل</option>
+                  <option value="product">بيانات منتج</option>
+                </select>
                 <button
                   type="button"
                   onClick={() => removeCustomField(i)}
@@ -191,10 +249,10 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
             <button
               type="button"
               onClick={handleSave}
-              disabled={saveMutation.isPending}
+              disabled={saveMutation.isPending || productMutation.isPending}
               className="bg-slate-700 text-white px-3 py-1.5 rounded text-sm hover:bg-slate-600 disabled:opacity-50"
             >
-              {saveMutation.isPending ? 'جاري الحفظ...' : 'حفظ التعيين'}
+              {(saveMutation.isPending || productMutation.isPending) ? 'جاري الحفظ...' : 'حفظ التعيين'}
             </button>
             <button
               type="button"

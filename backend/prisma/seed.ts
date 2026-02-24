@@ -16,6 +16,7 @@ async function main() {
     { name: 'موظف سيلز', slug: 'sales' },
     { name: 'موظف حسابات', slug: 'accounts' },
     { name: 'مسئول أوبريشنز', slug: 'operations' },
+    { name: 'عضو فريق ماركتينج', slug: 'marketing' },
   ];
 
   for (const r of roles) {
@@ -112,6 +113,22 @@ async function main() {
           where: { roleId_permissionId: { roleId: opsRole.id, permissionId: perm.id } },
           update: {},
           create: { roleId: opsRole.id, permissionId: perm.id },
+        });
+      }
+    }
+  }
+
+  // ماركتينج: داشبورد، ليدز (عرض فقط)
+  const marketingRole = await prisma.role.findUnique({ where: { slug: 'marketing' } });
+  if (marketingRole) {
+    const slugs = ['dashboard.view', 'leads.view'];
+    for (const slug of slugs) {
+      const perm = await prisma.permission.findUnique({ where: { slug } });
+      if (perm) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: marketingRole.id, permissionId: perm.id } },
+          update: {},
+          create: { roleId: marketingRole.id, permissionId: perm.id },
         });
       }
     }

@@ -253,6 +253,7 @@ model Product {
 
   productInterests ProductInterest[]
   orderItems    OrderItem[]
+  formConnections FormConnection[]
 
   @@map("products")
 }
@@ -320,6 +321,8 @@ model FormConnection {
   shortcode    String?  @map("shortcode") // مثلاً [contact-form-7 id="123"] للتوثيق فقط
   token        String   @unique // يُستخدم في رابط الويب هوك
   fieldMapping Json?    @map("field_mapping") // تعيين حقول الفورم: { name: "text-1", phone: "phone-1", ... }
+  productId    String?  @map("product_id")
+  product      Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   createdAt    DateTime @default(now()) @map("created_at")
 
   @@map("form_connections")

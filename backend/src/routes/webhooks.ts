@@ -125,16 +125,24 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
     const mappedAddress = mapping.address ? String(getField('address') ?? '').trim() : '';
     const address = (mappedAddress || pickAddress(raw)) || undefined;
     // الحقول المخصصة التي عرّفها المستخدم في الـ mapping
-    const customFields: Record<string, unknown> = {};
+    const leadCustomFields: Record<string, unknown> = {};
+    const productCustomFields: Record<string, unknown> = {};
     const customFieldDefs = Array.isArray(mapping.customFields)
-      ? (mapping.customFields as Array<{ label: string; field: string }>)
+      ? (mapping.customFields as Array<{ label: string; field: string; type?: string }>)
       : [];
     for (const def of customFieldDefs) {
       const val = String(raw[def.field] ?? '').trim();
-      console.log(`[webhook] customField: label="${def.label}" field="${def.field}" rawValue=${JSON.stringify(raw[def.field])} result="${val}"`);
-      if (val) customFields[def.label] = val;
+      console.log(`[webhook] customField: label="${def.label}" field="${def.field}" type="${def.type ?? 'customer'}" rawValue=${JSON.stringify(raw[def.field])} result="${val}"`);
+      if (val) {
+        if ((def as { label: string; field: string; type?: string }).type === 'product') {
+          productCustomFields[def.label] = val;
+        } else {
+          leadCustomFields[def.label] = val;
+        }
+      }
     }
-    console.log('[webhook] customFields المُجمَّعة:', JSON.stringify(customFields));
+    console.log('[webhook] leadCustomFields:', JSON.stringify(leadCustomFields));
+    console.log('[webhook] productCustomFields:', JSON.stringify(productCustomFields));
 
     const status = await prisma.leadStatus.findUnique({ where: { slug: 'new' } });
     if (!status) {
@@ -167,7 +175,7 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
         phoneNormalized,
         email,
         address,
-        customFields: customFields as object,
+        customFields: leadCustomFields as object,
         source: 'form',
         sourceDetail: connection.shortcode || connection.name,
         statusId: status.id,
@@ -176,6 +184,18 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
       },
       include: { status: true, customer: true, assignedTo: { select: { id: true, name: true } } },
     });
+
+    if (connection.productId) {
+      await prisma.productInterest.create({
+        data: {
+          leadId: lead.id,
+          productId: connection.productId,
+          quantity: 1,
+          customFields: productCustomFields as object,
+        },
+      });
+      console.log('[webhook] تم إنشاء اهتمام منتج تلقائياً للمنتج:', connection.productId);
+    }
 
     console.log('[webhook] تم إنشاء ليد:', lead.id, lead.name);
     res.status(201).json({ success: true, lead: { id: lead.id, name: lead.name } });

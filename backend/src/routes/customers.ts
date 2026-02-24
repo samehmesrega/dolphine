@@ -12,13 +12,15 @@ router.get('/', async (req: Request, res: Response) => {
     const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize), 10) || 20));
 
-    const where: { OR?: Array<{ phone?: { contains: string; mode: 'insensitive' }; name?: { contains: string; mode: 'insensitive' } }> } = {};
-    if (search) {
-      where.OR = [
-        { phone: { contains: search, mode: 'insensitive' } },
-        { name: { contains: search, mode: 'insensitive' } },
-      ];
-    }
+    const where = {
+      leads: { some: { status: { slug: 'confirmed' } } },
+      ...(search ? {
+        OR: [
+          { phone: { contains: search, mode: 'insensitive' as const } },
+          { name: { contains: search, mode: 'insensitive' as const } },
+        ],
+      } : {}),
+    };
 
     const [total, customers] = await prisma.$transaction([
       prisma.customer.count({ where }),

@@ -19,6 +19,7 @@ const fieldMappingSchema = z.object({
   customFields: z.array(z.object({
     label: z.string().min(1),
     field: z.string().min(1),
+    type: z.enum(['customer', 'product']).default('customer').optional(),
   })).optional(),
 }).optional();
 
@@ -26,6 +27,7 @@ const createSchema = z.object({
   name:         z.string().min(1, 'الاسم مطلوب'),
   shortcode:    z.string().optional(),
   fieldMapping: fieldMappingSchema,
+  productId:    z.string().uuid().optional(),
 });
 
 // قائمة اتصالات النماذج
@@ -33,6 +35,7 @@ router.get('/', async (_req: Request, res: Response) => {
   try {
     const connections = await prisma.formConnection.findMany({
       orderBy: { createdAt: 'desc' },
+      include: { product: { select: { id: true, name: true } } },
     });
     res.json({ connections });
   } catch (err: unknown) {
@@ -56,12 +59,32 @@ router.post('/', async (req: Request, res: Response) => {
         shortcode: parsed.data.shortcode || null,
         token,
         fieldMapping: (parsed.data.fieldMapping ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+        productId: parsed.data.productId || null,
       },
     });
     res.status(201).json({ connection });
   } catch (err: unknown) {
     console.error('Create form connection error:', err);
     res.status(500).json({ error: 'خطأ في إنشاء اتصال النموذج' });
+  }
+});
+
+// تحديث productId
+router.patch('/:id', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const { productId } = req.body as { productId?: string | null };
+    const existing = await prisma.formConnection.findUnique({ where: { id } });
+    if (!existing) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
+    const connection = await prisma.formConnection.update({
+      where: { id },
+      data: { productId: productId || null },
+      include: { product: { select: { id: true, name: true } } },
+    });
+    res.json({ connection });
+  } catch (err: unknown) {
+    console.error('Update connection error:', err);
+    res.status(500).json({ error: 'خطأ في تحديث الاتصال' });
   }
 });
 
