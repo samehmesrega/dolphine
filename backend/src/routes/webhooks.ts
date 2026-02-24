@@ -118,16 +118,15 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
     const email = (mappedEmail || pickEmail(raw)) || undefined;
     const mappedAddress = mapping.address ? String(getField('address') ?? '').trim() : '';
     const address = (mappedAddress || pickAddress(raw)) || undefined;
-    const notes = mapping.notes ? String(getField('notes') ?? '').trim() : undefined;
-
-    // حفظ كل الحقول القادمة من الفورم في customFields
+    // الحقول المخصصة التي عرّفها المستخدم في الـ mapping
     const customFields: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(raw)) {
-      if (v !== null && v !== undefined && String(v).trim() !== '') {
-        customFields[k] = v;
-      }
+    const customFieldDefs = Array.isArray(mapping.customFields)
+      ? (mapping.customFields as Array<{ label: string; field: string }>)
+      : [];
+    for (const def of customFieldDefs) {
+      const val = String(raw[def.field] ?? '').trim();
+      if (val) customFields[def.label] = val;
     }
-    if (notes) customFields['notes'] = notes;
 
     const status = await prisma.leadStatus.findUnique({ where: { slug: 'new' } });
     if (!status) {

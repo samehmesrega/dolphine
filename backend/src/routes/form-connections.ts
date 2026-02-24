@@ -12,11 +12,14 @@ import crypto from 'crypto';
 const router = Router();
 
 const fieldMappingSchema = z.object({
-  name:    z.string().optional(),
-  phone:   z.string().optional(),
-  email:   z.string().optional(),
-  address: z.string().optional(),
-  notes:   z.string().optional(),
+  name:         z.string().optional(),
+  phone:        z.string().optional(),
+  email:        z.string().optional(),
+  address:      z.string().optional(),
+  customFields: z.array(z.object({
+    label: z.string().min(1),
+    field: z.string().min(1),
+  })).optional(),
 }).optional();
 
 const createSchema = z.object({

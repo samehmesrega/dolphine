@@ -4,12 +4,14 @@ import api from '../services/api';
 
 const apiBase = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? window.location.origin : '');
 
+type CustomFieldDef = { label: string; field: string };
+
 type FieldMapping = {
   name?: string;
   phone?: string;
   email?: string;
   address?: string;
-  notes?: string;
+  customFields?: CustomFieldDef[];
 };
 
 type FormConnection = {
@@ -59,18 +61,20 @@ function useWooConfig() {
   });
 }
 
-const MAPPING_FIELDS: { key: keyof FieldMapping; label: string; placeholder: string }[] = [
-  { key: 'name',    label: 'الاسم',         placeholder: 'مثال: text-1 أو name-1' },
-  { key: 'phone',   label: 'التليفون',       placeholder: 'مثال: phone-1' },
-  { key: 'email',   label: 'الإيميل',        placeholder: 'مثال: email-1 (اختياري)' },
-  { key: 'address', label: 'العنوان',        placeholder: 'مثال: textarea-1 (اختياري)' },
-  { key: 'notes',   label: 'حقل مخصص/ملاحظات', placeholder: 'مثال: textarea-2 (اختياري)' },
+const CORE_FIELDS: { key: keyof Omit<FieldMapping, 'customFields'>; label: string; placeholder: string }[] = [
+  { key: 'name',    label: 'الاسم',    placeholder: 'مثال: text-1' },
+  { key: 'phone',   label: 'التليفون', placeholder: 'مثال: phone-1' },
+  { key: 'email',   label: 'الإيميل',  placeholder: 'مثال: email-1 (اختياري)' },
+  { key: 'address', label: 'العنوان',  placeholder: 'مثال: textarea-1 (اختياري)' },
 ];
 
 function MappingEditor({ connection }: { connection: FormConnection }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [mapping, setMapping] = useState<FieldMapping>(connection.fieldMapping ?? {});
+  const [customFields, setCustomFields] = useState<CustomFieldDef[]>(
+    connection.fieldMapping?.customFields ?? []
+  );
 
   const saveMutation = useMutation({
     mutationFn: async (data: FieldMapping) => {
@@ -82,12 +86,36 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
     },
   });
 
+  const addCustomField = () => {
+    setCustomFields((prev) => [...prev, { label: '', field: '' }]);
+  };
+
+  const updateCustomField = (i: number, key: keyof CustomFieldDef, val: string) => {
+    setCustomFields((prev) => prev.map((f, idx) => idx === i ? { ...f, [key]: val } : f));
+  };
+
+  const removeCustomField = (i: number) => {
+    setCustomFields((prev) => prev.filter((_, idx) => idx !== i));
+  };
+
+  const handleSave = () => {
+    const cleaned: FieldMapping = {};
+    for (const { key } of CORE_FIELDS) {
+      const v = mapping[key]?.trim();
+      if (v) cleaned[key] = v;
+    }
+    const validCustom = customFields.filter((f) => f.label.trim() && f.field.trim());
+    if (validCustom.length > 0) cleaned.customFields = validCustom;
+    saveMutation.mutate(cleaned);
+  };
+
   return (
     <div className="mt-3 border-t border-slate-100 pt-3">
       <button
         type="button"
         onClick={() => {
           setMapping(connection.fieldMapping ?? {});
+          setCustomFields(connection.fieldMapping?.customFields ?? []);
           setOpen(!open);
         }}
         className="text-sm text-blue-600 hover:text-blue-700 font-medium"
@@ -99,33 +127,70 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
       </button>
 
       {open && (
-        <div className="mt-3 space-y-2 max-w-lg">
-          <p className="text-xs text-slate-500 mb-3">
-            اكتب اسم الحقل كما هو في Forminator (الـ Element ID). اتركه فارغاً للكشف التلقائي.
+        <div className="mt-3 max-w-xl space-y-4">
+          <p className="text-xs text-slate-500">
+            اكتب الـ Element ID للحقل كما هو في Forminator. اتركه فارغاً للكشف التلقائي.
           </p>
-          {MAPPING_FIELDS.map(({ key, label, placeholder }) => (
-            <div key={key} className="flex items-center gap-2">
-              <label className="text-sm text-slate-700 w-32 shrink-0">{label}</label>
-              <input
-                type="text"
-                value={mapping[key] ?? ''}
-                onChange={(e) => setMapping((prev) => ({ ...prev, [key]: e.target.value }))}
-                placeholder={placeholder}
-                className="border border-slate-300 rounded px-2 py-1 text-sm flex-1 font-mono"
-              />
-            </div>
-          ))}
-          <div className="flex items-center gap-3 mt-3">
+
+          {/* الحقول الأساسية */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">الحقول الأساسية</p>
+            {CORE_FIELDS.map(({ key, label, placeholder }) => (
+              <div key={key} className="flex items-center gap-2">
+                <label className="text-sm text-slate-700 w-24 shrink-0">{label}</label>
+                <input
+                  type="text"
+                  value={mapping[key] ?? ''}
+                  onChange={(e) => setMapping((prev) => ({ ...prev, [key]: e.target.value }))}
+                  placeholder={placeholder}
+                  className="border border-slate-300 rounded px-2 py-1 text-sm flex-1 font-mono"
+                />
+              </div>
+            ))}
+          </div>
+
+          {/* الحقول المخصصة */}
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">حقول مخصصة</p>
+            {customFields.map((cf, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={cf.label}
+                  onChange={(e) => updateCustomField(i, 'label', e.target.value)}
+                  placeholder="اسم الحقل (مثال: الصفة)"
+                  className="border border-slate-300 rounded px-2 py-1 text-sm w-36"
+                />
+                <span className="text-slate-400 text-sm">←</span>
+                <input
+                  type="text"
+                  value={cf.field}
+                  onChange={(e) => updateCustomField(i, 'field', e.target.value)}
+                  placeholder="ID في Forminator (مثال: text-2)"
+                  className="border border-slate-300 rounded px-2 py-1 text-sm flex-1 font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => removeCustomField(i)}
+                  className="text-red-500 hover:text-red-700 text-sm px-1"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
             <button
               type="button"
-              onClick={() => {
-                const cleaned: FieldMapping = {};
-                for (const { key } of MAPPING_FIELDS) {
-                  const v = mapping[key]?.trim();
-                  if (v) cleaned[key] = v;
-                }
-                saveMutation.mutate(cleaned);
-              }}
+              onClick={addCustomField}
+              className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50"
+            >
+              + إضافة حقل مخصص
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSave}
               disabled={saveMutation.isPending}
               className="bg-slate-700 text-white px-3 py-1.5 rounded text-sm hover:bg-slate-600 disabled:opacity-50"
             >
