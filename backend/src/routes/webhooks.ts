@@ -141,6 +141,30 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
         }
       }
     }
+    // استخراج UTMs تلقائياً من current_url اللي Forminator بيبعته
+    const utmLabels: Record<string, string> = {
+      utm_source:   'مصدر الزيارة',
+      utm_medium:   'وسيلة الزيارة',
+      utm_campaign: 'الحملة الإعلانية',
+      utm_content:  'محتوى الإعلان',
+      utm_term:     'كلمة البحث',
+    };
+    const currentUrl = typeof raw.current_url === 'string' ? raw.current_url : '';
+    if (currentUrl) {
+      try {
+        const urlParams = new URL(currentUrl).searchParams;
+        for (const [key, label] of Object.entries(utmLabels)) {
+          const val = urlParams.get(key)?.trim();
+          if (val && !leadCustomFields[label]) leadCustomFields[label] = val;
+        }
+      } catch { /* URL غير صالح، نتجاهله */ }
+    }
+    // fallback: لو في حقول utm_* مباشرة في الفورم (hidden fields)
+    for (const [key, label] of Object.entries(utmLabels)) {
+      const val = typeof raw[key] === 'string' ? (raw[key] as string).trim() : '';
+      if (val && !leadCustomFields[label]) leadCustomFields[label] = val;
+    }
+
     console.log('[webhook] leadCustomFields:', JSON.stringify(leadCustomFields));
     console.log('[webhook] productCustomFields:', JSON.stringify(productCustomFields));
 
