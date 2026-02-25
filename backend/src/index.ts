@@ -26,6 +26,7 @@ import formConnectionsRoutes from './routes/form-connections';
 import webhooksRoutes from './routes/webhooks';
 import notificationsRoutes from './routes/notifications';
 import auditLogsRoutes from './routes/audit-logs';
+import reportsRoutes from './routes/reports';
 import { authMiddleware, requirePermission } from './middleware/auth';
 
 const app = express();
@@ -119,6 +120,7 @@ app.use('/api/woocommerce', authMiddleware, woocommerceRoutes);
 app.use('/api/form-connections', authMiddleware, formConnectionsRoutes);
 app.use('/api/notifications', authMiddleware, notificationsRoutes);
 app.use('/api/audit-logs', authMiddleware, auditLogsRoutes);
+app.use('/api/reports', authMiddleware, requirePermission('reports.view'), reportsRoutes);
 
 // ===== Frontend Static Files (Production) =====
 if (process.env.NODE_ENV === 'production') {
