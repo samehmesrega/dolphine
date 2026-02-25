@@ -60,7 +60,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'مرفوض',
 };
 
-const CHART_COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];
+const CHART_COLORS = ['#0d9488', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];
 
 // ===== helpers =====
 
@@ -370,7 +370,7 @@ export default function ReportsPage() {
                   formatter={(v: number | undefined) => [v ?? 0, 'عدد الليدز']}
                   labelFormatter={(l) => `التاريخ: ${l}`}
                 />
-                <Bar dataKey="count" name="ليدز" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="count" name="ليدز" fill="#0d9488" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

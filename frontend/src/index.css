@@ -5,3 +5,9 @@
 body {
   font-family: 'Cairo', sans-serif;
 }
+
+/* العناوين تستخدم Tajawal — أثقل وأكثر حضوراً للعربية */
+h1, h2, h3 {
+  font-family: 'Tajawal', 'Cairo', sans-serif;
+  font-weight: 700;
+}

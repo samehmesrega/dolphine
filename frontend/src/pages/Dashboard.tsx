@@ -24,7 +24,7 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'مرفوض',
 };
 
-const CHART_COLORS = ['#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];
+const CHART_COLORS = ['#0d9488', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];
 
 async function fetchStats() {
   const { data } = await api.get('/dashboard/stats');
@@ -127,7 +127,7 @@ export default function Dashboard() {
                   formatter={(value: number | undefined) => [value ?? 0, 'عدد الليدز']}
                   labelFormatter={(label) => `التاريخ: ${label}`}
                 />
-                <Line type="monotone" dataKey="count" name="ليدز" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
+                <Line type="monotone" dataKey="count" name="ليدز" stroke="#0d9488" strokeWidth={2} dot={{ r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </div>

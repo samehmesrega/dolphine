@@ -29,10 +29,10 @@ export default function Sidebar() {
   const visibleItems = navItems.filter((item) => !item.permission || hasPermission(item.permission));
 
   return (
-    <aside className="w-64 bg-slate-800 text-white flex flex-col">
-      <div className="p-4 border-b border-slate-700 flex items-start justify-between gap-2">
+    <aside className="w-64 bg-slate-900 text-white flex flex-col">
+      <div className="p-4 border-b border-slate-800 flex items-start justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold">دولفين</h1>
+          <h1 className="text-xl font-bold text-teal-400">دولفين</h1>
           <p className="text-sm text-slate-400 mt-1">نظام إدارة الليدز</p>
         </div>
         <NotificationBell />
@@ -43,8 +43,10 @@ export default function Sidebar() {
             key={item.to}
             to={item.to}
             className={({ isActive }) =>
-              `block px-4 py-2 rounded-lg mb-1 transition ${
-                isActive ? 'bg-slate-600' : 'hover:bg-slate-700'
+              `block px-4 py-2 rounded-lg mb-1 transition text-sm ${
+                isActive
+                  ? 'bg-teal-700 text-white font-medium'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`
             }
           >
@@ -52,9 +54,9 @@ export default function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="p-4 border-t border-slate-700">
-        <p className="text-sm text-slate-300">{user?.name}</p>
-        <p className="text-xs text-slate-500">{user?.role?.name}</p>
+      <div className="p-4 border-t border-slate-800">
+        <p className="text-sm text-slate-300 font-medium">{user?.name}</p>
+        <p className="text-xs text-slate-500 mt-0.5">{user?.role?.name}</p>
         <button
           onClick={handleLogout}
           className="mt-2 text-sm text-red-400 hover:text-red-300"
