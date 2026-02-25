@@ -1,3 +1,4 @@
+
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import NotificationBell from './NotificationBell';
@@ -32,7 +33,7 @@ export default function Sidebar() {
     <aside className="w-64 bg-slate-900 text-white flex flex-col">
       <div className="p-4 border-b border-slate-800 flex items-start justify-between gap-2">
         <div>
-          <h1 className="text-xl font-bold text-teal-400">دولفين</h1>
+          <h1 className="text-xl font-bold text-amber-400">دولفين</h1>
           <p className="text-sm text-slate-400 mt-1">نظام إدارة الليدز</p>
         </div>
         <NotificationBell />
@@ -45,7 +46,7 @@ export default function Sidebar() {
             className={({ isActive }) =>
               `block px-4 py-2 rounded-lg mb-1 transition text-sm ${
                 isActive
-                  ? 'bg-teal-700 text-white font-medium'
+                  ? 'bg-amber-600 text-white font-medium'
                   : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`
             }
