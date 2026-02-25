@@ -559,11 +559,19 @@ router.delete('/:id/response-requests/:requestId', async (req: Request, res: Res
 // POST /api/leads/:id/response-requests/:requestId/reply
 router.post('/:id/response-requests/:requestId/reply', async (req: Request, res: Response) => {
   try {
+    const authReq = req as AuthRequest;
+    const callerId = authReq.user?.userId;
+    if (!callerId) { res.status(401).json({ error: 'مطلوب تسجيل الدخول' }); return; }
     const requestId = String(req.params.requestId);
     const { response } = req.body as { response?: string };
     if (!response?.trim()) { res.status(400).json({ error: 'نص الرد مطلوب' }); return; }
     const rr = await prisma.responseRequest.findUnique({ where: { id: requestId } });
     if (!rr) { res.status(404).json({ error: 'طلب الرد غير موجود' }); return; }
+    // فقط المطلوب منه الرد يستطيع الرد
+    if (rr.requestedFromId !== callerId) {
+      res.status(403).json({ error: 'يمكن فقط للمطلوب منه الرد إضافة الرد' });
+      return;
+    }
     const updated = await prisma.responseRequest.update({
       where: { id: requestId },
       data: { response: response.trim(), respondedAt: new Date() },

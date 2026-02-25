@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '../../services/api';
@@ -51,6 +51,10 @@ type LeadDetail = {
 };
 type MyProfile = { id: string; name: string; whatsappNumber: string | null };
 
+// حقول UTM المخزنة في customFields بأسمائها العربية
+const UTM_FIELD_KEYS = new Set(['مصدر الزيارة', 'وسيلة الزيارة', 'الحملة الإعلانية', 'محتوى الإعلان', 'كلمة البحث']);
+const UTM_FIELDS = ['مصدر الزيارة', 'وسيلة الزيارة', 'الحملة الإعلانية', 'محتوى الإعلان', 'كلمة البحث'];
+
 const COMM_TYPE_LABELS: Record<string, string> = {
   whatsapp: 'واتساب',
   call: 'مكالمة',
@@ -101,7 +105,7 @@ export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user: currentUser } = useAuth();
   const canAssign = hasPermission('leads.assign');
 
   const [commForm, setCommForm] = useState({ type: 'call', notes: '', statusId: '' });
@@ -227,6 +231,14 @@ export default function LeadDetailPage() {
     },
     onError: (err: any) => setError(err.response?.data?.error || 'فشل إضافة الرد'),
   });
+
+  // تملأ dropdown المنتج تلقائياً من أول اهتمام موجود (قادم من الفورم)
+  useEffect(() => {
+    if (lead?.productInterests?.length && lead.productInterests[0]?.productId && !interestForm.productId) {
+      setInterestForm((p) => ({ ...p, productId: lead.productInterests![0].productId! }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead?.productInterests]);
 
   const handleWhatsApp = () => {
     if (!myProfile?.whatsappNumber) {
@@ -382,15 +394,17 @@ export default function LeadDetailPage() {
                 </div>
               ))}
 
-              {lead.customFields && Object.entries(lead.customFields).map(([k, v]) => (
-                <div key={k} className="flex items-start">
-                  <dt className="text-slate-500 w-24 shrink-0 truncate" title={k}>{k}</dt>
-                  <dd className="flex items-center text-slate-700 flex-wrap">
-                    <span>{String(v)}</span>
-                    <CopyBtn value={String(v)} />
-                  </dd>
-                </div>
-              ))}
+              {lead.customFields && Object.entries(lead.customFields)
+                .filter(([k]) => !UTM_FIELD_KEYS.has(k))
+                .map(([k, v]) => (
+                  <div key={k} className="flex items-start">
+                    <dt className="text-slate-500 w-24 shrink-0 truncate" title={k}>{k}</dt>
+                    <dd className="flex items-center text-slate-700 flex-wrap">
+                      <span>{String(v)}</span>
+                      <CopyBtn value={String(v)} />
+                    </dd>
+                  </div>
+                ))}
 
               <div className="flex items-start">
                 <dt className="text-slate-500 w-24 shrink-0">المصدر</dt>
@@ -477,8 +491,11 @@ export default function LeadDetailPage() {
         </div>
       </div>
 
+      {/* Callback Requests + Communication Form - نصف/نصف */}
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+
       {/* Callback Requests */}
-      <div className="mt-6 bg-white rounded-xl shadow p-6">
+      <div className="bg-white rounded-xl shadow p-6">
         <h2 className="font-semibold text-slate-700 mb-4">طلبات الرد</h2>
 
         <div className="flex flex-wrap gap-3 pb-4 mb-4 border-b border-slate-100">
@@ -554,7 +571,7 @@ export default function LeadDetailPage() {
                     <p className="text-sm text-slate-700">{rr.response}</p>
                     {rr.respondedAt && <p className="text-xs text-slate-400 mt-1">{formatDateTime(rr.respondedAt)}</p>}
                   </div>
-                ) : (
+                ) : currentUser?.id === rr.requestedFrom?.id ? (
                   <div className="mt-3 flex gap-2">
                     <input
                       className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -574,6 +591,8 @@ export default function LeadDetailPage() {
                       رد
                     </button>
                   </div>
+                ) : (
+                  <p className="text-xs text-slate-400 mt-2">في انتظار رد {rr.requestedFrom?.name}...</p>
                 )}
               </li>
             ))}
@@ -582,7 +601,7 @@ export default function LeadDetailPage() {
       </div>
 
       {/* Communication Form */}
-      <div className="mt-6 bg-white rounded-xl shadow p-6">
+      <div className="bg-white rounded-xl shadow p-6">
         <h2 className="font-semibold text-slate-700 mb-4">إضافة تواصُل</h2>
         <form onSubmit={handleCommSubmit} className="space-y-3">
           <div>
@@ -629,6 +648,8 @@ export default function LeadDetailPage() {
           </button>
         </form>
       </div>
+
+      </div>{/* end grid: callback + comm form */}
 
       {/* Communications List */}
       <div className="mt-6 bg-white rounded-xl shadow overflow-hidden">
@@ -740,6 +761,23 @@ export default function LeadDetailPage() {
           </ul>
         )}
       </div>
+
+      {/* UTM Block */}
+      {lead.customFields && UTM_FIELDS.some((k) => (lead.customFields as Record<string, unknown>)[k]) && (
+        <div className="mt-6 bg-white rounded-xl shadow p-6">
+          <h2 className="font-semibold text-slate-700 mb-4">بيانات UTM</h2>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+            {UTM_FIELDS.filter((k) => (lead.customFields as Record<string, unknown>)[k]).map((k) => (
+              <div key={k} className="flex items-start">
+                <dt className="text-slate-500 w-36 shrink-0">{k}</dt>
+                <dd className="text-slate-800 font-medium">
+                  {String((lead.customFields as Record<string, unknown>)[k])}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
     </div>
   );
 }
