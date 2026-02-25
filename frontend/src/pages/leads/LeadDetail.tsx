@@ -38,7 +38,7 @@ type LeadDetail = {
   whatsapp: string | null;
   email: string | null;
   address: string | null;
-  customFields: Record<string, string> | null;
+  customFields: Record<string, unknown> | null;
   source: string;
   sourceDetail: string | null;
   createdAt: string;
@@ -164,19 +164,6 @@ export default function LeadDetailPage() {
     onError: (err: any) => setError(err.response?.data?.error || 'فشل تحديث البيانات'),
   });
 
-  const convertMutation = useMutation({
-    mutationFn: async () => {
-      const statusConfirmed = statuses?.find((s) => s.slug === 'confirmed');
-      if (!statusConfirmed) throw new Error('حالة طلب مؤكد غير موجودة');
-      return api.patch(`/leads/${id}`, { statusId: statusConfirmed.id });
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['lead', id] });
-      qc.invalidateQueries({ queryKey: ['leads'] });
-    },
-    onError: (err: any) => setError(err.response?.data?.error || 'فشل التحويل'),
-  });
-
   const deleteMutation = useMutation({
     mutationFn: () => api.delete(`/leads/${id}`),
     onSuccess: () => {
@@ -195,7 +182,7 @@ export default function LeadDetailPage() {
       api.post(`/leads/${id}/product-interests`, payload).then((r) => r.data.productInterest as ProductInterest),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['lead', id] });
-      setInterestForm({ productId: '', quantity: 1, notes: '' });
+      setInterestForm((p) => ({ ...p, notes: '' }));
     },
     onError: (err: any) => setError(err.response?.data?.error || 'فشل إضافة الاهتمام'),
   });
@@ -298,6 +285,8 @@ export default function LeadDetailPage() {
     <div className="p-4 text-slate-500">جاري التحميل...</div>
   );
 
+  const isConfirmed = lead.status?.slug === 'confirmed';
+
   return (
     <div>
       {/* Header */}
@@ -339,45 +328,45 @@ export default function LeadDetailPage() {
         </div>
       )}
 
-      {/* Two columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Lead data */}
-        <div className="bg-white rounded-xl shadow p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-700">بيانات الليد</h2>
-            {!editing ? (
-              <button type="button" onClick={startEdit} className="text-sm text-blue-600 hover:underline">تعديل</button>
-            ) : (
-              <button type="button" onClick={() => setEditing(false)} className="text-sm text-slate-500 hover:underline">إلغاء</button>
-            )}
-          </div>
-
-          {editing ? (
-            <form onSubmit={handleEditSubmit} className="space-y-3">
-              {([
-                { label: 'الاسم', key: 'name', required: true },
-                { label: 'الموبايل', key: 'phone', required: true },
-                { label: 'واتساب', key: 'whatsapp', required: false },
-                { label: 'الإيميل', key: 'email', required: false },
-                { label: 'العنوان', key: 'address', required: false },
-              ] as const).map(({ label, key, required }) => (
-                <div key={key}>
-                  <label className="block text-sm text-slate-600 mb-1">{label}</label>
-                  <input
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    value={editForm[key]}
-                    onChange={(e) => setEditForm((p) => ({ ...p, [key]: e.target.value }))}
-                    required={required}
-                  />
-                </div>
-              ))}
-              <button type="submit" disabled={updateLeadMutation.isPending}
-                className="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm">
-                {updateLeadMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
-              </button>
-            </form>
+      {/* Lead data block with inline actions */}
+      <div className="bg-white rounded-xl shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-semibold text-slate-700">بيانات الليد</h2>
+          {!editing ? (
+            <button type="button" onClick={startEdit} className="text-sm text-blue-600 hover:underline">تعديل</button>
           ) : (
-            <dl className="space-y-3 text-sm">
+            <button type="button" onClick={() => setEditing(false)} className="text-sm text-slate-500 hover:underline">إلغاء</button>
+          )}
+        </div>
+
+        {editing ? (
+          <form onSubmit={handleEditSubmit} className="space-y-3">
+            {([
+              { label: 'الاسم', key: 'name', required: true },
+              { label: 'الموبايل', key: 'phone', required: true },
+              { label: 'واتساب', key: 'whatsapp', required: false },
+              { label: 'الإيميل', key: 'email', required: false },
+              { label: 'العنوان', key: 'address', required: false },
+            ] as const).map(({ label, key, required }) => (
+              <div key={key}>
+                <label className="block text-sm text-slate-600 mb-1">{label}</label>
+                <input
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  value={editForm[key]}
+                  onChange={(e) => setEditForm((p) => ({ ...p, [key]: e.target.value }))}
+                  required={required}
+                />
+              </div>
+            ))}
+            <button type="submit" disabled={updateLeadMutation.isPending}
+              className="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm">
+              {updateLeadMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
+            </button>
+          </form>
+        ) : (
+          <div className="flex gap-6 flex-col lg:flex-row">
+            {/* Left: data */}
+            <dl className="flex-1 space-y-3 text-sm">
               {([
                 { label: 'الاسم', value: lead.name },
                 { label: 'الموبايل', value: lead.phone },
@@ -419,235 +408,228 @@ export default function LeadDetailPage() {
                 <dd className="text-slate-700">{formatDateTime(lead.createdAt)}</dd>
               </div>
             </dl>
-          )}
-        </div>
 
-        {/* Right: Actions */}
-        <div className="bg-white rounded-xl shadow p-6 space-y-5">
-          <h2 className="font-semibold text-slate-700">الإجراءات</h2>
+            {/* Right: actions */}
+            <div className="lg:w-52 shrink-0 space-y-3">
+              {canAssign ? (
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">التعيين</label>
+                  <select
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    value={lead.assignedTo?.id ?? ''}
+                    onChange={(e) => handleAssign(e.target.value)}
+                    disabled={updateLeadMutation.isPending}
+                  >
+                    <option value="">— غير معيّن —</option>
+                    {users?.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <div className="text-sm">
+                  <span className="text-slate-500 text-xs block mb-1">المعيّن له</span>
+                  <span className="font-medium text-slate-800">{lead.assignedTo?.name ?? '—'}</span>
+                </div>
+              )}
 
-          {canAssign ? (
-            <div>
-              <label className="block text-sm text-slate-600 mb-1">التعيين</label>
-              <select
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                value={lead.assignedTo?.id ?? ''}
-                onChange={(e) => handleAssign(e.target.value)}
-                disabled={updateLeadMutation.isPending}
-              >
-                <option value="">— غير معيّن —</option>
-                {users?.map((u) => (
-                  <option key={u.id} value={u.id}>{u.name}</option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="text-sm">
-              <span className="text-slate-500">المعيّن له: </span>
-              <span className="font-medium text-slate-800">{lead.assignedTo?.name ?? '—'}</span>
-            </div>
-          )}
-
-          <div>
-            <button
-              type="button"
-              onClick={handleWhatsApp}
-              className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
-            >
-              فتح واتساب
-            </button>
-            {!myProfile?.whatsappNumber && (
-              <p className="text-xs text-amber-600 mt-1">
-                أضف رقم واتساب في{' '}
-                <Link to="/profile" className="underline hover:text-amber-700">ملفك الشخصي</Link>
-                {' '}أولاً
-              </p>
-            )}
-          </div>
-
-          {lead.status?.slug !== 'confirmed' ? (
-            <div>
               <button
                 type="button"
-                onClick={() => convertMutation.mutate()}
-                disabled={convertMutation.isPending}
-                className="w-full px-4 py-2.5 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm font-medium"
+                onClick={handleWhatsApp}
+                className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
               >
-                {convertMutation.isPending ? 'جاري...' : 'تحويل لطلب مؤكد'}
+                فتح واتساب
               </button>
-              <p className="text-xs text-slate-400 mt-1">يغيّر الحالة إلى «طلب مؤكد»</p>
-            </div>
-          ) : (
-            <div>
+              {!myProfile?.whatsappNumber && (
+                <p className="text-xs text-amber-600">
+                  أضف رقم واتساب في{' '}
+                  <Link to="/profile" className="underline hover:text-amber-700">ملفك الشخصي</Link>
+                </p>
+              )}
+
               <Link
-                to={`/leads/${lead.id}/create-order`}
-                className="block w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium text-center"
+                to={isConfirmed ? `/leads/${lead.id}/create-order` : '#'}
+                onClick={(e) => { if (!isConfirmed) e.preventDefault(); }}
+                className={`block w-full px-4 py-2.5 text-center rounded-lg text-sm font-medium transition ${
+                  isConfirmed
+                    ? 'bg-amber-600 text-white hover:bg-amber-700'
+                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                }`}
               >
                 إنشاء الطلب
               </Link>
-              <p className="text-xs text-slate-400 mt-1">إدخال بيانات الشحن والمنتجات</p>
+              {!isConfirmed && (
+                <p className="text-xs text-slate-400">يتطلب حالة «طلب مؤكد»</p>
+              )}
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Callback Requests + Communication Form - نصف/نصف */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-      {/* Callback Requests */}
-      <div className="bg-white rounded-xl shadow p-6">
-        <h2 className="font-semibold text-slate-700 mb-4">طلبات الرد</h2>
+        {/* Callback Requests */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-semibold text-slate-700 mb-4">طلبات الرد</h2>
 
-        <div className="flex flex-wrap gap-3 pb-4 mb-4 border-b border-slate-100">
-          <div className="min-w-[180px] flex-1">
-            <select
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-              value={cbForm.targetUserId}
-              onChange={(e) => setCbForm((p) => ({ ...p, targetUserId: e.target.value }))}
+          <div className="flex flex-wrap gap-3 pb-4 mb-4 border-b border-slate-100">
+            <div className="min-w-[180px] flex-1">
+              <select
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                value={cbForm.targetUserId}
+                onChange={(e) => setCbForm((p) => ({ ...p, targetUserId: e.target.value }))}
+              >
+                <option value="">— اختر الحساب المطلوب رده —</option>
+                {users?.map((u) => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.role?.name})</option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-[200px] flex-1">
+              <input
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                placeholder="جملة توضيحية (اختياري)"
+                value={cbForm.note}
+                onChange={(e) => setCbForm((p) => ({ ...p, note: e.target.value }))}
+              />
+            </div>
+            <button
+              type="button"
+              disabled={!cbForm.targetUserId || addCallbackMutation.isPending}
+              onClick={() => {
+                if (!cbForm.targetUserId) return;
+                addCallbackMutation.mutate({
+                  targetUserId: cbForm.targetUserId,
+                  note: cbForm.note.trim() || undefined,
+                });
+              }}
+              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm whitespace-nowrap"
             >
-              <option value="">— اختر الحساب المطلوب رده —</option>
-              {users?.map((u) => (
-                <option key={u.id} value={u.id}>{u.name} ({u.role?.name})</option>
+              {addCallbackMutation.isPending ? 'جاري...' : '+ إضافة'}
+            </button>
+          </div>
+
+          {!lead.responseRequests?.length ? (
+            <p className="text-slate-500 text-sm">لا توجد طلبات رد.</p>
+          ) : (
+            <ul className="space-y-3">
+              {lead.responseRequests.map((rr) => (
+                <li key={rr.id} className="border border-slate-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium text-slate-800 text-sm">مطلوب من: {rr.requestedFrom?.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {rr.requestedBy && `طلب بواسطة: ${rr.requestedBy.name} · `}
+                        {formatDateTime(rr.createdAt)}
+                      </p>
+                    </div>
+                    {!rr.response && (
+                      <button
+                        type="button"
+                        onClick={() => deleteCallbackMutation.mutate(rr.id)}
+                        disabled={deleteCallbackMutation.isPending}
+                        className="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50 shrink-0"
+                      >
+                        حذف
+                      </button>
+                    )}
+                  </div>
+
+                  {rr.note && (
+                    <p className="text-sm text-slate-600 mt-2 bg-slate-50 rounded px-3 py-1.5">{rr.note}</p>
+                  )}
+
+                  {rr.response ? (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <p className="text-xs font-medium text-green-600 mb-1">الرد:</p>
+                      <p className="text-sm text-slate-700">{rr.response}</p>
+                      {rr.respondedAt && <p className="text-xs text-slate-400 mt-1">{formatDateTime(rr.respondedAt)}</p>}
+                    </div>
+                  ) : currentUser?.id === rr.requestedFrom?.id ? (
+                    <div className="mt-3 flex gap-2">
+                      <input
+                        className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        placeholder="اكتب الرد هنا..."
+                        value={replyTexts[rr.id] ?? ''}
+                        onChange={(e) => setReplyTexts((p) => ({ ...p, [rr.id]: e.target.value }))}
+                      />
+                      <button
+                        type="button"
+                        disabled={!replyTexts[rr.id]?.trim() || replyCallbackMutation.isPending}
+                        onClick={() => {
+                          const text = replyTexts[rr.id];
+                          if (text?.trim()) replyCallbackMutation.mutate({ requestId: rr.id, response: text.trim() });
+                        }}
+                        className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50"
+                      >
+                        رد
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 mt-2">في انتظار رد {rr.requestedFrom?.name}...</p>
+                  )}
+                </li>
               ))}
-            </select>
-          </div>
-          <div className="min-w-[200px] flex-1">
-            <input
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-              placeholder="جملة توضيحية عن طلب الرد (اختياري)"
-              value={cbForm.note}
-              onChange={(e) => setCbForm((p) => ({ ...p, note: e.target.value }))}
-            />
-          </div>
-          <button
-            type="button"
-            disabled={!cbForm.targetUserId || addCallbackMutation.isPending}
-            onClick={() => {
-              if (!cbForm.targetUserId) return;
-              addCallbackMutation.mutate({
-                targetUserId: cbForm.targetUserId,
-                note: cbForm.note.trim() || undefined,
-              });
-            }}
-            className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm whitespace-nowrap"
-          >
-            {addCallbackMutation.isPending ? 'جاري...' : '+ إضافة طلب رد'}
-          </button>
+            </ul>
+          )}
         </div>
 
-        {!lead.responseRequests?.length ? (
-          <p className="text-slate-500 text-sm">لا توجد طلبات رد.</p>
-        ) : (
-          <ul className="space-y-3">
-            {lead.responseRequests.map((rr) => (
-              <li key={rr.id} className="border border-slate-200 rounded-lg p-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-slate-800 text-sm">مطلوب من: {rr.requestedFrom?.name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5">
-                      {rr.requestedBy && `طلب بواسطة: ${rr.requestedBy.name} · `}
-                      {formatDateTime(rr.createdAt)}
-                    </p>
-                  </div>
-                  {!rr.response && (
-                    <button
-                      type="button"
-                      onClick={() => deleteCallbackMutation.mutate(rr.id)}
-                      disabled={deleteCallbackMutation.isPending}
-                      className="text-red-400 hover:text-red-600 text-xs px-2 py-1 rounded hover:bg-red-50 shrink-0"
-                    >
-                      حذف
-                    </button>
-                  )}
-                </div>
-
-                {rr.note && (
-                  <p className="text-sm text-slate-600 mt-2 bg-slate-50 rounded px-3 py-1.5">{rr.note}</p>
-                )}
-
-                {rr.response ? (
-                  <div className="mt-3 pt-3 border-t border-slate-100">
-                    <p className="text-xs font-medium text-green-600 mb-1">الرد:</p>
-                    <p className="text-sm text-slate-700">{rr.response}</p>
-                    {rr.respondedAt && <p className="text-xs text-slate-400 mt-1">{formatDateTime(rr.respondedAt)}</p>}
-                  </div>
-                ) : currentUser?.id === rr.requestedFrom?.id ? (
-                  <div className="mt-3 flex gap-2">
-                    <input
-                      className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                      placeholder="اكتب الرد هنا..."
-                      value={replyTexts[rr.id] ?? ''}
-                      onChange={(e) => setReplyTexts((p) => ({ ...p, [rr.id]: e.target.value }))}
-                    />
-                    <button
-                      type="button"
-                      disabled={!replyTexts[rr.id]?.trim() || replyCallbackMutation.isPending}
-                      onClick={() => {
-                        const text = replyTexts[rr.id];
-                        if (text?.trim()) replyCallbackMutation.mutate({ requestId: rr.id, response: text.trim() });
-                      }}
-                      className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50"
-                    >
-                      رد
-                    </button>
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-400 mt-2">في انتظار رد {rr.requestedFrom?.name}...</p>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Communication Form */}
-      <div className="bg-white rounded-xl shadow p-6">
-        <h2 className="font-semibold text-slate-700 mb-4">إضافة تواصُل</h2>
-        <form onSubmit={handleCommSubmit} className="space-y-3">
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">نوع التواصُل</label>
-            <select
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-              value={commForm.type}
-              onChange={(e) => setCommForm((p) => ({ ...p, type: e.target.value }))}
+        {/* Communication Form */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-semibold text-slate-700 mb-4">إضافة تواصُل</h2>
+          <form onSubmit={handleCommSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-600 mb-2">نوع التواصُل</label>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(COMM_TYPE_LABELS).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setCommForm((p) => ({ ...p, type: value }))}
+                    className={`px-4 py-2 rounded-lg text-sm border transition ${
+                      commForm.type === value
+                        ? 'bg-slate-700 text-white border-slate-700 font-medium'
+                        : 'border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">ملاحظات</label>
+              <textarea
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 min-h-[80px] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                value={commForm.notes}
+                onChange={(e) => setCommForm((p) => ({ ...p, notes: e.target.value }))}
+                placeholder="ملخص ما تم مع الليد..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">تحديث الحالة</label>
+              <select
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                value={commForm.statusId}
+                onChange={(e) => setCommForm((p) => ({ ...p, statusId: e.target.value }))}
+              >
+                <option value="">— بدون تغيير —</option>
+                {statuses?.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            {commError && <p className="text-sm text-red-600">{commError}</p>}
+            <button
+              type="submit"
+              disabled={addCommMutation.isPending}
+              className="w-full py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
             >
-              {Object.entries(COMM_TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>{label}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">ملاحظات</label>
-            <textarea
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 min-h-[80px] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-              value={commForm.notes}
-              onChange={(e) => setCommForm((p) => ({ ...p, notes: e.target.value }))}
-              placeholder="ملخص ما تم مع الليد..."
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-600 mb-1">تحديث الحالة</label>
-            <select
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-              value={commForm.statusId}
-              onChange={(e) => setCommForm((p) => ({ ...p, statusId: e.target.value }))}
-            >
-              <option value="">— بدون تغيير —</option>
-              {statuses?.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          </div>
-          {commError && <p className="text-sm text-red-600">{commError}</p>}
-          <button
-            type="submit"
-            disabled={addCommMutation.isPending}
-            className="w-full py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
-          >
-            {addCommMutation.isPending ? 'جاري الحفظ...' : 'حفظ التواصُل'}
-          </button>
-        </form>
-      </div>
+              {addCommMutation.isPending ? 'جاري الحفظ...' : 'حفظ التواصُل'}
+            </button>
+          </form>
+        </div>
 
       </div>{/* end grid: callback + comm form */}
 

@@ -24,6 +24,7 @@ import IntegrationsPage from './pages/IntegrationsPage';
 import AuditLogPage from './pages/AuditLogPage';
 import RolesPage from './pages/RolesPage';
 import ProfilePage from './pages/ProfilePage';
+import LeadStatusesPage from './pages/LeadStatusesPage';
 
 // تقليل إعادة جلب البيانات: البيانات تعتبر «حديثة» لمدة دقيقة
 const queryClient = new QueryClient({
@@ -74,6 +75,7 @@ function AppRoutes() {
         <Route path="audit" element={<AuditLogPage />} />
         <Route path="roles" element={<RolesPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="lead-statuses" element={<LeadStatusesPage />} />
       </Route>
     </Routes>
   );
