@@ -13,7 +13,10 @@ import CustomerDetail from './pages/customers/CustomerDetail';
 import OrdersList from './pages/orders/OrdersList';
 import OrderDetail from './pages/orders/OrderDetail';
 import OrdersPending from './pages/orders/OrdersPending';
-import Reports from './pages/Reports';
+import ReportsLayout from './pages/reports/ReportsLayout';
+import GeneralReports from './pages/reports/GeneralReports';
+import SalesReports from './pages/reports/SalesReports';
+import MarketingReports from './pages/reports/MarketingReports';
 import ProductsPage from './pages/ProductsPage';
 import UsersPage from './pages/UsersPage';
 import ShiftsPage from './pages/ShiftsPage';
@@ -58,7 +61,11 @@ function AppRoutes() {
         <Route path="orders" element={<OrdersList />} />
         <Route path="orders/:id" element={<OrderDetail />} />
         <Route path="orders-pending" element={<OrdersPending />} />
-        <Route path="reports" element={<Reports />} />
+        <Route path="reports" element={<ReportsLayout />}>
+          <Route index element={<GeneralReports />} />
+          <Route path="sales" element={<SalesReports />} />
+          <Route path="marketing" element={<MarketingReports />} />
+        </Route>
         <Route path="products" element={<ProductsPage />} />
         <Route path="shifts" element={<ShiftsPage />} />
         <Route path="users" element={<UsersPage />} />

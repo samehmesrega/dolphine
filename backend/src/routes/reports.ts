@@ -54,6 +54,13 @@ type SourceRow = {
   avg_order_value: unknown;
 };
 
+type GeneralRow = {
+  total_leads: bigint;
+  total_orders: bigint;
+  total_order_value: unknown;
+  leads_over_time: unknown;
+};
+
 // بناء query المصادر بتعبير label متغيّر
 function sourceQuery(labelExpr: string): string {
   return `
@@ -331,6 +338,61 @@ router.get('/sources', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[reports/sources]', err);
     res.status(500).json({ error: 'خطأ في تحميل تقرير المصادر' });
+  }
+});
+
+// GET /api/reports/general?from=YYYY-MM-DD&to=YYYY-MM-DD
+router.get('/general', async (req: Request, res: Response) => {
+  try {
+    const [from, to] = parseDateRange(
+      req.query.from as string | undefined,
+      req.query.to as string | undefined,
+    );
+
+    const rows = await prisma.$queryRawUnsafe<GeneralRow[]>(`
+      WITH period_leads AS (
+        SELECT l.id AS lead_id, DATE(l.created_at) AS lead_date
+        FROM leads l
+        WHERE l.created_at >= $1 AND l.created_at <= $2
+      ),
+      period_orders AS (
+        SELECT o.id AS order_id, COALESCE(SUM(oi.price * oi.quantity), 0) AS order_value
+        FROM orders o
+        JOIN period_leads pl ON pl.lead_id = o.lead_id
+        LEFT JOIN order_items oi ON oi.order_id = o.id
+        GROUP BY o.id
+      ),
+      daily AS (
+        SELECT lead_date, COUNT(*) AS cnt
+        FROM period_leads
+        GROUP BY lead_date
+        ORDER BY lead_date
+      )
+      SELECT
+        (SELECT COUNT(*) FROM period_leads) AS total_leads,
+        (SELECT COUNT(*) FROM period_orders) AS total_orders,
+        (SELECT COALESCE(SUM(order_value), 0) FROM period_orders) AS total_order_value,
+        (SELECT COALESCE(json_agg(json_build_object('date', lead_date::text, 'count', cnt::int) ORDER BY lead_date), '[]'::json) FROM daily) AS leads_over_time
+    `, from, to);
+
+    const r = rows[0];
+    const totalLeads = toN(r?.total_leads);
+    const totalOrders = toN(r?.total_orders);
+    const totalOrderValue = Math.round(toN(r?.total_order_value) * 100) / 100;
+    const leadsOverTime = (r?.leads_over_time as { date: string; count: number }[] | null) ?? [];
+
+    res.json({
+      from: from.toISOString().slice(0, 10),
+      to: to.toISOString().slice(0, 10),
+      totalLeads,
+      totalOrders,
+      conversionRate: totalLeads > 0 ? Math.round((totalOrders / totalLeads) * 100) : 0,
+      totalOrderValue,
+      leadsOverTime,
+    });
+  } catch (err) {
+    console.error('[reports/general]', err);
+    res.status(500).json({ error: 'خطأ في تحميل التقارير العامة' });
   }
 });
 
