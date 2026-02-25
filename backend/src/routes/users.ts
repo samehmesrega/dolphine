@@ -121,6 +121,56 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/users/me - الملف الشخصي للمستخدم الحالي
+router.get('/me', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ error: 'غير مصادق' }); return; }
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, email: true, isActive: true, whatsappNumber: true, role: { select: { id: true, name: true, slug: true } } },
+    });
+    if (!user) { res.status(404).json({ error: 'المستخدم غير موجود' }); return; }
+    res.json({ user });
+  } catch (err) {
+    console.error('Get profile error:', err);
+    res.status(500).json({ error: 'خطأ في تحميل الملف الشخصي' });
+  }
+});
+
+const updateProfileSchema = z.object({
+  name: z.string().min(1).optional(),
+  whatsappNumber: z.string().optional().nullable(),
+  password: z.string().min(6).optional(),
+});
+
+// PATCH /api/users/me - تحديث الملف الشخصي
+router.patch('/me', async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) { res.status(401).json({ error: 'غير مصادق' }); return; }
+    const parsed = updateProfileSchema.safeParse(req.body);
+    if (!parsed.success) {
+      const msg = parsed.error.issues.map((e) => e.message).join('؛ ');
+      res.status(400).json({ error: msg });
+      return;
+    }
+    const updates: { name?: string; whatsappNumber?: string | null; passwordHash?: string } = {};
+    if (parsed.data.name != null) updates.name = parsed.data.name;
+    if (parsed.data.whatsappNumber !== undefined) updates.whatsappNumber = parsed.data.whatsappNumber;
+    if (parsed.data.password != null) updates.passwordHash = await bcrypt.hash(parsed.data.password, 10);
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updates,
+      select: { id: true, name: true, email: true, isActive: true, whatsappNumber: true, role: { select: { id: true, name: true, slug: true } } },
+    });
+    res.json({ user });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    res.status(500).json({ error: 'خطأ في تحديث الملف الشخصي' });
+  }
+});
+
 // مستخدم واحد (للتعديل)
 router.get('/:id', async (req: AuthRequest, res: Response) => {
   const id = String(req.params.id);

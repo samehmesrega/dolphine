@@ -22,6 +22,7 @@ model User {
   role          Role      @relation(fields: [roleId], references: [id])
   createdAt     DateTime  @default(now()) @map("created_at")
   updatedAt     DateTime  @updatedAt @map("updated_at")
+  whatsappNumber    String?          @map("whatsapp_number")
 
   assignedLeads     Lead[]           @relation("AssignedLeads")
   communications   Communication[]
@@ -30,6 +31,7 @@ model User {
   auditLogs       AuditLog[]
   shiftMembers    ShiftMember[]
   notifications   Notification[]
+  callbacksRequested ResponseRequest[] @relation("RequestedBy")
 
   @@map("users")
 }
@@ -185,6 +187,9 @@ model ResponseRequest {
   requestedFromId String @map("requested_from_id")
   requestedFrom   User   @relation("RequestedFrom", fields: [requestedFromId], references: [id])
   communicationId String? @map("communication_id")
+  requestedById   String?   @map("requested_by_id")
+  requestedBy     User?     @relation("RequestedBy", fields: [requestedById], references: [id])
+  note            String?
   response     String?
   respondedAt  DateTime? @map("responded_at")
   createdAt    DateTime  @default(now()) @map("created_at")

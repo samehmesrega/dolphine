@@ -23,6 +23,7 @@ import ShiftsPage from './pages/ShiftsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
 import AuditLogPage from './pages/AuditLogPage';
 import RolesPage from './pages/RolesPage';
+import ProfilePage from './pages/ProfilePage';
 
 // تقليل إعادة جلب البيانات: البيانات تعتبر «حديثة» لمدة دقيقة
 const queryClient = new QueryClient({
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route path="integrations" element={<IntegrationsPage />} />
         <Route path="audit" element={<AuditLogPage />} />
         <Route path="roles" element={<RolesPage />} />
+        <Route path="profile" element={<ProfilePage />} />
       </Route>
     </Routes>
   );

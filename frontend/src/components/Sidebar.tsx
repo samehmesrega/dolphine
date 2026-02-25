@@ -149,12 +149,23 @@ export default function Sidebar() {
       <div className="p-4 border-t border-slate-800">
         <p className="text-sm text-slate-300 font-medium">{user?.name}</p>
         <p className="text-xs text-slate-500 mt-0.5">{user?.role?.name}</p>
-        <button
-          onClick={handleLogout}
-          className="mt-2 text-sm text-red-400 hover:text-red-300"
-        >
-          تسجيل الخروج
-        </button>
+        <div className="mt-2 flex items-center gap-3">
+          <NavLink
+            to="/profile"
+            className={({ isActive }) =>
+              `text-sm ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'}`
+            }
+          >
+            ملفي الشخصي
+          </NavLink>
+          <span className="text-slate-700">·</span>
+          <button
+            onClick={handleLogout}
+            className="text-sm text-red-400 hover:text-red-300"
+          >
+            تسجيل الخروج
+          </button>
+        </div>
       </div>
     </aside>
   );

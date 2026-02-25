@@ -215,7 +215,21 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (data.email !== undefined) updateData.email = data.email;
     if (data.address !== undefined) updateData.address = data.address;
     if (data.statusId !== undefined) updateData.statusId = data.statusId;
-    if (data.assignedToId !== undefined) updateData.assignedToId = data.assignedToId;
+    if (data.assignedToId !== undefined) {
+      const callerId = (req as AuthRequest).user?.userId;
+      if (callerId) {
+        const callerUser = await prisma.user.findUnique({
+          where: { id: callerId },
+          include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+        });
+        const perms = callerUser?.role?.rolePermissions?.map((rp) => rp.permission.slug) ?? [];
+        if (!perms.includes('leads.assign')) {
+          res.status(403).json({ error: 'ليس لديك صلاحية تعيين الليدز' });
+          return;
+        }
+      }
+      updateData.assignedToId = data.assignedToId;
+    }
 
     if (data.phone !== undefined) {
       const phoneNormalized = normalizePhone(data.phone);
@@ -289,7 +303,10 @@ router.get('/:id', async (req: Request, res: Response) => {
         responseRequests: {
           orderBy: { createdAt: 'desc' },
           take: LEAD_DETAIL_RESPONSE_REQUESTS_LIMIT,
-          include: { requestedFrom: { select: { id: true, name: true } } },
+          include: {
+            requestedFrom: { select: { id: true, name: true } },
+            requestedBy: { select: { id: true, name: true } },
+          },
         },
         productInterests: {
           orderBy: { createdAt: 'desc' },
@@ -485,6 +502,80 @@ router.delete('/:id/product-interests/:interestId', async (req: Request, res: Re
   } catch (err: unknown) {
     console.error('Delete product interest error:', err);
     res.status(500).json({ error: 'خطأ في حذف اهتمام المنتج' });
+  }
+});
+
+// POST /api/leads/:id/response-requests - إضافة طلب رد مستقل
+router.post('/:id/response-requests', async (req: Request, res: Response) => {
+  try {
+    const authReq = req as AuthRequest;
+    const requestedById = authReq.user?.userId;
+    if (!requestedById) { res.status(401).json({ error: 'مطلوب تسجيل الدخول' }); return; }
+    const leadId = String(req.params.id);
+    const { targetUserId, note } = req.body as { targetUserId?: string; note?: string };
+    if (!targetUserId) { res.status(400).json({ error: 'targetUserId مطلوب' }); return; }
+    const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+    if (!lead) { res.status(404).json({ error: 'ليد غير موجود' }); return; }
+    const rr = await prisma.responseRequest.create({
+      data: { leadId, requestedFromId: targetUserId, requestedById, note: note || null },
+      include: {
+        requestedFrom: { select: { id: true, name: true } },
+        requestedBy: { select: { id: true, name: true } },
+      },
+    });
+    await prisma.notification.create({
+      data: {
+        userId: targetUserId,
+        title: 'طلب رد على ليد',
+        body: `تم طلب رد منك على ليد: ${lead.name}${note ? ' - ' + note : ''}`,
+        type: 'response_request',
+        entity: 'lead',
+        entityId: leadId,
+      },
+    });
+    res.status(201).json({ responseRequest: rr });
+  } catch (err) {
+    console.error('Add response-request error:', err);
+    res.status(500).json({ error: 'خطأ في إضافة طلب الرد' });
+  }
+});
+
+// DELETE /api/leads/:id/response-requests/:requestId
+router.delete('/:id/response-requests/:requestId', async (req: Request, res: Response) => {
+  try {
+    const leadId = String(req.params.id);
+    const requestId = String(req.params.requestId);
+    const rr = await prisma.responseRequest.findFirst({ where: { id: requestId, leadId } });
+    if (!rr) { res.status(404).json({ error: 'طلب الرد غير موجود' }); return; }
+    if (rr.response) { res.status(400).json({ error: 'لا يمكن حذف طلب رد تمت الإجابة عليه' }); return; }
+    await prisma.responseRequest.delete({ where: { id: requestId } });
+    res.status(204).send();
+  } catch (err) {
+    console.error('Delete response-request error:', err);
+    res.status(500).json({ error: 'خطأ في حذف طلب الرد' });
+  }
+});
+
+// POST /api/leads/:id/response-requests/:requestId/reply
+router.post('/:id/response-requests/:requestId/reply', async (req: Request, res: Response) => {
+  try {
+    const requestId = String(req.params.requestId);
+    const { response } = req.body as { response?: string };
+    if (!response?.trim()) { res.status(400).json({ error: 'نص الرد مطلوب' }); return; }
+    const rr = await prisma.responseRequest.findUnique({ where: { id: requestId } });
+    if (!rr) { res.status(404).json({ error: 'طلب الرد غير موجود' }); return; }
+    const updated = await prisma.responseRequest.update({
+      where: { id: requestId },
+      data: { response: response.trim(), respondedAt: new Date() },
+      include: {
+        requestedFrom: { select: { id: true, name: true } },
+        requestedBy: { select: { id: true, name: true } },
+      },
+    });
+    res.json({ responseRequest: updated });
+  } catch (err) {
+    console.error('Reply response-request error:', err);
+    res.status(500).json({ error: 'خطأ في إضافة الرد' });
   }
 });
 

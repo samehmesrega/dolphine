@@ -42,6 +42,7 @@ async function main() {
     { name: 'الربط والتكامل', slug: 'integrations.manage', module: 'integrations' },
     { name: 'التقارير', slug: 'reports.view', module: 'reports' },
     { name: 'سجل التدقيق', slug: 'audit.view', module: 'audit' },
+    { name: 'تعيين الليدز', slug: 'leads.assign', module: 'leads' },
   ];
   for (const p of permissions) {
     await prisma.permission.upsert({
@@ -100,6 +101,18 @@ async function main() {
           create: { roleId: accountsRole.id, permissionId: perm.id },
         });
       }
+    }
+  }
+  // مدير السيلز فقط: صلاحية تعيين الليدز
+  const salesManagerRole = await prisma.role.findUnique({ where: { slug: 'sales_manager' } });
+  if (salesManagerRole) {
+    const assignPerm = await prisma.permission.findUnique({ where: { slug: 'leads.assign' } });
+    if (assignPerm) {
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionId: { roleId: salesManagerRole.id, permissionId: assignPerm.id } },
+        update: {},
+        create: { roleId: salesManagerRole.id, permissionId: assignPerm.id },
+      });
     }
   }
   // أوبريشنز: داشبورد، منتجات، شيفتات، ربْط
