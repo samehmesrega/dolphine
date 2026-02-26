@@ -4,7 +4,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 type User = { id: string; name: string };
-type ShiftMember = { id: string; orderNum: number; user: User };
+type ShiftMember = { id: string; dayOfWeek: number; orderNum: number; user: User };
 type Shift = {
   id: string;
   name: string;
@@ -16,7 +16,16 @@ type Shift = {
   shiftMembers: ShiftMember[];
 };
 
-const DAYS = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
+// 0=أحد, 1=اثنين, ..., 6=سبت — نعرضها بدءاً من السبت
+const DAYS: { index: number; name: string }[] = [
+  { index: 6, name: 'السبت' },
+  { index: 0, name: 'الأحد' },
+  { index: 1, name: 'الاثنين' },
+  { index: 2, name: 'الثلاثاء' },
+  { index: 3, name: 'الأربعاء' },
+  { index: 4, name: 'الخميس' },
+  { index: 5, name: 'الجمعة' },
+];
 
 async function fetchShifts() {
   const { data } = await api.get('/shifts');
@@ -28,8 +37,8 @@ async function fetchUsers() {
   return data.users as User[];
 }
 
-async function createShift(payload: { name: string; startTime: string; endTime: string; daysOfWeek?: number[]; roundRobin?: boolean }) {
-  const { data } = await api.post('/shifts', { ...payload, daysOfWeek: payload.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6] });
+async function createShift(payload: { name: string; startTime: string; endTime: string }) {
+  const { data } = await api.post('/shifts', { ...payload, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] });
   return data.shift as Shift;
 }
 
@@ -37,13 +46,13 @@ async function deleteShift(id: string) {
   await api.delete(`/shifts/${id}`);
 }
 
-async function addShiftMember(shiftId: string, userId: string) {
-  const { data } = await api.post(`/shifts/${shiftId}/members`, { userId, orderNum: 0 });
+async function addShiftMember(shiftId: string, userId: string, dayOfWeek: number) {
+  const { data } = await api.post(`/shifts/${shiftId}/members`, { userId, dayOfWeek, orderNum: 0 });
   return data.shiftMember as ShiftMember;
 }
 
-async function removeShiftMember(shiftId: string, userId: string) {
-  await api.delete(`/shifts/${shiftId}/members/${userId}`);
+async function removeShiftMember(shiftId: string, memberId: string) {
+  await api.delete(`/shifts/${shiftId}/members/${memberId}`);
 }
 
 export default function ShiftsPage() {
@@ -72,29 +81,28 @@ export default function ShiftsPage() {
   });
 
   const addMemberMutation = useMutation({
-    mutationFn: ({ shiftId, userId }: { shiftId: string; userId: string }) => addShiftMember(shiftId, userId),
+    mutationFn: ({ shiftId, userId, dayOfWeek }: { shiftId: string; userId: string; dayOfWeek: number }) =>
+      addShiftMember(shiftId, userId, dayOfWeek),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
   });
 
   const removeMemberMutation = useMutation({
-    mutationFn: ({ shiftId, userId }: { shiftId: string; userId: string }) => removeShiftMember(shiftId, userId),
+    mutationFn: ({ shiftId, memberId }: { shiftId: string; memberId: string }) =>
+      removeShiftMember(shiftId, memberId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
   });
 
   const handleAddShift = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.name.trim()) return;
-    createMutation.mutate({
-      name: form.name.trim(),
-      startTime: form.startTime,
-      endTime: form.endTime,
-    });
+    createMutation.mutate({ name: form.name.trim(), startTime: form.startTime, endTime: form.endTime });
   };
 
   return (
     <div>
       <h1 className="text-2xl font-bold text-slate-800 mb-6">شيفتات</h1>
 
+      {/* Create shift form */}
       <div className="bg-white rounded-xl shadow p-6 mb-6">
         <h2 className="font-semibold text-slate-700 mb-4">إضافة شيفت</h2>
         <form onSubmit={handleAddShift} className="flex flex-wrap gap-3 items-end">
@@ -137,21 +145,20 @@ export default function ShiftsPage() {
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       </div>
 
-      <div className="space-y-4">
+      {/* Shifts list */}
+      <div className="space-y-6">
         {isLoading ? (
           <p className="text-slate-500">جاري التحميل...</p>
         ) : !shifts?.length ? (
           <p className="text-slate-500">لا توجد شيفتات.</p>
         ) : (
           shifts.map((shift) => (
-            <div key={shift.id} className="bg-white rounded-xl shadow p-6">
-              <div className="flex justify-between items-start flex-wrap gap-2">
+            <div key={shift.id} className="bg-white rounded-xl shadow overflow-hidden">
+              {/* Shift header */}
+              <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
                 <div>
                   <h3 className="font-semibold text-slate-800">{shift.name}</h3>
-                  <p className="text-sm text-slate-500">
-                    {shift.startTime} – {shift.endTime}
-                    {shift.daysOfWeek?.length ? ` · ${shift.daysOfWeek.map((d) => DAYS[d]).join(', ')}` : ''}
-                  </p>
+                  <p className="text-sm text-slate-500">{shift.startTime} – {shift.endTime}</p>
                 </div>
                 <button
                   type="button"
@@ -162,101 +169,97 @@ export default function ShiftsPage() {
                   حذف الشيفت
                 </button>
               </div>
-              <div className="mt-4">
-                <h4 className="text-sm font-medium text-slate-600 mb-2">الأعضاء</h4>
-                <ul className="space-y-1 text-sm">
-                  {shift.shiftMembers?.map((m) => (
-                    <li key={m.id} className="flex justify-between items-center">
-                      <span>{m.user.name}</span>
+
+              {/* Weekly calendar table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-100">
+                      <th className="py-2 px-4 text-right font-medium text-slate-600 w-28">اليوم</th>
+                      <th className="py-2 px-4 text-right font-medium text-slate-600">الأعضاء</th>
                       {canManageMembers && (
-                        <button
-                          type="button"
-                          onClick={() => removeMemberMutation.mutate({ shiftId: shift.id, userId: m.user.id })}
-                          className="text-red-500 text-xs hover:underline"
-                        >
-                          إزالة
-                        </button>
+                        <th className="py-2 px-4 text-right font-medium text-slate-600 w-44">إضافة</th>
                       )}
-                    </li>
-                  ))}
-                </ul>
-                {canManageMembers && (
-                  <div className="mt-2 flex gap-2 items-center">
-                    <select
-                      className="border rounded px-2 py-1 text-sm"
-                      defaultValue=""
-                      onChange={(e) => {
-                        const uid = e.target.value;
-                        if (uid) {
-                          addMemberMutation.mutate({ shiftId: shift.id, userId: uid });
-                          e.target.value = '';
-                        }
-                      }}
-                    >
-                      <option value="">— إضافة عضو —</option>
-                      {users
-                        ?.filter((u) => !shift.shiftMembers?.some((m) => m.user.id === u.id))
-                        .map((u) => (
-                          <option key={u.id} value={u.id}>{u.name}</option>
-                        ))}
-                    </select>
-                  </div>
-                )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {DAYS.map(({ index: dayIndex, name: dayName }) => {
+                      const dayMembers = shift.shiftMembers?.filter((m) => m.dayOfWeek === dayIndex) ?? [];
+                      const availableUsers =
+                        users?.filter((u) => !dayMembers.some((m) => m.user.id === u.id)) ?? [];
+
+                      return (
+                        <tr key={dayIndex} className="hover:bg-slate-50/60">
+                          <td className="py-3 px-4 font-medium text-slate-700 whitespace-nowrap">
+                            {dayName}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {dayMembers.length === 0 ? (
+                                <span className="text-xs text-slate-300">—</span>
+                              ) : (
+                                dayMembers.map((m) => (
+                                  <span
+                                    key={m.id}
+                                    className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 text-xs rounded-full px-2.5 py-0.5 border border-amber-100"
+                                  >
+                                    {m.user.name}
+                                    {canManageMembers && (
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          removeMemberMutation.mutate({
+                                            shiftId: shift.id,
+                                            memberId: m.id,
+                                          })
+                                        }
+                                        className="text-amber-400 hover:text-red-500 leading-none font-bold"
+                                        title="إزالة"
+                                      >
+                                        ×
+                                      </button>
+                                    )}
+                                  </span>
+                                ))
+                              )}
+                            </div>
+                          </td>
+                          {canManageMembers && (
+                            <td className="py-2 px-4">
+                              <select
+                                className="border rounded-lg px-2 py-1 text-xs text-slate-600 w-full bg-white"
+                                defaultValue=""
+                                onChange={(e) => {
+                                  const uid = e.target.value;
+                                  if (uid) {
+                                    addMemberMutation.mutate({
+                                      shiftId: shift.id,
+                                      userId: uid,
+                                      dayOfWeek: dayIndex,
+                                    });
+                                    e.target.value = '';
+                                  }
+                                }}
+                              >
+                                <option value="">+ إضافة سيلز</option>
+                                {availableUsers.map((u) => (
+                                  <option key={u.id} value={u.id}>
+                                    {u.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                          )}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           ))
         )}
       </div>
-
-      {/* Weekly Schedule Table */}
-      {shifts && shifts.length > 0 && (
-        <div className="mt-8 bg-white rounded-xl shadow overflow-hidden">
-          <h2 className="font-semibold text-slate-700 p-4 border-b">جدول الأسبوع</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="py-3 px-4 text-right font-medium text-slate-600 w-24">اليوم</th>
-                  {shifts.map((shift) => (
-                    <th key={shift.id} className="py-3 px-4 text-right font-medium text-slate-600">
-                      <div>{shift.name}</div>
-                      <div className="text-xs text-slate-400 font-normal">{shift.startTime} – {shift.endTime}</div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {DAYS.map((dayName, dayIndex) => (
-                  <tr key={dayIndex} className="hover:bg-slate-50">
-                    <td className="py-3 px-4 font-medium text-slate-700">{dayName}</td>
-                    {shifts.map((shift) => {
-                      const active = shift.daysOfWeek?.includes(dayIndex);
-                      const members = active ? shift.shiftMembers?.map((m) => m.user.name) : [];
-                      return (
-                        <td key={shift.id} className="py-3 px-4 text-slate-600">
-                          {active && members && members.length > 0 ? (
-                            <ul className="space-y-0.5">
-                              {members.map((name) => (
-                                <li key={name} className="text-xs bg-amber-50 text-amber-800 rounded px-2 py-0.5 inline-block ml-1">
-                                  {name}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : active ? (
-                            <span className="text-xs text-slate-400">لا أعضاء</span>
-                          ) : (
-                            <span className="text-slate-200">—</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

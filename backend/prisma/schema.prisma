@@ -232,15 +232,16 @@ model Shift {
 }
 
 model ShiftMember {
-  id        String @id @default(uuid())
-  shiftId   String @map("shift_id")
-  shift     Shift  @relation(fields: [shiftId], references: [id], onDelete: Cascade)
-  userId    String @map("user_id")
-  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  orderNum  Int    @default(0) @map("order_num")
-  createdAt DateTime @default(now()) @map("created_at")
+  id         String   @id @default(uuid())
+  shiftId    String   @map("shift_id")
+  shift      Shift    @relation(fields: [shiftId], references: [id], onDelete: Cascade)
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dayOfWeek  Int      @default(0) @map("day_of_week")
+  orderNum   Int      @default(0) @map("order_num")
+  createdAt  DateTime @default(now()) @map("created_at")
 
-  @@unique([shiftId, userId])
+  @@unique([shiftId, userId, dayOfWeek])
   @@map("shift_members")
 }
 

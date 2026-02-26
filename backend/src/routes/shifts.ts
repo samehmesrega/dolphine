@@ -142,6 +142,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
 const addMemberSchema = z.object({
   userId: z.string().uuid(),
+  dayOfWeek: z.number().int().min(0).max(6),
   orderNum: z.number().int().min(0).optional().default(0),
 });
 
@@ -159,7 +160,7 @@ router.post('/:id/members', async (req: Request, res: Response) => {
       return;
     }
     const member = await prisma.shiftMember.create({
-      data: { shiftId, userId: parsed.data.userId, orderNum: parsed.data.orderNum },
+      data: { shiftId, userId: parsed.data.userId, dayOfWeek: parsed.data.dayOfWeek, orderNum: parsed.data.orderNum },
       include: { user: { select: { id: true, name: true } } },
     });
     res.status(201).json({ shiftMember: member });
@@ -167,23 +168,24 @@ router.post('/:id/members', async (req: Request, res: Response) => {
     console.error('Add shift member error:', err);
     const code = err && typeof err === 'object' && 'code' in err ? (err as { code?: string }).code : '';
     if (code === 'P2002') {
-      res.status(400).json({ error: 'المستخدم مضاف مسبقاً لهذا الشيفت' });
+      res.status(400).json({ error: 'هذا السيلز مضاف مسبقاً في هذا اليوم' });
       return;
     }
     res.status(500).json({ error: 'خطأ في إضافة عضو للشيفت' });
   }
 });
 
-router.delete('/:id/members/:userId', async (req: Request, res: Response) => {
+// Delete by member record ID (not userId) so we can target a specific day assignment
+router.delete('/:id/members/:memberId', async (req: Request, res: Response) => {
   try {
     const shiftId = String(req.params.id);
-    const userId = String(req.params.userId);
-    const member = await prisma.shiftMember.findFirst({ where: { shiftId, userId } });
+    const memberId = String(req.params.memberId);
+    const member = await prisma.shiftMember.findFirst({ where: { id: memberId, shiftId } });
     if (!member) {
       res.status(404).json({ error: 'العضو غير موجود في الشيفت' });
       return;
     }
-    await prisma.shiftMember.delete({ where: { id: member.id } });
+    await prisma.shiftMember.delete({ where: { id: memberId } });
     res.status(204).send();
   } catch (err: unknown) {
     console.error('Remove shift member error:', err);
