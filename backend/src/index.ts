@@ -28,7 +28,6 @@ import notificationsRoutes from './routes/notifications';
 import auditLogsRoutes from './routes/audit-logs';
 import reportsRoutes from './routes/reports';
 import { authMiddleware, requirePermission, AuthRequest } from './middleware/auth';
-import { Response, NextFunction } from 'express';
 
 // يسمح بـ users.manage أو مدير السيلز (يديروا موظفيهم فقط)
 function requireUsersAccess(req: AuthRequest, res: Response, next: NextFunction): void {
