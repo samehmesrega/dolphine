@@ -3,9 +3,9 @@ import Sidebar from './Sidebar';
 
 export default function Layout() {
   return (
-    <div className="flex min-h-screen bg-slate-50 overflow-x-hidden">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       <Sidebar />
-      <main className="flex-1 p-6 overflow-auto">
+      <main className="flex-1 p-6 overflow-y-auto">
         <Outlet />
       </main>
     </div>

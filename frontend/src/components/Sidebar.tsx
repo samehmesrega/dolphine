@@ -195,7 +195,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`${collapsed ? 'w-16' : 'w-64'} bg-slate-900 text-white flex flex-col h-screen sticky top-0 transition-all duration-200 shrink-0`}
+      className={`${collapsed ? 'w-16' : 'w-64'} bg-slate-900 text-white flex flex-col transition-all duration-200 shrink-0`}
     >
       {/* Header */}
       <div className={`border-b border-slate-800 flex items-center shrink-0 ${collapsed ? 'flex-col gap-2 py-3 px-2' : 'p-4 justify-between gap-2'}`}>
