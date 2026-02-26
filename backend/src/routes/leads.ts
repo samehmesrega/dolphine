@@ -404,6 +404,18 @@ router.post('/:id/communications', async (req: Request, res: Response) => {
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
+    const callerId = (req as AuthRequest).user?.userId;
+    if (callerId) {
+      const callerUser = await prisma.user.findUnique({
+        where: { id: callerId },
+        include: { role: true },
+      });
+      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+        res.status(403).json({ error: 'ليس لديك صلاحية حذف الليدز' });
+        return;
+      }
+    }
     const id = String(req.params.id);
     const lead = await prisma.lead.findUnique({ where: { id }, include: { orders: { take: 1 } } });
     if (!lead) {

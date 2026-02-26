@@ -26,6 +26,9 @@ const createOrderSchema = z.object({
   shippingAddress: z.string().optional(),
   notes: z.string().optional(),
   paymentType: z.enum(['full', 'partial']),
+  discount: z.coerce.number().min(0).optional().default(0),
+  discountReason: z.string().optional(),
+  partialAmount: z.coerce.number().min(0).optional().default(0),
   items: z.array(orderItemSchema).min(1),
 });
 
@@ -76,7 +79,7 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
       return;
     }
 
-    const { leadId, shippingName, shippingPhone, shippingAddress, notes, paymentType, items } = parsed.data;
+    const { leadId, shippingName, shippingPhone, shippingAddress, notes, paymentType, discount, discountReason, partialAmount, items } = parsed.data;
 
     let leadCustomerId: string | null = null;
     const foundLead = await prisma.lead.findUnique({
@@ -131,6 +134,9 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
           shippingPhone,
           shippingAddress: shippingAddress || undefined,
           notes: notes || undefined,
+          discount: discount ?? 0,
+          discountReason: discountReason || undefined,
+          partialAmount: partialAmount ?? 0,
         },
       });
 

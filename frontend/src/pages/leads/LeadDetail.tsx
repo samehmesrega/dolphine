@@ -107,6 +107,7 @@ export default function LeadDetailPage() {
   const qc = useQueryClient();
   const { hasPermission, user: currentUser } = useAuth();
   const canAssign = hasPermission('leads.assign');
+  const canDelete = ['super_admin', 'admin', 'sales_manager'].includes(currentUser?.role?.slug ?? '');
 
   const [commForm, setCommForm] = useState({ type: 'call', notes: '', statusId: '' });
   const [commError, setCommError] = useState('');
@@ -295,14 +296,16 @@ export default function LeadDetailPage() {
           <Link to="/leads" className="text-slate-600 hover:text-slate-800 text-sm">← ليدز</Link>
           <h1 className="text-2xl font-bold text-slate-800">تفاصيل الليد</h1>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowDeleteConfirm(true)}
-          disabled={deleteMutation.isPending}
-          className="px-4 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 disabled:opacity-50 text-sm"
-        >
-          حذف الليد
-        </button>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={() => setShowDeleteConfirm(true)}
+            disabled={deleteMutation.isPending}
+            className="px-4 py-2 text-red-600 border border-red-300 rounded-lg hover:bg-red-50 disabled:opacity-50 text-sm"
+          >
+            حذف الليد
+          </button>
+        )}
       </div>
 
       {error && (

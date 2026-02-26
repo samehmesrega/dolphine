@@ -55,6 +55,16 @@ export default function CreateOrderPage() {
   ]);
   const [transferFile, setTransferFile] = useState<File | null>(null);
 
+  // New state variables
+  const [discount, setDiscount] = useState(0);
+  const [discountReason, setDiscountReason] = useState('');
+  const [partialAmount, setPartialAmount] = useState<number | ''>('');
+  const [customPartial, setCustomPartial] = useState(false);
+
+  // Computed totals
+  const orderTotal = items.reduce((sum, it) => sum + (it.quantity * it.price), 0);
+  const remaining = orderTotal - discount - (typeof partialAmount === 'number' ? partialAmount : 0);
+
   const { data: lead, isLoading: leadLoading } = useQuery({
     queryKey: ['lead', id],
     queryFn: () => fetchLead(id!),
@@ -123,6 +133,11 @@ export default function CreateOrderPage() {
     }
     fd.append('items', JSON.stringify(validItems));
     if (transferFile) fd.append('transferImage', transferFile);
+    fd.append('discount', String(discount));
+    if (discountReason.trim()) fd.append('discountReason', discountReason.trim());
+    if (paymentType === 'partial' && typeof partialAmount === 'number') {
+      fd.append('partialAmount', String(partialAmount));
+    }
     createMutation.mutate(fd);
   };
 
@@ -255,6 +270,48 @@ export default function CreateOrderPage() {
           <button type="button" onClick={addItem} className="text-blue-600 text-sm border border-blue-600 rounded px-3 py-1">
             + إضافة صنف
           </button>
+
+          {/* Order total summary */}
+          <div className="bg-slate-50 border-t border-slate-200 mt-4 pt-4 px-2 space-y-1 text-sm text-slate-700">
+            <div className="flex justify-between">
+              <span>الإجمالي</span>
+              <span className="font-medium">{orderTotal.toLocaleString()} ج.م</span>
+            </div>
+            {discount > 0 && (
+              <div className="flex justify-between text-red-600">
+                <span>الخصم</span>
+                <span className="font-medium">- {discount.toLocaleString()} ج.م</span>
+              </div>
+            )}
+            <div className="flex justify-between font-semibold text-slate-800 border-t border-slate-200 pt-1 mt-1">
+              <span>صافي الطلب</span>
+              <span>{(orderTotal - discount).toLocaleString()} ج.م</span>
+            </div>
+          </div>
+
+          {/* Discount fields */}
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3 items-end">
+            <div className="w-32">
+              <label className="block text-xs text-slate-500 mb-1">الخصم (ج.م)</label>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                value={discount}
+                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+              />
+            </div>
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs text-slate-500 mb-1">سبب الخصم</label>
+              <input
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                placeholder="مثال: عميل مميز"
+                value={discountReason}
+                onChange={(e) => setDiscountReason(e.target.value)}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow p-6">
@@ -271,6 +328,58 @@ export default function CreateOrderPage() {
                 <option value="partial">دفع جزئي</option>
               </select>
             </div>
+
+            {paymentType === 'partial' && (
+              <div>
+                <label className="block text-sm text-slate-600 mb-2">المبلغ المدفوع جزئياً</label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {[60, 100, 150, 200].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => { setPartialAmount(amt); setCustomPartial(false); }}
+                      className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+                        partialAmount === amt && !customPartial
+                          ? 'bg-slate-700 text-white border-slate-700'
+                          : 'border-slate-300 text-slate-600 hover:border-slate-400'
+                      }`}
+                    >
+                      {amt} ج.م
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => { setCustomPartial(true); setPartialAmount(''); }}
+                    className={`px-3 py-1.5 rounded-lg text-sm border transition ${
+                      customPartial
+                        ? 'bg-slate-700 text-white border-slate-700'
+                        : 'border-slate-300 text-slate-600 hover:border-slate-400'
+                    }`}
+                  >
+                    مخصص
+                  </button>
+                </div>
+                {customPartial && (
+                  <input
+                    type="number"
+                    min={0}
+                    step={0.01}
+                    className="border border-slate-300 rounded-lg px-3 py-2 text-sm w-40"
+                    placeholder="أدخل المبلغ"
+                    value={partialAmount}
+                    onChange={(e) => setPartialAmount(parseFloat(e.target.value) || 0)}
+                  />
+                )}
+                {typeof partialAmount === 'number' && partialAmount > 0 && (
+                  <p className="text-sm text-slate-600 mt-2">
+                    المدفوع: <span className="font-medium text-green-700">{partialAmount.toLocaleString()} ج.م</span>
+                    {' · '}
+                    الباقي: <span className="font-medium text-amber-700">{Math.max(0, remaining).toLocaleString()} ج.م</span>
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <label className="block text-sm text-slate-600 mb-1">صورة التحويل (اختياري)</label>
               <input

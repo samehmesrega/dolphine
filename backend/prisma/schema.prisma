@@ -283,6 +283,9 @@ model Order {
   accountsConfirmedAt DateTime? @map("accounts_confirmed_at")
   accountsConfirmedBy String? @map("accounts_confirmed_by")
   rejectedReason  String?   @map("rejected_reason")
+  discount        Float?    @default(0) @map("discount")
+  discountReason  String?   @map("discount_reason")
+  partialAmount   Float?    @default(0) @map("partial_amount")
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 

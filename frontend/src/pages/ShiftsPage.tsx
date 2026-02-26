@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 type User = { id: string; name: string };
 type ShiftMember = { id: string; orderNum: number; user: User };
@@ -47,6 +48,8 @@ async function removeShiftMember(shiftId: string, userId: string) {
 
 export default function ShiftsPage() {
   const qc = useQueryClient();
+  const { hasPermission } = useAuth();
+  const canManageMembers = hasPermission('shifts.manage');
   const [form, setForm] = useState({ name: '', startTime: '09:00', endTime: '17:00' });
   const [error, setError] = useState('');
 
@@ -165,41 +168,95 @@ export default function ShiftsPage() {
                   {shift.shiftMembers?.map((m) => (
                     <li key={m.id} className="flex justify-between items-center">
                       <span>{m.user.name}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeMemberMutation.mutate({ shiftId: shift.id, userId: m.user.id })}
-                        className="text-red-500 text-xs hover:underline"
-                      >
-                        إزالة
-                      </button>
+                      {canManageMembers && (
+                        <button
+                          type="button"
+                          onClick={() => removeMemberMutation.mutate({ shiftId: shift.id, userId: m.user.id })}
+                          className="text-red-500 text-xs hover:underline"
+                        >
+                          إزالة
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
-                <div className="mt-2 flex gap-2 items-center">
-                  <select
-                    className="border rounded px-2 py-1 text-sm"
-                    defaultValue=""
-                    onChange={(e) => {
-                      const uid = e.target.value;
-                      if (uid) {
-                        addMemberMutation.mutate({ shiftId: shift.id, userId: uid });
-                        e.target.value = '';
-                      }
-                    }}
-                  >
-                    <option value="">— إضافة عضو —</option>
-                    {users
-                      ?.filter((u) => !shift.shiftMembers?.some((m) => m.user.id === u.id))
-                      .map((u) => (
-                        <option key={u.id} value={u.id}>{u.name}</option>
-                      ))}
-                  </select>
-                </div>
+                {canManageMembers && (
+                  <div className="mt-2 flex gap-2 items-center">
+                    <select
+                      className="border rounded px-2 py-1 text-sm"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const uid = e.target.value;
+                        if (uid) {
+                          addMemberMutation.mutate({ shiftId: shift.id, userId: uid });
+                          e.target.value = '';
+                        }
+                      }}
+                    >
+                      <option value="">— إضافة عضو —</option>
+                      {users
+                        ?.filter((u) => !shift.shiftMembers?.some((m) => m.user.id === u.id))
+                        .map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                )}
               </div>
             </div>
           ))
         )}
       </div>
+
+      {/* Weekly Schedule Table */}
+      {shifts && shifts.length > 0 && (
+        <div className="mt-8 bg-white rounded-xl shadow overflow-hidden">
+          <h2 className="font-semibold text-slate-700 p-4 border-b">جدول الأسبوع</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="py-3 px-4 text-right font-medium text-slate-600 w-24">اليوم</th>
+                  {shifts.map((shift) => (
+                    <th key={shift.id} className="py-3 px-4 text-right font-medium text-slate-600">
+                      <div>{shift.name}</div>
+                      <div className="text-xs text-slate-400 font-normal">{shift.startTime} – {shift.endTime}</div>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {DAYS.map((dayName, dayIndex) => (
+                  <tr key={dayIndex} className="hover:bg-slate-50">
+                    <td className="py-3 px-4 font-medium text-slate-700">{dayName}</td>
+                    {shifts.map((shift) => {
+                      const active = shift.daysOfWeek?.includes(dayIndex);
+                      const members = active ? shift.shiftMembers?.map((m) => m.user.name) : [];
+                      return (
+                        <td key={shift.id} className="py-3 px-4 text-slate-600">
+                          {active && members && members.length > 0 ? (
+                            <ul className="space-y-0.5">
+                              {members.map((name) => (
+                                <li key={name} className="text-xs bg-amber-50 text-amber-800 rounded px-2 py-0.5 inline-block ml-1">
+                                  {name}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : active ? (
+                            <span className="text-xs text-slate-400">لا أعضاء</span>
+                          ) : (
+                            <span className="text-slate-200">—</span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
