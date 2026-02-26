@@ -276,9 +276,11 @@ model Order {
   status          String
   paymentType    String    @map("payment_type")
   transferImage   String?   @map("transfer_image")
-  shippingName    String    @map("shipping_name")
-  shippingPhone   String    @map("shipping_phone")
-  shippingAddress String?   @map("shipping_address")
+  shippingName        String    @map("shipping_name")
+  shippingPhone       String    @map("shipping_phone")
+  shippingGovernorate String?   @map("shipping_governorate")
+  shippingCity        String?   @map("shipping_city")
+  shippingAddress     String?   @map("shipping_address")
   notes           String?
   accountsConfirmed Boolean @default(false) @map("accounts_confirmed")
   accountsConfirmedAt DateTime? @map("accounts_confirmed_at")

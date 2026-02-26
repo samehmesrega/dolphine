@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
@@ -25,6 +25,11 @@ type OrderItemInput = {
   notes: string;
 };
 
+type GeoSuggestion = {
+  governorate: string;
+  city: string;
+};
+
 async function fetchLead(id: string) {
   const { data } = await api.get(`/leads/${id}`);
   return data.lead as Lead;
@@ -42,12 +47,41 @@ async function createOrder(formData: FormData) {
   return data.order;
 }
 
+async function geocodeAddress(query: string): Promise<GeoSuggestion | null> {
+  if (!query.trim() || query.trim().length < 4) return null;
+  try {
+    const url =
+      `https://nominatim.openstreetmap.org/search?` +
+      `q=${encodeURIComponent(query + ' مصر')}&countrycodes=eg&format=json&addressdetails=1&limit=3&accept-language=ar`;
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Dolphin-CRM/1.0' },
+    });
+    if (!res.ok) return null;
+    const results = await res.json();
+    if (!results || results.length === 0) return null;
+    const addr = results[0].address ?? {};
+    const governorate = addr.state || addr.county || '';
+    const city =
+      addr.city || addr.town || addr.village || addr.suburb || addr.county || '';
+    if (!governorate && !city) return null;
+    return { governorate, city };
+  } catch {
+    return null;
+  }
+}
+
 export default function CreateOrderPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const [error, setError] = useState('');
 
-  const [shipping, setShipping] = useState({ name: '', phone: '', address: '' });
+  const [shipping, setShipping] = useState({
+    name: '',
+    phone: '',
+    governorate: '',
+    city: '',
+    addressDetail: '',
+  });
   const [notes, setNotes] = useState('');
   const [paymentType, setPaymentType] = useState<'full' | 'partial'>('full');
   const [items, setItems] = useState<OrderItemInput[]>([
@@ -55,15 +89,21 @@ export default function CreateOrderPage() {
   ]);
   const [transferFile, setTransferFile] = useState<File | null>(null);
 
-  // New state variables
+  // Discount / partial
   const [discount, setDiscount] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
   const [partialAmount, setPartialAmount] = useState<number | ''>('');
   const [customPartial, setCustomPartial] = useState(false);
 
+  // Geo suggestion state
+  const [geoSuggestion, setGeoSuggestion] = useState<GeoSuggestion | null>(null);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Computed totals
-  const orderTotal = items.reduce((sum, it) => sum + (it.quantity * it.price), 0);
-  const remaining = orderTotal - discount - (typeof partialAmount === 'number' ? partialAmount : 0);
+  const orderTotal = items.reduce((sum, it) => sum + it.quantity * it.price, 0);
+  const remaining =
+    orderTotal - discount - (typeof partialAmount === 'number' ? partialAmount : 0);
 
   const { data: lead, isLoading: leadLoading } = useQuery({
     queryKey: ['lead', id],
@@ -73,11 +113,43 @@ export default function CreateOrderPage() {
 
   const { data: products } = useQuery({ queryKey: ['products'], queryFn: fetchProducts });
 
+  // Auto-fill from lead on load
   useEffect(() => {
     if (lead?.name) {
-      setShipping({ name: lead.name, phone: lead.phone, address: lead.address || '' });
+      setShipping((p) => ({
+        ...p,
+        name: lead.name,
+        phone: lead.phone,
+        addressDetail: lead.address || '',
+      }));
     }
   }, [lead?.id]);
+
+  // Geocode when addressDetail changes (debounced 800ms)
+  const handleAddressChange = (value: string) => {
+    setShipping((p) => ({ ...p, addressDetail: value }));
+    setGeoSuggestion(null);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!value.trim() || value.trim().length < 5) return;
+    debounceRef.current = setTimeout(async () => {
+      setGeoLoading(true);
+      const suggestion = await geocodeAddress(value);
+      setGeoLoading(false);
+      if (suggestion) setGeoSuggestion(suggestion);
+    }, 800);
+  };
+
+  // Accept suggestion chips
+  const acceptGovernorate = () => {
+    if (geoSuggestion?.governorate) {
+      setShipping((p) => ({ ...p, governorate: geoSuggestion.governorate }));
+    }
+  };
+  const acceptCity = () => {
+    if (geoSuggestion?.city) {
+      setShipping((p) => ({ ...p, city: geoSuggestion.city }));
+    }
+  };
 
   const createMutation = useMutation({
     mutationFn: createOrder,
@@ -115,7 +187,9 @@ export default function CreateOrderPage() {
     fd.append('leadId', id!);
     fd.append('shippingName', shipping.name.trim());
     fd.append('shippingPhone', shipping.phone.trim());
-    fd.append('shippingAddress', shipping.address.trim());
+    if (shipping.governorate.trim()) fd.append('shippingGovernorate', shipping.governorate.trim());
+    if (shipping.city.trim()) fd.append('shippingCity', shipping.city.trim());
+    if (shipping.addressDetail.trim()) fd.append('shippingAddress', shipping.addressDetail.trim());
     fd.append('notes', notes.trim());
     fd.append('paymentType', paymentType);
     const validItems = items
@@ -145,7 +219,9 @@ export default function CreateOrderPage() {
     return (
       <div className="p-4">
         <p className="text-slate-500">معرف الليد غير صالح.</p>
-        <Link to="/leads" className="text-blue-600 mt-2 inline-block">← ليدز</Link>
+        <Link to="/leads" className="text-blue-600 mt-2 inline-block">
+          ← ليدز
+        </Link>
       </div>
     );
   }
@@ -157,14 +233,18 @@ export default function CreateOrderPage() {
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <Link to={`/leads/${id}`} className="text-slate-600 hover:text-slate-800">← تفاصيل الليد</Link>
+        <Link to={`/leads/${id}`} className="text-slate-600 hover:text-slate-800">
+          ← تفاصيل الليد
+        </Link>
         <h1 className="text-2xl font-bold text-slate-800">إنشاء طلب من الليد</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
+        {/* Shipping section */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-slate-700 mb-4">بيانات الشحن</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Name */}
             <div>
               <label className="block text-sm text-slate-600 mb-1">الاسم</label>
               <input
@@ -174,6 +254,7 @@ export default function CreateOrderPage() {
                 required
               />
             </div>
+            {/* Phone */}
             <div>
               <label className="block text-sm text-slate-600 mb-1">رقم الموبايل</label>
               <input
@@ -183,17 +264,75 @@ export default function CreateOrderPage() {
                 required
               />
             </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm text-slate-600 mb-1">العنوان</label>
+
+            {/* Governorate */}
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">المحافظة</label>
               <input
                 className="w-full border rounded-lg px-3 py-2"
-                value={shipping.address}
-                onChange={(e) => setShipping((p) => ({ ...p, address: e.target.value }))}
+                value={shipping.governorate}
+                onChange={(e) => setShipping((p) => ({ ...p, governorate: e.target.value }))}
+                placeholder="مثال: القاهرة"
               />
+              {geoSuggestion?.governorate && shipping.governorate !== geoSuggestion.governorate && (
+                <button
+                  type="button"
+                  onClick={acceptGovernorate}
+                  className="mt-1 inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-1 hover:bg-blue-100 transition"
+                >
+                  <span>اقتراح:</span>
+                  <span className="font-medium">{geoSuggestion.governorate}</span>
+                  <span className="text-blue-400">← اضغط للقبول</span>
+                </button>
+              )}
+            </div>
+
+            {/* City */}
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">المدينة / المنطقة</label>
+              <input
+                className="w-full border rounded-lg px-3 py-2"
+                value={shipping.city}
+                onChange={(e) => setShipping((p) => ({ ...p, city: e.target.value }))}
+                placeholder="مثال: وسط البلد"
+              />
+              {geoSuggestion?.city && shipping.city !== geoSuggestion.city && (
+                <button
+                  type="button"
+                  onClick={acceptCity}
+                  className="mt-1 inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-1 hover:bg-blue-100 transition"
+                >
+                  <span>اقتراح:</span>
+                  <span className="font-medium">{geoSuggestion.city}</span>
+                  <span className="text-blue-400">← اضغط للقبول</span>
+                </button>
+              )}
+            </div>
+
+            {/* Address detail */}
+            <div className="md:col-span-2">
+              <label className="block text-sm text-slate-600 mb-1">
+                العنوان التفصيلي
+                {geoLoading && (
+                  <span className="mr-2 text-xs text-slate-400">جاري البحث في الخريطة...</span>
+                )}
+              </label>
+              <input
+                className="w-full border rounded-lg px-3 py-2"
+                value={shipping.addressDetail}
+                onChange={(e) => handleAddressChange(e.target.value)}
+                placeholder="الشارع / العمارة / الدور..."
+              />
+              {geoSuggestion && (shipping.governorate !== geoSuggestion.governorate || shipping.city !== geoSuggestion.city) && (
+                <p className="text-xs text-slate-400 mt-1">
+                  تم العثور على اقتراح — اضغط على الشريط أعلاه لكل حقل لقبوله
+                </p>
+              )}
             </div>
           </div>
         </div>
 
+        {/* Order items */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-slate-700 mb-4">عناصر الطلب</h2>
           {items.map((item, index) => (
@@ -214,7 +353,9 @@ export default function CreateOrderPage() {
                     >
                       <option value="">— اسم يدوي أدناه —</option>
                       {products.map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
                       ))}
                     </select>
                     <input
@@ -314,6 +455,7 @@ export default function CreateOrderPage() {
           </div>
         </div>
 
+        {/* Payment section */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-slate-700 mb-4">الدفع وصورة التحويل</h2>
           <div className="space-y-4">
@@ -337,7 +479,10 @@ export default function CreateOrderPage() {
                     <button
                       key={amt}
                       type="button"
-                      onClick={() => { setPartialAmount(amt); setCustomPartial(false); }}
+                      onClick={() => {
+                        setPartialAmount(amt);
+                        setCustomPartial(false);
+                      }}
                       className={`px-3 py-1.5 rounded-lg text-sm border transition ${
                         partialAmount === amt && !customPartial
                           ? 'bg-slate-700 text-white border-slate-700'
@@ -349,7 +494,10 @@ export default function CreateOrderPage() {
                   ))}
                   <button
                     type="button"
-                    onClick={() => { setCustomPartial(true); setPartialAmount(''); }}
+                    onClick={() => {
+                      setCustomPartial(true);
+                      setPartialAmount('');
+                    }}
                     className={`px-3 py-1.5 rounded-lg text-sm border transition ${
                       customPartial
                         ? 'bg-slate-700 text-white border-slate-700'
@@ -372,9 +520,15 @@ export default function CreateOrderPage() {
                 )}
                 {typeof partialAmount === 'number' && partialAmount > 0 && (
                   <p className="text-sm text-slate-600 mt-2">
-                    المدفوع: <span className="font-medium text-green-700">{partialAmount.toLocaleString()} ج.م</span>
+                    المدفوع:{' '}
+                    <span className="font-medium text-green-700">
+                      {partialAmount.toLocaleString()} ج.م
+                    </span>
                     {' · '}
-                    الباقي: <span className="font-medium text-amber-700">{Math.max(0, remaining).toLocaleString()} ج.م</span>
+                    الباقي:{' '}
+                    <span className="font-medium text-amber-700">
+                      {Math.max(0, remaining).toLocaleString()} ج.م
+                    </span>
                   </p>
                 )}
               </div>
@@ -419,7 +573,9 @@ export default function CreateOrderPage() {
       {createMutation.isSuccess && (
         <div className="mt-6 p-4 bg-green-50 text-green-800 rounded-xl">
           تم إنشاء الطلب بنجاح. الطلب سيظهر في قسم «طلبات» وبانتظار تأكيد الحسابات.
-          <Link to="/orders" className="mr-2 text-green-700 underline">عرض الطلبات</Link>
+          <Link to="/orders" className="mr-2 text-green-700 underline">
+            عرض الطلبات
+          </Link>
         </div>
       )}
     </div>
