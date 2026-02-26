@@ -27,7 +27,19 @@ import webhooksRoutes from './routes/webhooks';
 import notificationsRoutes from './routes/notifications';
 import auditLogsRoutes from './routes/audit-logs';
 import reportsRoutes from './routes/reports';
-import { authMiddleware, requirePermission } from './middleware/auth';
+import { authMiddleware, requirePermission, AuthRequest } from './middleware/auth';
+import { Response, NextFunction } from 'express';
+
+// يسمح بـ users.manage أو مدير السيلز (يديروا موظفيهم فقط)
+function requireUsersAccess(req: AuthRequest, res: Response, next: NextFunction): void {
+  if (!req.user) { res.status(401).json({ error: 'غير مصرح' }); return; }
+  const allowed =
+    req.user.permissions.includes('*') ||
+    req.user.permissions.includes('users.manage') ||
+    req.user.roleSlug === 'sales_manager';
+  if (!allowed) { res.status(403).json({ error: 'غير مسموح', message: 'ليس لديك صلاحية' }); return; }
+  next();
+}
 
 const app = express();
 
@@ -110,7 +122,7 @@ app.use('/api/auth', authLimiter, authRoutes);
 app.use('/api/webhooks', webhookLimiter, webhooksRoutes);
 app.use('/api/lead-statuses', authMiddleware, leadStatusesRoutes);
 app.use('/api/leads', authMiddleware, leadsRoutes);
-app.use('/api/users', authMiddleware, requirePermission('users.manage'), usersRoutes);
+app.use('/api/users', authMiddleware, requireUsersAccess, usersRoutes);
 app.use('/api/products', authMiddleware, productsRoutes);
 app.use('/api/orders', authMiddleware, ordersRoutes);
 app.use('/api/customers', authMiddleware, customersRoutes);

@@ -33,7 +33,7 @@ function NavIcon({ name, className = 'w-5 h-5' }: { name: string; className?: st
 }
 
 // ============ تعريف القائمة مع الأيقونات ============
-type ChildItem = { to: string; label: string; permission?: string };
+type ChildItem = { to: string; label: string; permission?: string; allowRoleSlugs?: string[] };
 type SimpleEntry = { type: 'item'; to: string; label: string; icon: string; permission?: string };
 type GroupEntry = { type: 'group'; label: string; icon: string; children: ChildItem[] };
 type NavEntry = SimpleEntry | GroupEntry;
@@ -68,7 +68,7 @@ const NAV: NavEntry[] = [
     label: 'حسابات',
     icon: 'shield',
     children: [
-      { to: '/users', label: 'المستخدمين', permission: 'users.manage' },
+      { to: '/users', label: 'المستخدمين', permission: 'users.manage', allowRoleSlugs: ['sales_manager'] },
       { to: '/roles', label: 'الأدوار والصلاحيات', permission: 'users.manage' },
     ],
   },
@@ -79,14 +79,18 @@ const NAV: NavEntry[] = [
 function GroupNav({
   group,
   hasPermission,
+  roleSlug,
 }: {
   group: GroupEntry;
   hasPermission: (p: string) => boolean;
+  roleSlug?: string;
 }) {
   const location = useLocation();
-  const visibleChildren = group.children.filter(
-    (c) => !c.permission || hasPermission(c.permission),
-  );
+  const visibleChildren = group.children.filter((c) => {
+    if (!c.permission) return true;
+    if (c.allowRoleSlugs?.includes(roleSlug ?? '')) return true;
+    return hasPermission(c.permission);
+  });
   if (!visibleChildren.length) return null;
 
   const isAnyChildActive = visibleChildren.some((c) =>
@@ -141,15 +145,19 @@ function GroupNav({
 function GroupIcon({
   group,
   hasPermission,
+  roleSlug,
 }: {
   group: GroupEntry;
   hasPermission: (p: string) => boolean;
+  roleSlug?: string;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const visibleChildren = group.children.filter(
-    (c) => !c.permission || hasPermission(c.permission),
-  );
+  const visibleChildren = group.children.filter((c) => {
+    if (!c.permission) return true;
+    if (c.allowRoleSlugs?.includes(roleSlug ?? '')) return true;
+    return hasPermission(c.permission);
+  });
   if (!visibleChildren.length) return null;
 
   const isAnyChildActive = visibleChildren.some((c) =>
@@ -175,6 +183,7 @@ function GroupIcon({
 // ============ Sidebar ============
 export default function Sidebar() {
   const { user, logout, hasPermission } = useAuth();
+  const roleSlug = user?.role?.slug;
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
@@ -262,9 +271,9 @@ export default function Sidebar() {
             );
           }
           if (collapsed) {
-            return <GroupIcon key={i} group={entry} hasPermission={hasPermission} />;
+            return <GroupIcon key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} />;
           }
-          return <GroupNav key={i} group={entry} hasPermission={hasPermission} />;
+          return <GroupNav key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} />;
         })}
       </nav>
 
