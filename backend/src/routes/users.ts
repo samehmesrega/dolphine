@@ -15,14 +15,32 @@ const userSelect = {
   role: { select: { id: true, name: true, slug: true } },
 };
 
+// مساعد: يجلب دور المستدعي
+async function getCallerRole(req: AuthRequest) {
+  const callerId = req.user?.userId;
+  if (!callerId) return null;
+  const caller = await prisma.user.findUnique({ where: { id: callerId }, include: { role: true } });
+  return caller?.role ?? null;
+}
+
 // قائمة المستخدمين (اختياري: تضمين المعطّلين)
+// مدير السيلز يرى موظفي السيلز فقط
 router.get('/', async (req: AuthRequest, res: Response) => {
   const includeInactive = req.query.includeInactive === '1';
-  const users = await prisma.user.findMany({
-    where: includeInactive ? undefined : { isActive: true },
-    select: userSelect,
-    orderBy: { name: 'asc' },
-  });
+  const callerRole = await getCallerRole(req);
+
+  let roleIdFilter: string | undefined;
+  if (callerRole?.slug === 'sales_manager') {
+    const salesRole = await prisma.role.findUnique({ where: { slug: 'sales' } });
+    roleIdFilter = salesRole?.id;
+  }
+
+  const where = {
+    ...(includeInactive ? {} : { isActive: true }),
+    ...(roleIdFilter ? { roleId: roleIdFilter } : {}),
+  };
+
+  const users = await prisma.user.findMany({ where, select: userSelect, orderBy: { name: 'asc' } });
   res.json({ users });
 });
 
@@ -100,6 +118,12 @@ router.post('/', async (req: AuthRequest, res: Response) => {
     const role = await prisma.role.findUnique({ where: { id: roleId } });
     if (!role) {
       res.status(400).json({ error: 'الدور غير موجود' });
+      return;
+    }
+    // مدير السيلز يمكنه إنشاء موظفي سيلز فقط
+    const callerRole = await getCallerRole(req);
+    if (callerRole?.slug === 'sales_manager' && role.slug !== 'sales') {
+      res.status(403).json({ error: 'يمكنك إضافة موظفي سيلز فقط' });
       return;
     }
     const passwordHash = await bcrypt.hash(password, 10);
@@ -197,16 +221,32 @@ const updateUserSchema = z.object({
 router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = String(req.params.id);
-    const existing = await prisma.user.findUnique({ where: { id } });
+    const existing = await prisma.user.findUnique({ where: { id }, include: { role: true } });
     if (!existing) {
       res.status(404).json({ error: 'المستخدم غير موجود' });
       return;
+    }
+    // مدير السيلز يمكنه تعديل موظفي السيلز فقط
+    const callerRole = await getCallerRole(req);
+    if (callerRole?.slug === 'sales_manager') {
+      if (existing.role.slug !== 'sales') {
+        res.status(403).json({ error: 'يمكنك تعديل موظفي سيلز فقط' });
+        return;
+      }
     }
     const parsed = updateUserSchema.safeParse(req.body);
     if (!parsed.success) {
       const msg = (parsed.error as { issues: { message?: string }[] }).issues.map((e: { message?: string }) => e.message ?? '').join('؛ ');
       res.status(400).json({ error: msg });
       return;
+    }
+    // مدير السيلز لا يمكنه تغيير الدور إلى غير سيلز
+    if (callerRole?.slug === 'sales_manager' && parsed.data.roleId) {
+      const newRole = await prisma.role.findUnique({ where: { id: parsed.data.roleId } });
+      if (newRole?.slug !== 'sales') {
+        res.status(403).json({ error: 'لا يمكنك تغيير الدور إلى غير موظف سيلز' });
+        return;
+      }
     }
     const updates: { name?: string; email?: string; passwordHash?: string; roleId?: string; isActive?: boolean } = {};
     if (parsed.data.name != null) updates.name = parsed.data.name;

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 type Role = { id: string; name: string; slug: string };
 
@@ -24,6 +25,8 @@ async function fetchRoles() {
 
 export default function UsersPage() {
   const qc = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const isSalesManager = currentUser?.role?.slug === 'sales_manager';
   const [includeInactive, setIncludeInactive] = useState(false);
   const [modal, setModal] = useState<'add' | 'edit' | null>(null);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -59,8 +62,11 @@ export default function UsersPage() {
     },
   });
 
+  // مدير السيلز يرى فقط دور موظف سيلز في القائمة
+  const availableRoles = isSalesManager ? roles.filter((r) => r.slug === 'sales') : roles;
+
   const openAdd = () => {
-    setForm({ name: '', email: '', password: '', roleId: roles[0]?.id ?? '' });
+    setForm({ name: '', email: '', password: '', roleId: availableRoles[0]?.id ?? '' });
     setEditingUser(null);
     setModal('add');
   };
@@ -232,7 +238,7 @@ export default function UsersPage() {
                   onChange={(e) => setForm((f) => ({ ...f, roleId: e.target.value }))}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 >
-                  {roles.map((r) => (
+                  {availableRoles.map((r) => (
                     <option key={r.id} value={r.id}>{r.name}</option>
                   ))}
                 </select>
