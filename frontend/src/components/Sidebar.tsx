@@ -220,7 +220,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className={`flex-1 overflow-y-auto ${collapsed ? 'p-1.5' : 'p-2'}`}>
+      <nav className={`flex-1 overflow-y-auto min-h-0 ${collapsed ? 'p-1.5' : 'p-2'}`}>
         {NAV.map((entry, i) => {
           if (entry.type === 'item') {
             if (entry.permission && !hasPermission(entry.permission)) return null;
