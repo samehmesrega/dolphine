@@ -1,7 +1,40 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
+
+// ============ بيانات المحافظات والمدن ============
+const EGYPT_GOVERNORATES: Record<string, string[]> = {
+  'القاهرة': ['وسط البلد', 'مدينة نصر', 'النزهة', 'العباسية', 'حلوان', 'المعادي', 'المقطم', 'مصر الجديدة', 'مصر القديمة', 'شبرا', 'الزيتون', 'عين شمس', 'التجمع الخامس', 'الشروق', 'بولاق', 'الأميرية', 'عزبة النخل', 'الزاوية الحمراء', 'السلام', 'المرج', 'منشية ناصر', 'الموسكي', 'روض الفرج'],
+  'الجيزة': ['الجيزة', '6 أكتوبر', 'الشيخ زايد', 'إمبابة', 'فيصل', 'الهرم', 'العجوزة', 'الدقي', 'المنيب', 'الحوامدية', 'البدرشين', 'الصف', 'أوسيم', 'كرداسة', 'بولاق الدكرور'],
+  'الإسكندرية': ['وسط الإسكندرية', 'المنتزه', 'العجمي', 'العامرية', 'برج العرب', 'سيدي جابر', 'سيدي بشر', 'كامب شيزار', 'المكس', 'الدخيلة', 'أبو قير', 'الأنفوشي', 'باب شرق', 'محرم بك', 'سموحة', 'ميامي', 'الإبراهيمية'],
+  'الدقهلية': ['المنصورة', 'طلخا', 'ميت غمر', 'دكرنس', 'أجا', 'المنزلة', 'بلقاس', 'شربين', 'تمي الأمديد', 'السنبلاوين', 'نبروه', 'منية النصر'],
+  'البحر الأحمر': ['الغردقة', 'رأس غارب', 'سفاجا', 'القصير', 'مرسى علم', 'الشلاتين'],
+  'البحيرة': ['دمنهور', 'كفر الدوار', 'رشيد', 'أبو المطامير', 'شبراخيت', 'إيتاي البارود', 'المحمودية', 'حوش عيسى', 'وادي النطرون', 'أبو حمص'],
+  'الفيوم': ['الفيوم', 'سنورس', 'إطسا', 'طامية', 'يوسف الصديق', 'أبشواي'],
+  'الغربية': ['طنطا', 'المحلة الكبرى', 'كفر الزيات', 'زفتى', 'السنطة', 'بسيون', 'قطور'],
+  'الإسماعيلية': ['الإسماعيلية', 'القنطرة', 'أبو صوير', 'فايد', 'القصاصين'],
+  'المنوفية': ['شبين الكوم', 'مينوف', 'تلا', 'الشهداء', 'قويسنا', 'بركة السبع', 'أشمون', 'الباجور'],
+  'المنيا': ['المنيا', 'ملوي', 'مغاغة', 'بني مزار', 'أبو قرقاص', 'سمالوط', 'دير مواس', 'العدوة', 'مطاي'],
+  'القليوبية': ['بنها', 'شبين القناطر', 'قليوب', 'الخانكة', 'القناطر الخيرية', 'طوخ', 'كفر شكر', 'العبور'],
+  'الوادي الجديد': ['الخارجة', 'الداخلة', 'الفرافرة', 'بريس', 'موط'],
+  'السويس': ['السويس', 'الأربعين', 'عتاقة', 'الجناين'],
+  'أسوان': ['أسوان', 'كوم أمبو', 'إدفو', 'نصر النوبة', 'دراو', 'أبو سمبل'],
+  'أسيوط': ['أسيوط', 'ديروط', 'منفلوط', 'القوصية', 'أبنوب', 'صدفا', 'البداري', 'الغنايم'],
+  'بني سويف': ['بني سويف', 'الفشن', 'ناصر', 'إهناسيا', 'ببا', 'سمسطا', 'الواسطى'],
+  'بورسعيد': ['بورسعيد', 'بورفؤاد', 'الضواحي', 'العرب'],
+  'دمياط': ['دمياط', 'رأس البر', 'الزرقا', 'فارسكور', 'كفر سعد', 'عزبة البرج'],
+  'الشرقية': ['الزقازيق', 'العاشر من رمضان', 'منيا القمح', 'فاقوس', 'بلبيس', 'كفر صقر', 'أبو حماد', 'ديرب نجم', 'أبو كبير', 'مشتول السوق'],
+  'جنوب سيناء': ['الطور', 'شرم الشيخ', 'دهب', 'نويبع', 'طابا', 'أبو زنيمة', 'أبو رديس', 'رأس سدر'],
+  'كفر الشيخ': ['كفر الشيخ', 'دسوق', 'فوه', 'سيدي سالم', 'بيلا', 'مطوبس', 'الحامول', 'الرياض'],
+  'مطروح': ['مرسى مطروح', 'سيوة', 'سيدي براني', 'الضبعة', 'العلمين', 'النجيلة'],
+  'الأقصر': ['الأقصر', 'أرمنت', 'إسنا', 'البياضية', 'القرنة', 'الزينية'],
+  'قنا': ['قنا', 'نجع حمادي', 'دشنا', 'قوص', 'فرشوط', 'أبو تشت', 'الوقف'],
+  'شمال سيناء': ['العريش', 'رفح', 'الشيخ زويد', 'بئر العبد', 'الحسنة', 'نخل'],
+  'سوهاج': ['سوهاج', 'طهطا', 'طما', 'أخميم', 'المنشاة', 'جرجا', 'البلينا', 'دار السلام', 'ساقلته'],
+};
+
+const GOVERNORATE_LIST = Object.keys(EGYPT_GOVERNORATES).sort();
 
 type Lead = {
   id: string;
@@ -25,11 +58,6 @@ type OrderItemInput = {
   notes: string;
 };
 
-type GeoSuggestion = {
-  governorate: string;
-  city: string;
-};
-
 async function fetchLead(id: string) {
   const { data } = await api.get(`/leads/${id}`);
   return data.lead as Lead;
@@ -45,29 +73,6 @@ async function createOrder(formData: FormData) {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
   return data.order;
-}
-
-async function geocodeAddress(query: string): Promise<GeoSuggestion | null> {
-  if (!query.trim() || query.trim().length < 4) return null;
-  try {
-    const url =
-      `https://nominatim.openstreetmap.org/search?` +
-      `q=${encodeURIComponent(query + ' مصر')}&countrycodes=eg&format=json&addressdetails=1&limit=3&accept-language=ar`;
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Dolphin-CRM/1.0' },
-    });
-    if (!res.ok) return null;
-    const results = await res.json();
-    if (!results || results.length === 0) return null;
-    const addr = results[0].address ?? {};
-    const governorate = addr.state || addr.county || '';
-    const city =
-      addr.city || addr.town || addr.village || addr.suburb || addr.county || '';
-    if (!governorate && !city) return null;
-    return { governorate, city };
-  } catch {
-    return null;
-  }
 }
 
 export default function CreateOrderPage() {
@@ -89,21 +94,19 @@ export default function CreateOrderPage() {
   ]);
   const [transferFile, setTransferFile] = useState<File | null>(null);
 
-  // Discount / partial
   const [discount, setDiscount] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
   const [partialAmount, setPartialAmount] = useState<number | ''>('');
   const [customPartial, setCustomPartial] = useState(false);
 
-  // Geo suggestion state
-  const [geoSuggestion, setGeoSuggestion] = useState<GeoSuggestion | null>(null);
-  const [geoLoading, setGeoLoading] = useState(false);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Computed totals
   const orderTotal = items.reduce((sum, it) => sum + it.quantity * it.price, 0);
   const remaining =
     orderTotal - discount - (typeof partialAmount === 'number' ? partialAmount : 0);
+
+  // المدن المتاحة حسب المحافظة المختارة
+  const availableCities = shipping.governorate
+    ? (EGYPT_GOVERNORATES[shipping.governorate] ?? [])
+    : [];
 
   const { data: lead, isLoading: leadLoading } = useQuery({
     queryKey: ['lead', id],
@@ -113,7 +116,6 @@ export default function CreateOrderPage() {
 
   const { data: products } = useQuery({ queryKey: ['products'], queryFn: fetchProducts });
 
-  // Auto-fill from lead on load
   useEffect(() => {
     if (lead?.name) {
       setShipping((p) => ({
@@ -125,30 +127,9 @@ export default function CreateOrderPage() {
     }
   }, [lead?.id]);
 
-  // Geocode when addressDetail changes (debounced 800ms)
-  const handleAddressChange = (value: string) => {
-    setShipping((p) => ({ ...p, addressDetail: value }));
-    setGeoSuggestion(null);
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    if (!value.trim() || value.trim().length < 5) return;
-    debounceRef.current = setTimeout(async () => {
-      setGeoLoading(true);
-      const suggestion = await geocodeAddress(value);
-      setGeoLoading(false);
-      if (suggestion) setGeoSuggestion(suggestion);
-    }, 800);
-  };
-
-  // Accept suggestion chips
-  const acceptGovernorate = () => {
-    if (geoSuggestion?.governorate) {
-      setShipping((p) => ({ ...p, governorate: geoSuggestion.governorate }));
-    }
-  };
-  const acceptCity = () => {
-    if (geoSuggestion?.city) {
-      setShipping((p) => ({ ...p, city: geoSuggestion.city }));
-    }
+  // عند تغيير المحافظة امسح المدينة
+  const handleGovernoraChange = (val: string) => {
+    setShipping((p) => ({ ...p, governorate: val, city: '' }));
   };
 
   const createMutation = useMutation({
@@ -187,7 +168,7 @@ export default function CreateOrderPage() {
     fd.append('leadId', id!);
     fd.append('shippingName', shipping.name.trim());
     fd.append('shippingPhone', shipping.phone.trim());
-    if (shipping.governorate.trim()) fd.append('shippingGovernorate', shipping.governorate.trim());
+    if (shipping.governorate) fd.append('shippingGovernorate', shipping.governorate);
     if (shipping.city.trim()) fd.append('shippingCity', shipping.city.trim());
     if (shipping.addressDetail.trim()) fd.append('shippingAddress', shipping.addressDetail.trim());
     fd.append('notes', notes.trim());
@@ -219,9 +200,7 @@ export default function CreateOrderPage() {
     return (
       <div className="p-4">
         <p className="text-slate-500">معرف الليد غير صالح.</p>
-        <Link to="/leads" className="text-blue-600 mt-2 inline-block">
-          ← ليدز
-        </Link>
+        <Link to="/leads" className="text-blue-600 mt-2 inline-block">← ليدز</Link>
       </div>
     );
   }
@@ -233,18 +212,18 @@ export default function CreateOrderPage() {
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <Link to={`/leads/${id}`} className="text-slate-600 hover:text-slate-800">
-          ← تفاصيل الليد
-        </Link>
+        <Link to={`/leads/${id}`} className="text-slate-600 hover:text-slate-800">← تفاصيل الليد</Link>
         <h1 className="text-2xl font-bold text-slate-800">إنشاء طلب من الليد</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
-        {/* Shipping section */}
+
+        {/* بيانات الشحن */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-slate-700 mb-4">بيانات الشحن</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Name */}
+
+            {/* الاسم */}
             <div>
               <label className="block text-sm text-slate-600 mb-1">الاسم</label>
               <input
@@ -254,7 +233,8 @@ export default function CreateOrderPage() {
                 required
               />
             </div>
-            {/* Phone */}
+
+            {/* رقم الموبايل */}
             <div>
               <label className="block text-sm text-slate-600 mb-1">رقم الموبايل</label>
               <input
@@ -265,74 +245,65 @@ export default function CreateOrderPage() {
               />
             </div>
 
-            {/* Governorate */}
+            {/* المحافظة */}
             <div>
               <label className="block text-sm text-slate-600 mb-1">المحافظة</label>
-              <input
-                className="w-full border rounded-lg px-3 py-2"
+              <select
+                className="w-full border rounded-lg px-3 py-2 bg-white"
                 value={shipping.governorate}
-                onChange={(e) => setShipping((p) => ({ ...p, governorate: e.target.value }))}
-                placeholder="مثال: القاهرة"
-              />
-              {geoSuggestion?.governorate && shipping.governorate !== geoSuggestion.governorate && (
-                <button
-                  type="button"
-                  onClick={acceptGovernorate}
-                  className="mt-1 inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-1 hover:bg-blue-100 transition"
-                >
-                  <span>اقتراح:</span>
-                  <span className="font-medium">{geoSuggestion.governorate}</span>
-                  <span className="text-blue-400">← اضغط للقبول</span>
-                </button>
-              )}
+                onChange={(e) => handleGovernoraChange(e.target.value)}
+              >
+                <option value="">— اختر المحافظة —</option>
+                {GOVERNORATE_LIST.map((g) => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
             </div>
 
-            {/* City */}
+            {/* المدينة / المنطقة */}
             <div>
               <label className="block text-sm text-slate-600 mb-1">المدينة / المنطقة</label>
-              <input
-                className="w-full border rounded-lg px-3 py-2"
-                value={shipping.city}
-                onChange={(e) => setShipping((p) => ({ ...p, city: e.target.value }))}
-                placeholder="مثال: وسط البلد"
-              />
-              {geoSuggestion?.city && shipping.city !== geoSuggestion.city && (
-                <button
-                  type="button"
-                  onClick={acceptCity}
-                  className="mt-1 inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-full px-3 py-1 hover:bg-blue-100 transition"
-                >
-                  <span>اقتراح:</span>
-                  <span className="font-medium">{geoSuggestion.city}</span>
-                  <span className="text-blue-400">← اضغط للقبول</span>
-                </button>
+              {availableCities.length > 0 ? (
+                <>
+                  <input
+                    list="cities-datalist"
+                    className="w-full border rounded-lg px-3 py-2"
+                    value={shipping.city}
+                    onChange={(e) => setShipping((p) => ({ ...p, city: e.target.value }))}
+                    placeholder="اختر أو اكتب المدينة"
+                  />
+                  <datalist id="cities-datalist">
+                    {availableCities.map((c) => (
+                      <option key={c} value={c} />
+                    ))}
+                  </datalist>
+                </>
+              ) : (
+                <input
+                  className="w-full border rounded-lg px-3 py-2"
+                  value={shipping.city}
+                  onChange={(e) => setShipping((p) => ({ ...p, city: e.target.value }))}
+                  placeholder={shipping.governorate ? 'اكتب المدينة' : 'اختر المحافظة أولاً'}
+                  disabled={!shipping.governorate}
+                />
               )}
             </div>
 
-            {/* Address detail */}
+            {/* العنوان التفصيلي */}
             <div className="md:col-span-2">
-              <label className="block text-sm text-slate-600 mb-1">
-                العنوان التفصيلي
-                {geoLoading && (
-                  <span className="mr-2 text-xs text-slate-400">جاري البحث في الخريطة...</span>
-                )}
-              </label>
+              <label className="block text-sm text-slate-600 mb-1">العنوان التفصيلي</label>
               <input
                 className="w-full border rounded-lg px-3 py-2"
                 value={shipping.addressDetail}
-                onChange={(e) => handleAddressChange(e.target.value)}
+                onChange={(e) => setShipping((p) => ({ ...p, addressDetail: e.target.value }))}
                 placeholder="الشارع / العمارة / الدور..."
               />
-              {geoSuggestion && (shipping.governorate !== geoSuggestion.governorate || shipping.city !== geoSuggestion.city) && (
-                <p className="text-xs text-slate-400 mt-1">
-                  تم العثور على اقتراح — اضغط على الشريط أعلاه لكل حقل لقبوله
-                </p>
-              )}
             </div>
+
           </div>
         </div>
 
-        {/* Order items */}
+        {/* عناصر الطلب */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-slate-700 mb-4">عناصر الطلب</h2>
           {items.map((item, index) => (
@@ -353,9 +324,7 @@ export default function CreateOrderPage() {
                     >
                       <option value="">— اسم يدوي أدناه —</option>
                       {products.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
+                        <option key={p.id} value={p.id}>{p.name}</option>
                       ))}
                     </select>
                     <input
@@ -412,7 +381,7 @@ export default function CreateOrderPage() {
             + إضافة صنف
           </button>
 
-          {/* Order total summary */}
+          {/* ملخص الإجمالي */}
           <div className="bg-slate-50 border-t border-slate-200 mt-4 pt-4 px-2 space-y-1 text-sm text-slate-700">
             <div className="flex justify-between">
               <span>الإجمالي</span>
@@ -430,7 +399,7 @@ export default function CreateOrderPage() {
             </div>
           </div>
 
-          {/* Discount fields */}
+          {/* الخصم */}
           <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap gap-3 items-end">
             <div className="w-32">
               <label className="block text-xs text-slate-500 mb-1">الخصم (ج.م)</label>
@@ -455,7 +424,7 @@ export default function CreateOrderPage() {
           </div>
         </div>
 
-        {/* Payment section */}
+        {/* الدفع */}
         <div className="bg-white rounded-xl shadow p-6">
           <h2 className="font-semibold text-slate-700 mb-4">الدفع وصورة التحويل</h2>
           <div className="space-y-4">
@@ -479,10 +448,7 @@ export default function CreateOrderPage() {
                     <button
                       key={amt}
                       type="button"
-                      onClick={() => {
-                        setPartialAmount(amt);
-                        setCustomPartial(false);
-                      }}
+                      onClick={() => { setPartialAmount(amt); setCustomPartial(false); }}
                       className={`px-3 py-1.5 rounded-lg text-sm border transition ${
                         partialAmount === amt && !customPartial
                           ? 'bg-slate-700 text-white border-slate-700'
@@ -494,10 +460,7 @@ export default function CreateOrderPage() {
                   ))}
                   <button
                     type="button"
-                    onClick={() => {
-                      setCustomPartial(true);
-                      setPartialAmount('');
-                    }}
+                    onClick={() => { setCustomPartial(true); setPartialAmount(''); }}
                     className={`px-3 py-1.5 rounded-lg text-sm border transition ${
                       customPartial
                         ? 'bg-slate-700 text-white border-slate-700'
@@ -520,15 +483,9 @@ export default function CreateOrderPage() {
                 )}
                 {typeof partialAmount === 'number' && partialAmount > 0 && (
                   <p className="text-sm text-slate-600 mt-2">
-                    المدفوع:{' '}
-                    <span className="font-medium text-green-700">
-                      {partialAmount.toLocaleString()} ج.م
-                    </span>
+                    المدفوع: <span className="font-medium text-green-700">{partialAmount.toLocaleString()} ج.م</span>
                     {' · '}
-                    الباقي:{' '}
-                    <span className="font-medium text-amber-700">
-                      {Math.max(0, remaining).toLocaleString()} ج.م
-                    </span>
+                    الباقي: <span className="font-medium text-amber-700">{Math.max(0, remaining).toLocaleString()} ج.م</span>
                   </p>
                 )}
               </div>
@@ -573,9 +530,7 @@ export default function CreateOrderPage() {
       {createMutation.isSuccess && (
         <div className="mt-6 p-4 bg-green-50 text-green-800 rounded-xl">
           تم إنشاء الطلب بنجاح. الطلب سيظهر في قسم «طلبات» وبانتظار تأكيد الحسابات.
-          <Link to="/orders" className="mr-2 text-green-700 underline">
-            عرض الطلبات
-          </Link>
+          <Link to="/orders" className="mr-2 text-green-700 underline">عرض الطلبات</Link>
         </div>
       )}
     </div>
