@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-type User = { id: string; name: string };
+type User = { id: string; name: string; role: { slug: string } };
 type ShiftMember = { id: string; dayOfWeek: number; orderNum: number; user: User };
 type Shift = {
   id: string;
@@ -63,7 +63,8 @@ export default function ShiftsPage() {
   const [error, setError] = useState('');
 
   const { data: shifts, isLoading } = useQuery({ queryKey: ['shifts'], queryFn: fetchShifts });
-  const { data: users } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
+  const { data: allUsers } = useQuery({ queryKey: ['users'], queryFn: fetchUsers });
+  const users = allUsers?.filter((u) => u.role.slug === 'sales');
 
   const createMutation = useMutation({
     mutationFn: createShift,
