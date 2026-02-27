@@ -27,6 +27,8 @@ import webhooksRoutes from './routes/webhooks';
 import notificationsRoutes from './routes/notifications';
 import auditLogsRoutes from './routes/audit-logs';
 import reportsRoutes from './routes/reports';
+import tasksRoutes from './routes/tasks';
+import taskRulesRoutes from './routes/task-rules';
 import { authMiddleware, requirePermission, AuthRequest } from './middleware/auth';
 
 // يسمح بـ users.manage أو مدير السيلز (يديروا موظفيهم فقط)
@@ -132,6 +134,8 @@ app.use('/api/form-connections', authMiddleware, formConnectionsRoutes);
 app.use('/api/notifications', authMiddleware, notificationsRoutes);
 app.use('/api/audit-logs', authMiddleware, auditLogsRoutes);
 app.use('/api/reports', authMiddleware, requirePermission('reports.view'), reportsRoutes);
+app.use('/api/tasks', authMiddleware, tasksRoutes);
+app.use('/api/task-rules', authMiddleware, taskRulesRoutes);
 
 // ===== Frontend Static Files (Production) =====
 if (process.env.NODE_ENV === 'production') {

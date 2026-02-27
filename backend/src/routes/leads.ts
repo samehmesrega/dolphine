@@ -163,6 +163,19 @@ router.post('/', async (req: Request, res: Response) => {
       include: { status: true, customer: true, assignedTo: { select: { id: true, name: true } } },
     });
 
+    // أنشئ task "ليد جديد" للموظف المعين
+    if (assignedToId) {
+      await prisma.task.create({
+        data: {
+          type: 'new_lead',
+          title: `تواصل مع ليد جديد: ${lead.name}`,
+          leadId: lead.id,
+          assignedToId,
+          status: 'pending',
+        },
+      });
+    }
+
     res.status(201).json({ lead });
   } catch (err: unknown) {
     console.error('Create lead error:', err);
@@ -275,6 +288,25 @@ router.patch('/:id', async (req: Request, res: Response) => {
       oldData: { name: lead.name, statusId: lead.statusId, assignedToId: lead.assignedToId },
       newData: { name: updated.name, statusId: updated.statusId, assignedToId: updated.assignedToId },
     });
+
+    // لو اتغير التعيين → أنشئ task "ليد جديد" للموظف الجديد (لو مافيش pending بالفعل)
+    if (updateData.assignedToId && updateData.assignedToId !== lead.assignedToId) {
+      const exists = await prisma.task.findFirst({
+        where: { leadId: id, type: 'new_lead', status: 'pending' },
+      });
+      if (!exists) {
+        await prisma.task.create({
+          data: {
+            type: 'new_lead',
+            title: `تواصل مع: ${updated.name}`,
+            leadId: id,
+            assignedToId: updateData.assignedToId,
+            status: 'pending',
+          },
+        });
+      }
+    }
+
     res.json({ lead: updated });
   } catch (err: unknown) {
     console.error('Update lead error:', err);
@@ -384,6 +416,17 @@ router.post('/:id/communications', async (req: Request, res: Response) => {
         });
       }
       return comm;
+    });
+
+    // أعلم pending tasks للموظف ده على الليد ده كمكتملة
+    await prisma.task.updateMany({
+      where: {
+        leadId: id,
+        assignedToId: userId,
+        status: 'pending',
+        type: { in: ['new_lead', 're_contact', 'callback_replied'] },
+      },
+      data: { status: 'done', completedAt: new Date(), completedById: userId },
     });
 
     const updatedLead = await prisma.lead.findUnique({
@@ -584,6 +627,8 @@ router.post('/:id/response-requests/:requestId/reply', async (req: Request, res:
       res.status(403).json({ error: 'يمكن فقط للمطلوب منه الرد إضافة الرد' });
       return;
     }
+    const leadId = String(req.params.id);
+    const lead = await prisma.lead.findUnique({ where: { id: leadId }, select: { name: true } });
     const updated = await prisma.responseRequest.update({
       where: { id: requestId },
       data: { response: response.trim(), respondedAt: new Date() },
@@ -592,6 +637,20 @@ router.post('/:id/response-requests/:requestId/reply', async (req: Request, res:
         requestedBy: { select: { id: true, name: true } },
       },
     });
+
+    // أنشئ task لصاحب الطلب الأصلي إنه يتابع
+    if (rr.requestedById) {
+      await prisma.task.create({
+        data: {
+          type: 'callback_replied',
+          title: `تم الرد على طلبك — تابع مع: ${lead?.name ?? ''}`,
+          leadId: leadId,
+          assignedToId: rr.requestedById,
+          status: 'pending',
+        },
+      });
+    }
+
     res.json({ responseRequest: updated });
   } catch (err) {
     console.error('Reply response-request error:', err);
