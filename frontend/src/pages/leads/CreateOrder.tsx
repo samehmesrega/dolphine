@@ -41,12 +41,21 @@ const GOVERNORATE_LIST = [
   'مرسى مطروح', 'الأقصر', 'جنوب سيناء', 'الوادي الجديد', 'شمال سيناء',
 ];
 
+type ProductInterest = {
+  id: string;
+  productId: string | null;
+  product: { id: string; name: string } | null;
+  quantity: number;
+  notes: string | null;
+};
+
 type Lead = {
   id: string;
   name: string;
   phone: string;
   address: string | null;
   customerId: string | null;
+  productInterests?: ProductInterest[];
 };
 
 type Product = {
@@ -129,6 +138,19 @@ export default function CreateOrderPage() {
         phone: lead.phone,
         addressDetail: lead.address || '',
       }));
+
+      // ملء عناصر الطلب من اهتمامات المنتجات تلقائياً
+      if (lead.productInterests && lead.productInterests.length > 0) {
+        setItems(
+          lead.productInterests.map((pi) => ({
+            productId: pi.productId || '',
+            productName: pi.product?.name || '',
+            quantity: pi.quantity,
+            price: 0,
+            notes: pi.notes || '',
+          }))
+        );
+      }
     }
   }, [lead?.id]);
 
