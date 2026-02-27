@@ -7,6 +7,7 @@ type LeadStatus = {
   id: string;
   name: string;
   slug: string;
+  color?: string | null;
 };
 
 type Lead = {
@@ -171,31 +172,31 @@ export default function LeadsList() {
         {isFetching && <span className="text-sm text-slate-500">جاري التحديث...</span>}
       </div>
 
-      <div className="bg-white rounded-xl shadow p-4 mb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
         <h2 className="font-semibold text-slate-700 mb-3">إضافة ليد يدوي</h2>
         <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <input
-            className="border rounded-lg px-3 py-2"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             placeholder="الاسم"
             value={form.name}
             onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
             required
           />
           <input
-            className="border rounded-lg px-3 py-2"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             placeholder="رقم الموبايل"
             value={form.phone}
             onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
             required
           />
           <input
-            className="border rounded-lg px-3 py-2"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             placeholder="واتساب (اختياري)"
             value={form.whatsapp}
             onChange={(e) => setForm((p) => ({ ...p, whatsapp: e.target.value }))}
           />
           <input
-            className="border rounded-lg px-3 py-2"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             placeholder="إيميل (اختياري)"
             value={form.email}
             onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
@@ -207,7 +208,7 @@ export default function LeadsList() {
             {submitting ? 'جاري الحفظ...' : 'حفظ'}
           </button>
           <input
-            className="border rounded-lg px-3 py-2 md:col-span-5"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors md:col-span-5"
             placeholder="العنوان (اختياري)"
             value={form.address}
             onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
@@ -216,10 +217,10 @@ export default function LeadsList() {
         {error && <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
       </div>
 
-      <div className="bg-white rounded-xl shadow p-4 mb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
           <input
-            className="border rounded-lg px-3 py-2"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             placeholder="بحث: اسم / فون / إيميل"
             value={search}
             onChange={(e) => {
@@ -228,7 +229,7 @@ export default function LeadsList() {
             }}
           />
           <select
-            className="border rounded-lg px-3 py-2"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             value={statusId}
             onChange={(e) => {
               setPage(1);
@@ -243,7 +244,7 @@ export default function LeadsList() {
             ))}
           </select>
           <select
-            className="border rounded-lg px-3 py-2"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             value={assignedToId}
             onChange={(e) => {
               setPage(1);
@@ -258,7 +259,7 @@ export default function LeadsList() {
             ))}
           </select>
           <select
-            className="border rounded-lg px-3 py-2"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             value={`${sortBy}-${order}`}
             onChange={(e) => {
               const v = e.target.value;
@@ -278,7 +279,7 @@ export default function LeadsList() {
             type="button"
             onClick={handleExport}
             disabled={exporting}
-            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 text-slate-700"
+            className="border border-slate-300 text-slate-600 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-40"
           >
             {exporting ? 'جاري التصدير...' : 'تصدير CSV'}
           </button>
@@ -291,17 +292,17 @@ export default function LeadsList() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600">
+          <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
-              <th className="text-right p-3">#</th>
-              <th className="text-right p-3">الاسم</th>
-              <th className="text-right p-3">الموبايل</th>
-              <th className="text-right p-3">الحالة</th>
-              <th className="text-right p-3">المعيّن له</th>
-              <th className="text-right p-3">المصدر</th>
-              <th className="text-right p-3">تاريخ الإنشاء</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">#</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الاسم</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الموبايل</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الحالة</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">المعيّن له</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">المصدر</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">تاريخ الإنشاء</th>
             </tr>
           </thead>
           <tbody>
@@ -330,18 +331,29 @@ export default function LeadsList() {
               </tr>
             ) : (
               data!.leads.map((l) => (
-                <tr key={l.id} className="border-t hover:bg-slate-50">
-                  <td className="p-3 text-slate-400 text-xs font-mono">#{l.number}</td>
-                  <td className="p-3 text-slate-800">
+                <tr key={l.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                  <td className="px-4 py-3 text-slate-400 text-sm">#{l.number}</td>
+                  <td className="px-4 py-3 text-slate-700">
                     <Link to={`/leads/${l.id}`} className="text-blue-600 hover:underline font-medium">
                       {l.name}
                     </Link>
                   </td>
-                  <td className="p-3">{l.phone}</td>
-                  <td className="p-3">{l.status?.name}</td>
-                  <td className="p-3">{l.assignedTo?.name ?? '—'}</td>
-                  <td className="p-3">{l.source}</td>
-                  <td className="p-3">{new Date(l.createdAt).toLocaleString('ar-EG')}</td>
+                  <td className="px-4 py-3 text-slate-700">{l.phone}</td>
+                  <td className="px-4 py-3 text-slate-700">
+                    <span
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                      style={{
+                        backgroundColor: l.status?.color ? l.status.color + '20' : '#f1f5f9',
+                        color: l.status?.color || '#64748b',
+                        borderColor: l.status?.color ? l.status.color + '40' : '#e2e8f0',
+                      }}
+                    >
+                      {l.status?.name}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-slate-700">{l.assignedTo?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-700">{l.source}</td>
+                  <td className="px-4 py-3 text-slate-700">{new Date(l.createdAt).toLocaleString('ar-EG')}</td>
                 </tr>
               ))
             )}

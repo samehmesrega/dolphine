@@ -36,6 +36,12 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'مرفوض',
 };
 
+const ORDER_STATUS_STYLE: Record<string, string> = {
+  pending_accounts: 'bg-amber-50 text-amber-700 border border-amber-200',
+  accounts_confirmed: 'bg-green-50 text-green-700 border border-green-200',
+  rejected: 'bg-red-50 text-red-700 border border-red-200',
+};
+
 async function fetchOrder(id: string) {
   const { data } = await api.get(`/orders/${id}`);
   return data.order as Order;
@@ -117,21 +123,24 @@ export default function OrderDetailPage() {
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-4">
           <Link to="/orders" className="text-slate-600 hover:text-slate-800">← طلبات</Link>
-          <h1 className="text-2xl font-bold text-slate-800">
+          <h1 className="text-xl font-bold text-slate-800">
             {order.wooCommerceId ? (
-              <>تفاصيل الطلب <span className="font-mono text-blue-700">#{order.wooCommerceId}</span></>
+              <>تفاصيل الطلب <span className="font-mono font-semibold text-blue-700">#{order.wooCommerceId}</span></>
             ) : (
-              <>تفاصيل الطلب <span className="font-mono text-slate-500">#{order.number}</span> <span className="text-orange-400 text-sm font-normal">مؤقت</span></>
+              <>
+                تفاصيل الطلب <span className="text-slate-500 font-mono">#{order.number}</span>
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-600 border border-amber-100 mr-2">مؤقت</span>
+              </>
             )}
           </h1>
         </div>
-        <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-700">
+        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${ORDER_STATUS_STYLE[order.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
           {STATUS_LABELS[order.status] ?? order.status}
         </span>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h2 className="font-semibold text-slate-700 mb-4">بيانات الشحن</h2>
           <dl className="space-y-2 text-sm">
             <div><dt className="text-slate-500">الاسم</dt><dd className="font-medium">{order.shippingName}</dd></div>
@@ -190,7 +199,7 @@ export default function OrderDetailPage() {
                   type="button"
                   onClick={() => pushToWooMutation.mutate()}
                   disabled={pushToWooMutation.isPending}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
                 >
                   {pushToWooMutation.isPending ? 'جاري الرفع...' : 'رفع إلى ووكومرس'}
                 </button>
@@ -202,7 +211,7 @@ export default function OrderDetailPage() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h2 className="font-semibold text-slate-700 mb-4">عناصر الطلب</h2>
           <ul className="space-y-2">
             {order.orderItems.map((item) => (

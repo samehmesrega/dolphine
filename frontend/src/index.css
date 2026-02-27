@@ -4,6 +4,8 @@
 
 body {
   font-family: 'Cairo', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* العناوين تستخدم Tajawal — أثقل وأكثر حضوراً للعربية */

@@ -314,7 +314,7 @@ export default function LeadDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Lead Data Block */}
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-slate-700">بيانات الليد</h2>
             {!editing ? (
@@ -336,7 +336,7 @@ export default function LeadDetailPage() {
                 <div key={key}>
                   <label className="block text-sm text-slate-600 mb-1">{label}</label>
                   <input
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
                     value={editForm[key]}
                     onChange={(e) => setEditForm((p) => ({ ...p, [key]: e.target.value }))}
                     required={required}
@@ -344,7 +344,7 @@ export default function LeadDetailPage() {
                 </div>
               ))}
               <button type="submit" disabled={updateLeadMutation.isPending}
-                className="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm">
+                className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 text-sm font-medium transition-colors">
                 {updateLeadMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
               </button>
             </form>
@@ -404,7 +404,7 @@ export default function LeadDetailPage() {
                   <div>
                     <label className="block text-xs text-slate-500 mb-1">التعيين</label>
                     <select
-                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
                       value={lead.assignedTo?.id ?? ''}
                       onChange={(e) => handleAssign(e.target.value)}
                       disabled={updateLeadMutation.isPending}
@@ -427,7 +427,7 @@ export default function LeadDetailPage() {
                   onClick={(e) => { if (!isConfirmed) e.preventDefault(); }}
                   className={`block w-full px-4 py-2.5 text-center rounded-lg text-sm font-medium transition ${
                     isConfirmed
-                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                      ? 'bg-blue-600 text-white hover:bg-blue-700'
                       : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                   }`}
                 >
@@ -442,7 +442,7 @@ export default function LeadDetailPage() {
         </div>
 
         {/* Product Interests Block */}
-        <div className="bg-white rounded-xl shadow overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
           <h2 className="font-semibold text-slate-700 p-4 border-b">اهتمامات المنتجات</h2>
           <div className="p-4 border-b bg-slate-50">
             <form
@@ -491,7 +491,7 @@ export default function LeadDetailPage() {
               <button
                 type="submit"
                 disabled={addInterestMutation.isPending}
-                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 text-sm font-medium transition-colors"
               >
                 {addInterestMutation.isPending ? 'جاري...' : 'إضافة'}
               </button>
@@ -537,7 +537,7 @@ export default function LeadDetailPage() {
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
 
         {/* Communication Form */}
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h2 className="font-semibold text-slate-700 mb-4">إضافة تواصُل</h2>
           <form onSubmit={handleCommSubmit} className="space-y-4">
             <div>
@@ -550,7 +550,7 @@ export default function LeadDetailPage() {
                     onClick={() => setCommForm((p) => ({ ...p, type: value }))}
                     className={`px-4 py-2 rounded-lg text-sm border transition ${
                       commForm.type === value
-                        ? 'bg-slate-700 text-white border-slate-700 font-medium'
+                        ? 'bg-blue-600 text-white border-blue-600 font-medium'
                         : 'border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50'
                     }`}
                   >
@@ -562,7 +562,7 @@ export default function LeadDetailPage() {
             <div>
               <label className="block text-sm text-slate-600 mb-1">ملاحظات</label>
               <textarea
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 min-h-[80px] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 min-h-[80px] text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
                 value={commForm.notes}
                 onChange={(e) => setCommForm((p) => ({ ...p, notes: e.target.value }))}
                 placeholder="ملخص ما تم مع الليد..."
@@ -571,7 +571,7 @@ export default function LeadDetailPage() {
             <div>
               <label className="block text-sm text-slate-600 mb-1">تحديث الحالة</label>
               <select
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
                 value={commForm.statusId}
                 onChange={(e) => setCommForm((p) => ({ ...p, statusId: e.target.value }))}
               >
@@ -585,7 +585,7 @@ export default function LeadDetailPage() {
             <button
               type="submit"
               disabled={addCommMutation.isPending}
-              className="w-full py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
+              className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 text-sm font-medium transition-colors"
             >
               {addCommMutation.isPending ? 'جاري الحفظ...' : 'حفظ التواصُل'}
             </button>
@@ -593,13 +593,13 @@ export default function LeadDetailPage() {
         </div>
 
         {/* Callback Requests */}
-        <div className="bg-white rounded-xl shadow p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h2 className="font-semibold text-slate-700 mb-4">طلبات الرد</h2>
 
           <div className="flex flex-wrap gap-3 pb-4 mb-4 border-b border-slate-100">
             <div className="min-w-[180px] flex-1">
               <select
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
                 value={cbForm.targetUserId}
                 onChange={(e) => setCbForm((p) => ({ ...p, targetUserId: e.target.value }))}
               >
@@ -611,7 +611,7 @@ export default function LeadDetailPage() {
             </div>
             <div className="min-w-[200px] flex-1">
               <input
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
                 placeholder="جملة توضيحية (اختياري)"
                 value={cbForm.note}
                 onChange={(e) => setCbForm((p) => ({ ...p, note: e.target.value }))}
@@ -627,7 +627,7 @@ export default function LeadDetailPage() {
                   note: cbForm.note.trim() || undefined,
                 });
               }}
-              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm whitespace-nowrap"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 text-sm font-medium transition-colors whitespace-nowrap"
             >
               {addCallbackMutation.isPending ? 'جاري...' : '+ إضافة'}
             </button>
@@ -672,7 +672,7 @@ export default function LeadDetailPage() {
                   ) : currentUser?.id === rr.requestedFrom?.id ? (
                     <div className="mt-3 flex gap-2">
                       <input
-                        className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
                         placeholder="اكتب الرد هنا..."
                         value={replyTexts[rr.id] ?? ''}
                         onChange={(e) => setReplyTexts((p) => ({ ...p, [rr.id]: e.target.value }))}
@@ -684,7 +684,7 @@ export default function LeadDetailPage() {
                           const text = replyTexts[rr.id];
                           if (text?.trim()) replyCallbackMutation.mutate({ requestId: rr.id, response: text.trim() });
                         }}
-                        className="px-3 py-1.5 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50"
+                        className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-40 transition-colors font-medium"
                       >
                         رد
                       </button>
@@ -701,7 +701,7 @@ export default function LeadDetailPage() {
       </div>{/* end grid: comm form + callback */}
 
       {/* Communications List */}
-      <div className="mt-6 bg-white rounded-xl shadow overflow-hidden">
+      <div className="mt-6 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <h2 className="font-semibold text-slate-700 p-4 border-b">سجل التواصُل</h2>
         {!lead.communications?.length ? (
           <p className="p-4 text-slate-500 text-sm">لا يوجد تواصُل مسجّل بعد.</p>
@@ -723,7 +723,7 @@ export default function LeadDetailPage() {
 
       {/* UTM Block */}
       {lead.customFields && UTM_FIELDS.some((k) => (lead.customFields as Record<string, unknown>)[k]) && (
-        <div className="mt-6 bg-white rounded-xl shadow p-6">
+        <div className="mt-6 bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h2 className="font-semibold text-slate-700 mb-4">بيانات UTM</h2>
           <dl className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             {UTM_FIELDS.filter((k) => (lead.customFields as Record<string, unknown>)[k]).map((k) => (

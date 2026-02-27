@@ -48,12 +48,12 @@ export default function CustomersList() {
         {isFetching && <span className="text-sm text-slate-500">جاري التحديث...</span>}
       </div>
 
-      <div className="bg-white rounded-xl shadow p-4 mb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
         <div className="flex flex-wrap gap-3 items-center">
           <input
             type="search"
             placeholder="بحث بالاسم أو رقم الجوال..."
-            className="border rounded-lg px-3 py-2 min-w-[200px]"
+            className="border border-slate-300 rounded-lg px-3 py-2 text-sm min-w-[200px] focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             value={search}
             onChange={(e) => {
               setSearch(e.target.value);
@@ -63,7 +63,7 @@ export default function CustomersList() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-slate-500">جاري التحميل...</div>
         ) : !data?.customers?.length ? (
@@ -72,21 +72,21 @@ export default function CustomersList() {
           <>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
+                <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">#</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">الاسم</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">الجوال</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">الليدز</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">الطلبات</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">التاريخ</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">إجراء</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">#</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">الاسم</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">الجوال</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">الليدز</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">الطلبات</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">التاريخ</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">إجراء</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.customers.map((c) => (
                     <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-3 px-4 text-slate-400 text-xs font-mono">#{c.number}</td>
+                      <td className="py-3 px-4 text-slate-400 text-sm">#{c.number}</td>
                       <td className="py-3 px-4 text-slate-800">{c.name}</td>
                       <td className="py-3 px-4 text-slate-600 dir-ltr text-right">{c.phone}</td>
                       <td className="py-3 px-4 text-slate-600">{c._count.leads}</td>

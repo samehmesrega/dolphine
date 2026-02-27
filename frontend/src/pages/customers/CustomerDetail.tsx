@@ -53,6 +53,17 @@ async function fetchCustomer(id: string) {
   return data.customer as Customer;
 }
 
+const ORDER_STATUS_STYLE: Record<string, string> = {
+  pending_accounts: 'bg-amber-50 text-amber-700 border-amber-200',
+  accounts_confirmed: 'bg-green-50 text-green-700 border-green-200',
+  rejected: 'bg-red-50 text-red-700 border-red-200',
+};
+const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending_accounts: 'بانتظار الحسابات',
+  accounts_confirmed: 'مؤكد',
+  rejected: 'مرفوض',
+};
+
 export default function CustomerDetail() {
   const { id } = useParams<{ id: string }>();
 
@@ -87,12 +98,12 @@ export default function CustomerDetail() {
         <h1 className="text-2xl font-bold text-slate-800">تفاصيل العميل</h1>
       </div>
 
-      <div className="bg-white rounded-xl shadow p-6 mb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-6">
         <h2 className="font-semibold text-slate-700 mb-4">البيانات</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <span className="text-slate-500 text-sm">رقم العميل</span>
-            <p className="font-mono font-semibold text-slate-600">#{customer.number}</p>
+            <p className="font-semibold text-slate-600">#{customer.number}</p>
           </div>
           <div>
             <span className="text-slate-500 text-sm">الاسم</span>
@@ -127,34 +138,34 @@ export default function CustomerDetail() {
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden mb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden mb-6">
         <h2 className="font-semibold text-slate-700 p-4 border-b">الليدز ({customer.leads.length})</h2>
         {customer.leads.length === 0 ? (
           <p className="p-4 text-slate-500">لا توجد ليدز مرتبطة.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-50 border-b">
+              <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">#</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">الاسم</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">المصدر</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">الحالة</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">التاريخ</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">إجراء</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">#</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">الاسم</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">المصدر</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">الحالة</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">التاريخ</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">إجراء</th>
                 </tr>
               </thead>
               <tbody>
                 {customer.leads.map((lead) => (
-                  <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="py-2 px-4 text-slate-400 text-xs font-mono">#{lead.number}</td>
-                    <td className="py-2 px-4 text-slate-800">{lead.name}</td>
-                    <td className="py-2 px-4 text-slate-600">{lead.source}</td>
-                    <td className="py-2 px-4 text-slate-600">{lead.status?.name ?? '—'}</td>
-                    <td className="py-2 px-4 text-slate-500 text-sm">
+                  <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-slate-400 text-sm">#{lead.number}</td>
+                    <td className="px-4 py-3 text-slate-700">{lead.name}</td>
+                    <td className="px-4 py-3 text-slate-700">{lead.source}</td>
+                    <td className="px-4 py-3 text-slate-700">{lead.status?.name ?? '—'}</td>
+                    <td className="px-4 py-3 text-slate-700 text-sm">
                       {new Date(lead.createdAt).toLocaleDateString('ar-EG')}
                     </td>
-                    <td className="py-2 px-4">
+                    <td className="px-4 py-3">
                       <Link to={`/leads/${lead.id}`} className="text-blue-600 hover:text-blue-800">
                         تفاصيل
                       </Link>
@@ -167,44 +178,48 @@ export default function CustomerDetail() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <h2 className="font-semibold text-slate-700 p-4 border-b">الطلبات ({customer.orders.length})</h2>
         {customer.orders.length === 0 ? (
           <p className="p-4 text-slate-500">لا يوجد طلبات.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-slate-50 border-b">
+              <thead className="bg-slate-50 border-b border-slate-100">
                 <tr>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">رقم الطلب</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">التاريخ</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">الحالة</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">الدفع</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">الشحن</th>
-                  <th className="text-right py-2 px-4 font-semibold text-slate-700">إجراء</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">رقم الطلب</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">التاريخ</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">الحالة</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">الدفع</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">الشحن</th>
+                  <th className="text-right px-4 py-3 text-xs font-semibold text-slate-500">إجراء</th>
                 </tr>
               </thead>
               <tbody>
                 {customer.orders.map((order) => (
-                  <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
-                    <td className="py-2 px-4 font-mono text-xs">
+                  <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 text-slate-400 text-sm">
                       {order.wooCommerceId ? (
                         <span className="text-blue-700 font-semibold">#{order.wooCommerceId}</span>
                       ) : (
-                        <span className="text-slate-500">#{order.number} <span className="text-orange-400 text-[10px]">مؤقت</span></span>
+                        <span className="text-slate-500">#{order.number} <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-600 border border-amber-100">مؤقت</span></span>
                       )}
                     </td>
-                    <td className="py-2 px-4 text-slate-600 text-sm">
+                    <td className="px-4 py-3 text-slate-700 text-sm">
                       {new Date(order.createdAt).toLocaleDateString('ar-EG')}
                     </td>
-                    <td className="py-2 px-4 text-slate-600">{order.status}</td>
-                    <td className="py-2 px-4 text-slate-600">
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${ORDER_STATUS_STYLE[order.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                        {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
                       {order.paymentType === 'full' ? 'كامل' : 'جزئي'}
                     </td>
-                    <td className="py-2 px-4 text-slate-600">
+                    <td className="px-4 py-3 text-slate-700">
                       {order.shippingName} — {order.shippingPhone}
                     </td>
-                    <td className="py-2 px-4">
+                    <td className="px-4 py-3">
                       <Link to={`/orders/${order.id}`} className="text-blue-600 hover:text-blue-800">
                         تفاصيل
                       </Link>

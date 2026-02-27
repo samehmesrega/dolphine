@@ -28,6 +28,12 @@ const STATUS_LABELS: Record<string, string> = {
   rejected: 'مرفوض',
 };
 
+const ORDER_STATUS_STYLE: Record<string, string> = {
+  pending_accounts: 'bg-amber-50 text-amber-700 border-amber-200',
+  accounts_confirmed: 'bg-green-50 text-green-700 border-green-200',
+  rejected: 'bg-red-50 text-red-700 border-red-200',
+};
+
 export default function OrdersList({ defaultStatus }: { defaultStatus?: string }) {
   const [status, setStatus] = useState(defaultStatus ?? '');
   const [page, setPage] = useState(1);
@@ -57,7 +63,7 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
         </h1>
       </div>
 
-      <div className="bg-white rounded-xl shadow p-4 mb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-center">
           {!defaultStatus && (
             <select
@@ -78,7 +84,7 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
         </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {isLoading ? (
           <div className="p-8 text-slate-500">جاري التحميل...</div>
         ) : !data?.orders?.length ? (
@@ -89,23 +95,24 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">رقم الطلب</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">التاريخ</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">العميل / الشحن</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">الحالة</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">الدفع</th>
-                    <th className="text-right py-3 px-4 font-semibold text-slate-700">إجراء</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">رقم الطلب</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">التاريخ</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">العميل / الشحن</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الحالة</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الدفع</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">إجراء</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.orders.map((o) => (
                     <tr key={o.id} className="border-b border-slate-100 hover:bg-slate-50">
-                      <td className="py-3 px-4 font-mono text-xs">
+                      <td className="px-4 py-3">
                         {o.wooCommerceId ? (
-                          <span className="text-blue-700 font-semibold">#{o.wooCommerceId}</span>
+                          <span className="font-semibold text-blue-700">#{o.wooCommerceId}</span>
                         ) : (
                           <span className="text-slate-500">
-                            #{o.number} <span className="text-orange-400 text-[10px]">مؤقت</span>
+                            #{o.number}
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-600 border border-amber-100 mr-1">مؤقت</span>
                           </span>
                         )}
                       </td>
@@ -116,7 +123,11 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                         <span className="font-medium text-slate-800">{o.shippingName}</span>
                         <span className="text-slate-500 text-xs block">{o.shippingPhone}</span>
                       </td>
-                      <td className="py-3 px-4">{STATUS_LABELS[o.status] ?? o.status}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${ORDER_STATUS_STYLE[o.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                          {STATUS_LABELS[o.status] ?? o.status}
+                        </span>
+                      </td>
                       <td className="py-3 px-4">{o.paymentType === 'full' ? 'كامل' : 'جزئي'}</td>
                       <td className="py-3 px-4">
                         <Link to={`/orders/${o.id}`} className="text-blue-600 hover:text-blue-800 font-medium">
@@ -134,7 +145,7 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1 border rounded disabled:opacity-50 text-slate-700"
+                  className="px-3 py-1 border rounded disabled:opacity-50 text-slate-700 text-sm transition-colors hover:bg-slate-50"
                 >
                   السابق
                 </button>
@@ -145,7 +156,7 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1 border rounded disabled:opacity-50 text-slate-700"
+                  className="px-3 py-1 border rounded disabled:opacity-50 text-slate-700 text-sm transition-colors hover:bg-slate-50"
                 >
                   التالي
                 </button>
