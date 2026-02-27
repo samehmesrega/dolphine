@@ -149,8 +149,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // PATCH /api/tasks/:id/done
 router.patch('/:id/done', async (req: AuthRequest, res: Response) => {
   try {
+    const id = String(req.params.id);
     const userId = req.user!.userId;
-    const task = await prisma.task.findUnique({ where: { id: req.params.id } });
+    const task = await prisma.task.findUnique({ where: { id } });
     if (!task) { res.status(404).json({ error: 'المهمة غير موجودة' }); return; }
 
     // الموظف يقدر يعلم مهمته بس، المدير يقدر أي مهمة
@@ -160,7 +161,7 @@ router.patch('/:id/done', async (req: AuthRequest, res: Response) => {
     }
 
     const updated = await prisma.task.update({
-      where: { id: req.params.id },
+      where: { id },
       data: { status: 'done', completedAt: new Date(), completedById: userId },
     });
     res.json({ task: updated });
@@ -177,9 +178,10 @@ const snoozeSchema = z.object({
 
 router.patch('/:id/snooze', async (req: AuthRequest, res: Response) => {
   try {
+    const id = String(req.params.id);
     const userId = req.user!.userId;
     const body = snoozeSchema.parse(req.body);
-    const task = await prisma.task.findUnique({ where: { id: req.params.id } });
+    const task = await prisma.task.findUnique({ where: { id } });
     if (!task) { res.status(404).json({ error: 'المهمة غير موجودة' }); return; }
 
     if (!hasTasksManage(req) && task.assignedToId !== userId) {
@@ -189,7 +191,7 @@ router.patch('/:id/snooze', async (req: AuthRequest, res: Response) => {
 
     const snoozedUntil = new Date(Date.now() + body.days * 86400000);
     const updated = await prisma.task.update({
-      where: { id: req.params.id },
+      where: { id },
       data: { status: 'snoozed', snoozedUntil },
     });
     res.json({ task: updated });
@@ -210,7 +212,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     return;
   }
   try {
-    await prisma.task.delete({ where: { id: req.params.id } });
+    const id = String(req.params.id);
+    await prisma.task.delete({ where: { id } });
     res.status(204).send();
   } catch (err) {
     console.error('[tasks] DELETE error:', err);

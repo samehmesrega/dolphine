@@ -61,9 +61,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
     return;
   }
   try {
+    const id = String(req.params.id);
     const body = ruleSchema.partial().parse(req.body);
     const rule = await prisma.taskRule.update({
-      where: { id: req.params.id },
+      where: { id },
       data: body,
     });
     res.json({ rule });
@@ -84,7 +85,8 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
     return;
   }
   try {
-    await prisma.taskRule.delete({ where: { id: req.params.id } });
+    const id = String(req.params.id);
+    await prisma.taskRule.delete({ where: { id } });
     res.status(204).send();
   } catch (err) {
     console.error('[task-rules] DELETE error:', err);
