@@ -6,8 +6,10 @@ type LeadStatus = { id: string; name: string; slug: string };
 type TaskRule = {
   id: string;
   name: string;
+  triggerType: string;
   statusSlug: string;
-  afterDays: number;
+  afterDays: number | null;
+  afterHours: number | null;
   isActive: boolean;
   createdAt: string;
 };
@@ -22,16 +24,33 @@ async function fetchStatuses() {
   return data.statuses as LeadStatus[];
 }
 
+const TRIGGER_LABELS: Record<string, string> = {
+  no_contact: 'بدون تواصل',
+  status_change: 'تغيير حالة',
+};
+
+const TRIGGER_COLORS: Record<string, string> = {
+  no_contact: 'bg-amber-50 text-amber-700 border-amber-200',
+  status_change: 'bg-orange-50 text-orange-700 border-orange-200',
+};
+
 export default function TaskRulesPage() {
   const queryClient = useQueryClient();
 
+  // Create form state
   const [name, setName] = useState('');
+  const [triggerType, setTriggerType] = useState<'no_contact' | 'status_change'>('no_contact');
   const [statusSlug, setStatusSlug] = useState('');
   const [afterDays, setAfterDays] = useState(3);
+  const [afterHours, setAfterHours] = useState(12);
+
+  // Edit form state
   const [editId, setEditId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editTrigger, setEditTrigger] = useState<'no_contact' | 'status_change'>('no_contact');
   const [editSlug, setEditSlug] = useState('');
   const [editDays, setEditDays] = useState(3);
+  const [editHours, setEditHours] = useState(12);
 
   const { data: rules = [], isLoading } = useQuery({
     queryKey: ['task-rules'],
@@ -48,7 +67,8 @@ export default function TaskRulesPage() {
   const createMutation = useMutation({
     mutationFn: (body: object) => api.post('/task-rules', body),
     onSuccess: () => {
-      setName(''); setStatusSlug(''); setAfterDays(3);
+      setName(''); setStatusSlug(''); setAfterDays(3); setAfterHours(12);
+      setTriggerType('no_contact');
       invalidate();
     },
   });
@@ -71,43 +91,109 @@ export default function TaskRulesPage() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !statusSlug || afterDays < 1) return;
-    createMutation.mutate({ name: name.trim(), statusSlug, afterDays });
+    if (!name.trim() || !statusSlug) return;
+    const body: Record<string, unknown> = { name: name.trim(), triggerType, statusSlug };
+    if (triggerType === 'no_contact') body.afterDays = afterDays;
+    else body.afterHours = afterHours;
+    createMutation.mutate(body);
   };
 
   const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editId) return;
-    updateMutation.mutate({
-      id: editId,
-      body: { name: editName.trim(), statusSlug: editSlug, afterDays: editDays },
-    });
+    const body: Record<string, unknown> = {
+      name: editName.trim(),
+      triggerType: editTrigger,
+      statusSlug: editSlug,
+    };
+    if (editTrigger === 'no_contact') {
+      body.afterDays = editDays;
+      body.afterHours = null;
+    } else {
+      body.afterHours = editHours;
+      body.afterDays = null;
+    }
+    updateMutation.mutate({ id: editId, body });
   };
 
   const startEdit = (rule: TaskRule) => {
     setEditId(rule.id);
     setEditName(rule.name);
+    setEditTrigger((rule.triggerType as 'no_contact' | 'status_change') ?? 'no_contact');
     setEditSlug(rule.statusSlug);
-    setEditDays(rule.afterDays);
+    setEditDays(rule.afterDays ?? 3);
+    setEditHours(rule.afterHours ?? 12);
   };
 
   const getStatusName = (slug: string) =>
     statuses.find((s) => s.slug === slug)?.name ?? slug;
 
+  const ruleDescription = (rule: TaskRule) => {
+    if (rule.triggerType === 'status_change') {
+      return (
+        <>
+          ليد في حالة{' '}
+          <span className="font-medium text-slate-700">{getStatusName(rule.statusSlug)}</span>
+          {' · '}بعد{' '}
+          <span className="font-medium text-slate-700">{rule.afterHours}</span>{' '}ساعة من تغيير الحالة
+        </>
+      );
+    }
+    return (
+      <>
+        ليد في حالة{' '}
+        <span className="font-medium text-slate-700">{getStatusName(rule.statusSlug)}</span>
+        {' · '}بدون تواصل لمدة{' '}
+        <span className="font-medium text-slate-700">{rule.afterDays}</span>{' '}أيام
+      </>
+    );
+  };
+
+  const inputClass =
+    'w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors';
+
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">قواعد إعادة التواصل</h1>
+        <h1 className="text-2xl font-bold text-slate-800">قواعد المهام</h1>
       </div>
 
       <p className="text-slate-500 text-sm mb-6">
-        عند فتح صفحة المهام، يتم تلقائياً إنشاء مهام لليدز التي مضى عليها أكثر من المدة المحددة في حالة معينة بدون تواصل.
+        عند فتح صفحة المهام، يتم تلقائياً إنشاء مهام بناءً على القواعد المفعّلة. قاعدة{' '}
+        <strong>بدون تواصل</strong>: تنشئ مهمة "إعادة تواصل" إذا لم يكن هناك تواصل X أيام. قاعدة{' '}
+        <strong>تغيير حالة</strong>: تنشئ مهمة "متابعة حالة" بعد X ساعة من تغيير حالة الليد.
       </p>
 
       {/* Create Form */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-6">
         <h2 className="font-semibold text-slate-700 mb-4">إضافة قاعدة جديدة</h2>
         <form onSubmit={handleCreate}>
+          {/* Trigger type toggle */}
+          <div className="mb-4">
+            <label className="block text-xs text-slate-500 mb-2">نوع القاعدة</label>
+            <div className="flex border border-slate-200 rounded-lg overflow-hidden w-fit">
+              {(['no_contact', 'status_change'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTriggerType(t)}
+                  className={`px-4 py-2 text-sm font-medium transition-colors ${
+                    triggerType === t
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {t === 'no_contact' ? 'بدون تواصل' : 'تغيير حالة'}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5">
+              {triggerType === 'no_contact'
+                ? 'تنشئ مهمة "إعادة تواصل" إذا مر X أيام على ليد في حالة معينة بدون أي تواصل'
+                : 'تنشئ مهمة "متابعة حالة" إذا مر X ساعة منذ تغيير حالة الليد إلى حالة معينة'}
+            </p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-xs text-slate-500 mb-1">اسم القاعدة</label>
@@ -115,8 +201,8 @@ export default function TaskRulesPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
-                placeholder="مثال: ليد مكسوب بدون تواصل"
+                className={inputClass}
+                placeholder={triggerType === 'no_contact' ? 'مثال: فولو أب بدون تواصل' : 'مثال: تذكير بعد تغيير الحالة'}
                 required
               />
             </div>
@@ -125,7 +211,7 @@ export default function TaskRulesPage() {
               <select
                 value={statusSlug}
                 onChange={(e) => setStatusSlug(e.target.value)}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
+                className={inputClass}
                 required
               >
                 <option value="">اختر الحالة</option>
@@ -135,15 +221,31 @@ export default function TaskRulesPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-slate-500 mb-1">عدد الأيام بدون تواصل</label>
-              <input
-                type="number"
-                min={1}
-                value={afterDays}
-                onChange={(e) => setAfterDays(parseInt(e.target.value, 10))}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
-                required
-              />
+              {triggerType === 'no_contact' ? (
+                <>
+                  <label className="block text-xs text-slate-500 mb-1">عدد الأيام بدون تواصل</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={afterDays}
+                    onChange={(e) => setAfterDays(parseInt(e.target.value, 10))}
+                    className={inputClass}
+                    required
+                  />
+                </>
+              ) : (
+                <>
+                  <label className="block text-xs text-slate-500 mb-1">عدد الساعات بعد تغيير الحالة</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={afterHours}
+                    onChange={(e) => setAfterHours(parseInt(e.target.value, 10))}
+                    className={inputClass}
+                    required
+                  />
+                </>
+              )}
             </div>
           </div>
           <button
@@ -172,6 +274,25 @@ export default function TaskRulesPage() {
               <div key={rule.id} className="p-4">
                 {editId === rule.id ? (
                   <form onSubmit={handleUpdate}>
+                    {/* Trigger type toggle in edit */}
+                    <div className="mb-3">
+                      <div className="flex border border-slate-200 rounded-lg overflow-hidden w-fit">
+                        {(['no_contact', 'status_change'] as const).map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setEditTrigger(t)}
+                            className={`px-3 py-1.5 text-xs font-medium transition-colors ${
+                              editTrigger === t
+                                ? 'bg-blue-600 text-white'
+                                : 'text-slate-600 hover:bg-slate-50'
+                            }`}
+                          >
+                            {t === 'no_contact' ? 'بدون تواصل' : 'تغيير حالة'}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                       <input
                         type="text"
@@ -190,14 +311,27 @@ export default function TaskRulesPage() {
                           <option key={s.id} value={s.slug}>{s.name}</option>
                         ))}
                       </select>
-                      <input
-                        type="number"
-                        min={1}
-                        value={editDays}
-                        onChange={(e) => setEditDays(parseInt(e.target.value, 10))}
-                        className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
-                        required
-                      />
+                      {editTrigger === 'no_contact' ? (
+                        <input
+                          type="number"
+                          min={1}
+                          value={editDays}
+                          onChange={(e) => setEditDays(parseInt(e.target.value, 10))}
+                          placeholder="أيام"
+                          className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
+                          required
+                        />
+                      ) : (
+                        <input
+                          type="number"
+                          min={1}
+                          value={editHours}
+                          onChange={(e) => setEditHours(parseInt(e.target.value, 10))}
+                          placeholder="ساعات"
+                          className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
+                          required
+                        />
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -223,6 +357,13 @@ export default function TaskRulesPage() {
                         <span className="font-medium text-slate-800">{rule.name}</span>
                         <span
                           className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
+                            TRIGGER_COLORS[rule.triggerType] ?? 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          {TRIGGER_LABELS[rule.triggerType] ?? rule.triggerType}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${
                             rule.isActive
                               ? 'bg-green-50 text-green-700 border-green-200'
                               : 'bg-slate-100 text-slate-500 border-slate-200'
@@ -231,14 +372,7 @@ export default function TaskRulesPage() {
                           {rule.isActive ? 'مفعّلة' : 'معطّلة'}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-500">
-                        الحالة:{' '}
-                        <span className="font-medium text-slate-700">{getStatusName(rule.statusSlug)}</span>
-                        {' · '}
-                        بعد{' '}
-                        <span className="font-medium text-slate-700">{rule.afterDays}</span>{' '}
-                        أيام بدون تواصل
-                      </p>
+                      <p className="text-sm text-slate-500">{ruleDescription(rule)}</p>
                     </div>
                     <div className="flex items-center gap-2">
                       <button

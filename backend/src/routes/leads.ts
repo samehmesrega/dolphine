@@ -203,6 +203,7 @@ type LeadUpdateData = {
   phone?: string;
   phoneNormalized?: string;
   customerId?: string;
+  lastStatusChangedAt?: Date;
 };
 
 router.patch('/:id', async (req: Request, res: Response) => {
@@ -227,7 +228,13 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (data.whatsapp !== undefined) updateData.whatsapp = data.whatsapp;
     if (data.email !== undefined) updateData.email = data.email;
     if (data.address !== undefined) updateData.address = data.address;
-    if (data.statusId !== undefined) updateData.statusId = data.statusId;
+    if (data.statusId !== undefined) {
+      updateData.statusId = data.statusId;
+      // سجّل وقت تغيير الحالة لدعم status_followup tasks
+      if (data.statusId !== lead.statusId) {
+        updateData.lastStatusChangedAt = new Date();
+      }
+    }
     if (data.assignedToId !== undefined) {
       const perms = (req as AuthRequest).user?.permissions ?? [];
       if (!perms.includes('*') && !perms.includes('leads.assign')) {
@@ -282,21 +289,36 @@ router.patch('/:id', async (req: Request, res: Response) => {
       newData: { name: updated.name, statusId: updated.statusId, assignedToId: updated.assignedToId },
     });
 
-    // لو اتغير التعيين → أنشئ task "ليد جديد" للموظف الجديد (لو مافيش pending بالفعل)
-    if (updateData.assignedToId && updateData.assignedToId !== lead.assignedToId) {
-      const exists = await prisma.task.findFirst({
-        where: { leadId: id, type: 'new_lead', status: 'pending' },
-      });
-      if (!exists) {
-        await prisma.task.create({
-          data: {
-            type: 'new_lead',
-            title: `تواصل مع: ${updated.name}`,
+    // لو اتغير التعيين → أكمل مهام الموظف القديم وأنشئ للجديد
+    if (updateData.assignedToId !== undefined && updateData.assignedToId !== lead.assignedToId) {
+      // 1. أكمل مهام الموظف القديم المعلقة على هذا الليد
+      if (lead.assignedToId) {
+        await prisma.task.updateMany({
+          where: {
             leadId: id,
-            assignedToId: updateData.assignedToId,
+            assignedToId: lead.assignedToId,
             status: 'pending',
+            type: { in: ['new_lead', 're_contact', 'status_followup'] },
           },
+          data: { status: 'done', completedAt: new Date(), completedById: authReq.user?.userId ?? null },
         });
+      }
+      // 2. أنشئ new_lead للموظف الجديد (لو موجود ومافيش pending خاص به)
+      if (updateData.assignedToId) {
+        const exists = await prisma.task.findFirst({
+          where: { leadId: id, type: 'new_lead', status: 'pending', assignedToId: updateData.assignedToId },
+        });
+        if (!exists) {
+          await prisma.task.create({
+            data: {
+              type: 'new_lead',
+              title: `تواصل مع: ${updated.name}`,
+              leadId: id,
+              assignedToId: updateData.assignedToId,
+              status: 'pending',
+            },
+          });
+        }
       }
     }
 
@@ -417,7 +439,7 @@ router.post('/:id/communications', async (req: Request, res: Response) => {
         leadId: id,
         assignedToId: userId,
         status: 'pending',
-        type: { in: ['new_lead', 're_contact', 'callback_replied'] },
+        type: { in: ['new_lead', 're_contact', 'status_followup', 'callback_replied'] },
       },
       data: { status: 'done', completedAt: new Date(), completedById: userId },
     });

@@ -12,10 +12,15 @@ function hasTasksManage(req: AuthRequest): boolean {
 
 const ruleSchema = z.object({
   name: z.string().min(1),
+  triggerType: z.enum(['no_contact', 'status_change']).optional().default('no_contact'),
   statusSlug: z.string().min(1),
-  afterDays: z.number().int().min(1),
+  afterDays: z.number().int().min(1).optional().nullable(),
+  afterHours: z.number().int().min(1).optional().nullable(),
   isActive: z.boolean().optional().default(true),
-});
+}).refine(
+  (d) => d.triggerType === 'status_change' ? !!d.afterHours : !!d.afterDays,
+  { message: 'no_contact يتطلب afterDays، status_change يتطلب afterHours' },
+);
 
 // GET /api/task-rules
 router.get('/', async (req: AuthRequest, res: Response) => {
@@ -42,7 +47,8 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   }
   try {
     const body = ruleSchema.parse(req.body);
-    const rule = await prisma.taskRule.create({ data: body });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rule = await prisma.taskRule.create({ data: body as any });
     res.status(201).json({ rule });
   } catch (err) {
     if (err instanceof z.ZodError) {
@@ -63,9 +69,10 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     const body = ruleSchema.partial().parse(req.body);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rule = await prisma.taskRule.update({
       where: { id },
-      data: body,
+      data: body as any,
     });
     res.json({ rule });
   } catch (err) {

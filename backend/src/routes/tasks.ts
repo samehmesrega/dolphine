@@ -5,35 +5,73 @@ import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// ====== Re-contact check ======
+// ====== Re-contact + Status-followup check ======
 async function runReContactCheck(userId: string, isManager: boolean) {
   const rules = await prisma.taskRule.findMany({ where: { isActive: true } });
+
   for (const rule of rules) {
-    const cutoff = new Date(Date.now() - rule.afterDays * 86400000);
+    // cast مؤقت حتى يتجدد Prisma client بعد db push
+    const r = rule as typeof rule & { triggerType?: string; afterHours?: number | null };
 
-    const leads = await prisma.lead.findMany({
-      where: {
-        status: { slug: rule.statusSlug },
-        assignedToId: isManager ? { not: null } : userId,
-        NOT: [
-          { communications: { some: { createdAt: { gte: cutoff } } } },
-          { tasks: { some: { type: 're_contact', status: 'pending' } } },
-        ],
-      },
-      select: { id: true, name: true, assignedToId: true },
-    });
+    // --- no_contact: ليد بدون تواصل X يوم في حالة X ---
+    if ((r.triggerType === 'no_contact' || !r.triggerType) && r.afterDays) {
+      const cutoff = new Date(Date.now() - r.afterDays * 86400000);
 
-    for (const lead of leads) {
-      if (!lead.assignedToId) continue;
-      await prisma.task.create({
-        data: {
-          type: 're_contact',
-          title: `إعادة تواصل: ${lead.name} (${rule.afterDays} أيام بدون تواصل)`,
-          leadId: lead.id,
-          assignedToId: lead.assignedToId,
-          status: 'pending',
+      const leads = await prisma.lead.findMany({
+        where: {
+          status: { slug: r.statusSlug },
+          assignedToId: isManager ? { not: null } : userId,
+          NOT: [
+            { communications: { some: { createdAt: { gte: cutoff } } } },
+            { tasks: { some: { type: 're_contact', status: 'pending' } } },
+          ],
         },
+        select: { id: true, name: true, assignedToId: true },
       });
+
+      for (const lead of leads) {
+        if (!lead.assignedToId) continue;
+        await prisma.task.create({
+          data: {
+            type: 're_contact',
+            title: `إعادة تواصل: ${lead.name} (${r.afterDays} أيام بدون تواصل)`,
+            leadId: lead.id,
+            assignedToId: lead.assignedToId,
+            status: 'pending',
+          },
+        });
+      }
+    }
+
+    // --- status_change: ليد تغيرت حالته لـ X منذ Y ساعة ---
+    if (r.triggerType === 'status_change' && r.afterHours) {
+      const afterHours = r.afterHours;
+      const cutoffHours = new Date(Date.now() - afterHours * 3600000);
+
+      const leads = await (prisma.lead.findMany as Function)({
+        where: {
+          status: { slug: r.statusSlug },
+          lastStatusChangedAt: { lte: cutoffHours },
+          assignedToId: isManager ? { not: null } : userId,
+          NOT: [
+            { tasks: { some: { type: 'status_followup', status: 'pending' } } },
+          ],
+        },
+        select: { id: true, name: true, assignedToId: true },
+      }) as { id: string; name: string; assignedToId: string | null }[];
+
+      for (const lead of leads) {
+        if (!lead.assignedToId) continue;
+        await prisma.task.create({
+          data: {
+            type: 'status_followup',
+            title: `متابعة: ${lead.name} (في حالة "${r.statusSlug}" منذ ${afterHours} ساعة)`,
+            leadId: lead.id,
+            assignedToId: lead.assignedToId,
+            status: 'pending',
+          },
+        });
+      }
     }
   }
 }

@@ -63,7 +63,7 @@ const NAV: NavEntry[] = [
       { to: '/shifts', label: 'شيفتات', permission: 'shifts.manage' },
       { to: '/integrations', label: 'الربط (ووردبريس)', permission: 'integrations.manage' },
       { to: '/lead-statuses', label: 'حالات الليد', permission: 'shifts.manage' },
-      { to: '/task-rules', label: 'قواعد إعادة التواصل', permission: 'tasks.manage' },
+      { to: '/task-rules', label: 'قواعد المهام', permission: 'tasks.manage' },
     ],
   },
   {

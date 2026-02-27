@@ -25,6 +25,7 @@ type Task = {
 const TASK_TYPE_LABEL: Record<string, string> = {
   new_lead: 'ليد جديد',
   re_contact: 'إعادة تواصل',
+  status_followup: 'متابعة حالة',
   callback_replied: 'رد على طلب',
   order_issue: 'مشكلة أوردر',
   manual: 'مهمة يدوية',
@@ -33,6 +34,7 @@ const TASK_TYPE_LABEL: Record<string, string> = {
 const TASK_TYPE_COLOR: Record<string, string> = {
   new_lead: 'bg-blue-50 text-blue-700 border-blue-200',
   re_contact: 'bg-amber-50 text-amber-700 border-amber-200',
+  status_followup: 'bg-orange-50 text-orange-700 border-orange-200',
   callback_replied: 'bg-purple-50 text-purple-700 border-purple-200',
   order_issue: 'bg-red-50 text-red-700 border-red-200',
   manual: 'bg-slate-100 text-slate-600 border-slate-200',
