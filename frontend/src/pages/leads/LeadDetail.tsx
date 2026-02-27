@@ -49,8 +49,6 @@ type LeadDetail = {
   responseRequests: CallbackRequest[];
   productInterests?: ProductInterest[];
 };
-type MyProfile = { id: string; name: string; whatsappNumber: string | null };
-
 // حقول UTM المخزنة في customFields بأسمائها العربية
 const UTM_FIELD_KEYS = new Set(['مصدر الزيارة', 'وسيلة الزيارة', 'الحملة الإعلانية', 'محتوى الإعلان', 'كلمة البحث']);
 const UTM_FIELDS = ['مصدر الزيارة', 'وسيلة الزيارة', 'الحملة الإعلانية', 'محتوى الإعلان', 'كلمة البحث'];
@@ -131,13 +129,6 @@ export default function LeadDetailPage() {
     queryFn: async () => {
       const { data } = await api.get('/products');
       return data.products as { id: string; name: string }[];
-    },
-  });
-  const { data: myProfile } = useQuery({
-    queryKey: ['my-profile'],
-    queryFn: async () => {
-      const { data } = await api.get('/users/me');
-      return data.user as MyProfile;
     },
   });
 
@@ -227,19 +218,6 @@ export default function LeadDetailPage() {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead?.productInterests]);
-
-  const handleWhatsApp = () => {
-    if (!myProfile?.whatsappNumber) {
-      setError('أضف رقم واتساب في ملفك الشخصي أولاً');
-      return;
-    }
-    const parts: string[] = [];
-    if (lead?.phone) parts.push(`فون: ${lead.phone}`);
-    if (lead?.whatsapp && lead.whatsapp !== lead.phone) parts.push(`واتساب: ${lead.whatsapp}`);
-    const text = parts.join('\n') || lead?.phone || '';
-    const url = `https://wa.me/${myProfile.whatsappNumber.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
-  };
 
   const handleAssign = (userId: string) => {
     updateLeadMutation.mutate({ assignedToId: userId === '' ? null : userId });
@@ -331,143 +309,224 @@ export default function LeadDetailPage() {
         </div>
       )}
 
-      {/* Lead data block with inline actions */}
-      <div className="bg-white rounded-xl shadow p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-slate-700">بيانات الليد</h2>
-          {!editing ? (
-            <button type="button" onClick={startEdit} className="text-sm text-blue-600 hover:underline">تعديل</button>
-          ) : (
-            <button type="button" onClick={() => setEditing(false)} className="text-sm text-slate-500 hover:underline">إلغاء</button>
-          )}
-        </div>
+      {/* Top two-column layout: Lead Data + Product Interests */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {editing ? (
-          <form onSubmit={handleEditSubmit} className="space-y-3">
-            {([
-              { label: 'الاسم', key: 'name', required: true },
-              { label: 'الموبايل', key: 'phone', required: true },
-              { label: 'واتساب', key: 'whatsapp', required: false },
-              { label: 'الإيميل', key: 'email', required: false },
-              { label: 'العنوان', key: 'address', required: false },
-            ] as const).map(({ label, key, required }) => (
-              <div key={key}>
-                <label className="block text-sm text-slate-600 mb-1">{label}</label>
-                <input
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  value={editForm[key]}
-                  onChange={(e) => setEditForm((p) => ({ ...p, [key]: e.target.value }))}
-                  required={required}
-                />
-              </div>
-            ))}
-            <button type="submit" disabled={updateLeadMutation.isPending}
-              className="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm">
-              {updateLeadMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
-            </button>
-          </form>
-        ) : (
-          <div className="flex gap-6 flex-col lg:flex-row">
-            {/* Left: data */}
-            <dl className="flex-1 space-y-3 text-sm">
+        {/* Lead Data Block */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold text-slate-700">بيانات الليد</h2>
+            {!editing ? (
+              <button type="button" onClick={startEdit} className="text-sm text-blue-600 hover:underline">تعديل</button>
+            ) : (
+              <button type="button" onClick={() => setEditing(false)} className="text-sm text-slate-500 hover:underline">إلغاء</button>
+            )}
+          </div>
+
+          {editing ? (
+            <form onSubmit={handleEditSubmit} className="space-y-3">
               {([
-                { label: 'الاسم', value: lead.name },
-                { label: 'الموبايل', value: lead.phone },
-                ...(lead.whatsapp ? [{ label: 'واتساب', value: lead.whatsapp }] : []),
-                ...(lead.email ? [{ label: 'الإيميل', value: lead.email }] : []),
-                ...(lead.address ? [{ label: 'العنوان', value: lead.address }] : []),
-              ]).map(({ label, value }) => (
-                <div key={label} className="flex items-start">
-                  <dt className="text-slate-500 w-24 shrink-0">{label}</dt>
-                  <dd className="flex items-center font-medium text-slate-800 flex-wrap">
-                    <span>{value}</span>
-                    <CopyBtn value={value} />
-                  </dd>
+                { label: 'الاسم', key: 'name', required: true },
+                { label: 'الموبايل', key: 'phone', required: true },
+                { label: 'واتساب', key: 'whatsapp', required: false },
+                { label: 'الإيميل', key: 'email', required: false },
+                { label: 'العنوان', key: 'address', required: false },
+              ] as const).map(({ label, key, required }) => (
+                <div key={key}>
+                  <label className="block text-sm text-slate-600 mb-1">{label}</label>
+                  <input
+                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    value={editForm[key]}
+                    onChange={(e) => setEditForm((p) => ({ ...p, [key]: e.target.value }))}
+                    required={required}
+                  />
                 </div>
               ))}
-
-              {lead.customFields && Object.entries(lead.customFields)
-                .filter(([k]) => !UTM_FIELD_KEYS.has(k))
-                .map(([k, v]) => (
-                  <div key={k} className="flex items-start">
-                    <dt className="text-slate-500 w-24 shrink-0 truncate" title={k}>{k}</dt>
-                    <dd className="flex items-center text-slate-700 flex-wrap">
-                      <span>{String(v)}</span>
-                      <CopyBtn value={String(v)} />
+              <button type="submit" disabled={updateLeadMutation.isPending}
+                className="w-full py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 text-sm">
+                {updateLeadMutation.isPending ? 'جاري الحفظ...' : 'حفظ'}
+              </button>
+            </form>
+          ) : (
+            <div className="flex gap-4 flex-col sm:flex-row">
+              {/* Right: data */}
+              <dl className="flex-1 space-y-3 text-sm">
+                {([
+                  { label: 'الاسم', value: lead.name },
+                  { label: 'الموبايل', value: lead.phone },
+                  ...(lead.whatsapp ? [{ label: 'واتساب', value: lead.whatsapp }] : []),
+                  ...(lead.email ? [{ label: 'الإيميل', value: lead.email }] : []),
+                  ...(lead.address ? [{ label: 'العنوان', value: lead.address }] : []),
+                ]).map(({ label, value }) => (
+                  <div key={label} className="flex items-start">
+                    <dt className="text-slate-500 w-24 shrink-0">{label}</dt>
+                    <dd className="flex items-center font-medium text-slate-800 flex-wrap">
+                      <span>{value}</span>
+                      <CopyBtn value={value} />
                     </dd>
                   </div>
                 ))}
 
-              <div className="flex items-start">
-                <dt className="text-slate-500 w-24 shrink-0">المصدر</dt>
-                <dd className="text-slate-700">{lead.sourceDetail || lead.source}</dd>
-              </div>
-              <div className="flex items-start">
-                <dt className="text-slate-500 w-24 shrink-0">الحالة</dt>
-                <dd className="text-slate-700">{lead.status?.name}</dd>
-              </div>
-              <div className="flex items-start">
-                <dt className="text-slate-500 w-24 shrink-0">تاريخ الإنشاء</dt>
-                <dd className="text-slate-700">{formatDateTime(lead.createdAt)}</dd>
-              </div>
-            </dl>
+                {lead.customFields && Object.entries(lead.customFields)
+                  .filter(([k]) => !UTM_FIELD_KEYS.has(k))
+                  .map(([k, v]) => (
+                    <div key={k} className="flex items-start">
+                      <dt className="text-slate-500 w-24 shrink-0 truncate" title={k}>{k}</dt>
+                      <dd className="flex items-center text-slate-700 flex-wrap">
+                        <span>{String(v)}</span>
+                        <CopyBtn value={String(v)} />
+                      </dd>
+                    </div>
+                  ))}
 
-            {/* Right: actions */}
-            <div className="lg:w-52 shrink-0 space-y-3">
-              {canAssign ? (
-                <div>
-                  <label className="block text-xs text-slate-500 mb-1">التعيين</label>
-                  <select
-                    className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    value={lead.assignedTo?.id ?? ''}
-                    onChange={(e) => handleAssign(e.target.value)}
-                    disabled={updateLeadMutation.isPending}
-                  >
-                    <option value="">— غير معيّن —</option>
-                    {users?.map((u) => (
-                      <option key={u.id} value={u.id}>{u.name}</option>
-                    ))}
-                  </select>
+                <div className="flex items-start">
+                  <dt className="text-slate-500 w-24 shrink-0">المصدر</dt>
+                  <dd className="text-slate-700">{lead.sourceDetail || lead.source}</dd>
                 </div>
-              ) : (
-                <div className="text-sm">
-                  <span className="text-slate-500 text-xs block mb-1">المعيّن له</span>
-                  <span className="font-medium text-slate-800">{lead.assignedTo?.name ?? '—'}</span>
+                <div className="flex items-start">
+                  <dt className="text-slate-500 w-24 shrink-0">الحالة</dt>
+                  <dd className="text-slate-700">{lead.status?.name}</dd>
                 </div>
-              )}
+                <div className="flex items-start">
+                  <dt className="text-slate-500 w-24 shrink-0">تاريخ الإنشاء</dt>
+                  <dd className="text-slate-700">{formatDateTime(lead.createdAt)}</dd>
+                </div>
+              </dl>
 
-              <button
-                type="button"
-                onClick={handleWhatsApp}
-                className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-medium"
-              >
-                فتح واتساب
-              </button>
-              {!myProfile?.whatsappNumber && (
-                <p className="text-xs text-amber-600">
-                  أضف رقم واتساب في{' '}
-                  <Link to="/profile" className="underline hover:text-amber-700">ملفك الشخصي</Link>
-                </p>
-              )}
+              {/* Left: actions */}
+              <div className="sm:w-44 shrink-0 space-y-3">
+                {canAssign ? (
+                  <div>
+                    <label className="block text-xs text-slate-500 mb-1">التعيين</label>
+                    <select
+                      className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      value={lead.assignedTo?.id ?? ''}
+                      onChange={(e) => handleAssign(e.target.value)}
+                      disabled={updateLeadMutation.isPending}
+                    >
+                      <option value="">— غير معيّن —</option>
+                      {users?.map((u) => (
+                        <option key={u.id} value={u.id}>{u.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : (
+                  <div className="text-sm">
+                    <span className="text-slate-500 text-xs block mb-1">المعيّن له</span>
+                    <span className="font-medium text-slate-800">{lead.assignedTo?.name ?? '—'}</span>
+                  </div>
+                )}
 
-              <Link
-                to={isConfirmed ? `/leads/${lead.id}/create-order` : '#'}
-                onClick={(e) => { if (!isConfirmed) e.preventDefault(); }}
-                className={`block w-full px-4 py-2.5 text-center rounded-lg text-sm font-medium transition ${
-                  isConfirmed
-                    ? 'bg-amber-600 text-white hover:bg-amber-700'
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                إنشاء الطلب
-              </Link>
-              {!isConfirmed && (
-                <p className="text-xs text-slate-400">يتطلب حالة «طلب مؤكد»</p>
-              )}
+                <Link
+                  to={isConfirmed ? `/leads/${lead.id}/create-order` : '#'}
+                  onClick={(e) => { if (!isConfirmed) e.preventDefault(); }}
+                  className={`block w-full px-4 py-2.5 text-center rounded-lg text-sm font-medium transition ${
+                    isConfirmed
+                      ? 'bg-amber-600 text-white hover:bg-amber-700'
+                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                  }`}
+                >
+                  إنشاء الطلب
+                </Link>
+                {!isConfirmed && (
+                  <p className="text-xs text-slate-400">يتطلب حالة «طلب مؤكد»</p>
+                )}
+              </div>
             </div>
+          )}
+        </div>
+
+        {/* Product Interests Block */}
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <h2 className="font-semibold text-slate-700 p-4 border-b">اهتمامات المنتجات</h2>
+          <div className="p-4 border-b bg-slate-50">
+            <form
+              className="flex flex-wrap gap-3 items-end"
+              onSubmit={(e) => {
+                e.preventDefault();
+                addInterestMutation.mutate({
+                  productId: interestForm.productId || null,
+                  quantity: interestForm.quantity,
+                  notes: interestForm.notes.trim() || undefined,
+                });
+              }}
+            >
+              <div className="min-w-[160px] flex-1">
+                <label className="block text-xs text-slate-500 mb-1">المنتج</label>
+                <select
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  value={interestForm.productId}
+                  onChange={(e) => setInterestForm((p) => ({ ...p, productId: e.target.value }))}
+                >
+                  <option value="">— وصف في الملاحظات —</option>
+                  {products?.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="w-16">
+                <label className="block text-xs text-slate-500 mb-1">الكمية</label>
+                <input
+                  type="number"
+                  min={1}
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  value={interestForm.quantity}
+                  onChange={(e) => setInterestForm((p) => ({ ...p, quantity: parseInt(e.target.value, 10) || 1 }))}
+                />
+              </div>
+              <div className="flex-1 min-w-[120px]">
+                <label className="block text-xs text-slate-500 mb-1">ملاحظات</label>
+                <input
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="ملاحظات"
+                  value={interestForm.notes}
+                  onChange={(e) => setInterestForm((p) => ({ ...p, notes: e.target.value }))}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={addInterestMutation.isPending}
+                className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm"
+              >
+                {addInterestMutation.isPending ? 'جاري...' : 'إضافة'}
+              </button>
+            </form>
           </div>
-        )}
-      </div>
+          {!lead.productInterests?.length ? (
+            <p className="p-4 text-slate-500 text-sm">لا توجد اهتمامات منتجات مسجّلة.</p>
+          ) : (
+            <ul className="divide-y overflow-y-auto max-h-80">
+              {(lead.productInterests ?? []).map((pi) => (
+                <li key={pi.id} className="p-4 flex justify-between items-start">
+                  <div>
+                    <span className="font-medium text-sm">{pi.product?.name ?? 'منتج (بدون ربط)'}</span>
+                    <span className="text-slate-500 text-sm mr-2"> × {pi.quantity}</span>
+                    {pi.notes && <p className="text-sm text-slate-600 mt-1">{pi.notes}</p>}
+                    {pi.customFields && Object.keys(pi.customFields).length > 0 && (
+                      <div className="mt-1 space-y-0.5">
+                        {Object.entries(pi.customFields).map(([k, v]) => (
+                          <p key={k} className="text-xs text-slate-500">
+                            <span className="font-medium text-slate-600">{k}:</span> {String(v)}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeInterestMutation.mutate(pi.id)}
+                    disabled={removeInterestMutation.isPending}
+                    className="text-red-500 text-sm hover:underline shrink-0"
+                  >
+                    حذف
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+      </div>{/* end top grid */}
 
       {/* Callback Requests + Communication Form - نصف/نصف */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -651,96 +710,6 @@ export default function LeadDetailPage() {
                 </div>
                 <p className="text-xs text-slate-500 mt-0.5">من: {c.user?.name}</p>
                 {c.notes && <p className="mt-2 text-sm text-slate-700">{c.notes}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {/* Product Interests */}
-      <div className="mt-6 bg-white rounded-xl shadow overflow-hidden">
-        <h2 className="font-semibold text-slate-700 p-4 border-b">اهتمامات المنتجات</h2>
-        <div className="p-4 border-b bg-slate-50">
-          <form
-            className="flex flex-wrap gap-3 items-end"
-            onSubmit={(e) => {
-              e.preventDefault();
-              addInterestMutation.mutate({
-                productId: interestForm.productId || null,
-                quantity: interestForm.quantity,
-                notes: interestForm.notes.trim() || undefined,
-              });
-            }}
-          >
-            <div className="min-w-[180px]">
-              <label className="block text-xs text-slate-500 mb-1">المنتج</label>
-              <select
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                value={interestForm.productId}
-                onChange={(e) => setInterestForm((p) => ({ ...p, productId: e.target.value }))}
-              >
-                <option value="">— وصف في الملاحظات —</option>
-                {products?.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="w-20">
-              <label className="block text-xs text-slate-500 mb-1">الكمية</label>
-              <input
-                type="number"
-                min={1}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                value={interestForm.quantity}
-                onChange={(e) => setInterestForm((p) => ({ ...p, quantity: parseInt(e.target.value, 10) || 1 }))}
-              />
-            </div>
-            <div className="flex-1 min-w-[150px]">
-              <label className="block text-xs text-slate-500 mb-1">ملاحظات</label>
-              <input
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
-                placeholder="ملاحظات"
-                value={interestForm.notes}
-                onChange={(e) => setInterestForm((p) => ({ ...p, notes: e.target.value }))}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={addInterestMutation.isPending}
-              className="px-4 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm"
-            >
-              {addInterestMutation.isPending ? 'جاري...' : 'إضافة'}
-            </button>
-          </form>
-        </div>
-        {!lead.productInterests?.length ? (
-          <p className="p-4 text-slate-500 text-sm">لا توجد اهتمامات منتجات مسجّلة.</p>
-        ) : (
-          <ul className="divide-y">
-            {(lead.productInterests ?? []).map((pi) => (
-              <li key={pi.id} className="p-4 flex justify-between items-start">
-                <div>
-                  <span className="font-medium text-sm">{pi.product?.name ?? 'منتج (بدون ربط)'}</span>
-                  <span className="text-slate-500 text-sm mr-2"> × {pi.quantity}</span>
-                  {pi.notes && <p className="text-sm text-slate-600 mt-1">{pi.notes}</p>}
-                  {pi.customFields && Object.keys(pi.customFields).length > 0 && (
-                    <div className="mt-1 space-y-0.5">
-                      {Object.entries(pi.customFields).map(([k, v]) => (
-                        <p key={k} className="text-xs text-slate-500">
-                          <span className="font-medium text-slate-600">{k}:</span> {String(v)}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeInterestMutation.mutate(pi.id)}
-                  disabled={removeInterestMutation.isPending}
-                  className="text-red-500 text-sm hover:underline shrink-0"
-                >
-                  حذف
-                </button>
               </li>
             ))}
           </ul>
