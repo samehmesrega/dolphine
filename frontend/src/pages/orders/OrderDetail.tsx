@@ -13,6 +13,7 @@ type OrderItem = {
 
 type Order = {
   id: string;
+  number: number;
   status: string;
   wooCommerceId?: number | null;
   paymentType: string;
@@ -116,7 +117,13 @@ export default function OrderDetailPage() {
       <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
         <div className="flex items-center gap-4">
           <Link to="/orders" className="text-slate-600 hover:text-slate-800">← طلبات</Link>
-          <h1 className="text-2xl font-bold text-slate-800">تفاصيل الطلب</h1>
+          <h1 className="text-2xl font-bold text-slate-800">
+            {order.wooCommerceId ? (
+              <>تفاصيل الطلب <span className="font-mono text-blue-700">#{order.wooCommerceId}</span></>
+            ) : (
+              <>تفاصيل الطلب <span className="font-mono text-slate-500">#{order.number}</span> <span className="text-orange-400 text-sm font-normal">مؤقت</span></>
+            )}
+          </h1>
         </div>
         <span className="px-3 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-700">
           {STATUS_LABELS[order.status] ?? order.status}

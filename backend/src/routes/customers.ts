@@ -31,6 +31,7 @@ router.get('/', async (req: Request, res: Response) => {
         take: pageSize,
         select: {
           id: true,
+          number: true,
           name: true,
           phone: true,
           whatsapp: true,

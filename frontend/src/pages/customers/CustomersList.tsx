@@ -5,6 +5,7 @@ import api from '../../services/api';
 
 type Customer = {
   id: string;
+  number: number;
   name: string;
   phone: string;
   whatsapp?: string | null;
@@ -73,6 +74,7 @@ export default function CustomersList() {
               <table className="w-full">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
+                    <th className="text-right py-3 px-4 font-semibold text-slate-700">#</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">الاسم</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">الجوال</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">الليدز</th>
@@ -84,6 +86,7 @@ export default function CustomersList() {
                 <tbody>
                   {data.customers.map((c) => (
                     <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-3 px-4 text-slate-400 text-xs font-mono">#{c.number}</td>
                       <td className="py-3 px-4 text-slate-800">{c.name}</td>
                       <td className="py-3 px-4 text-slate-600 dir-ltr text-right">{c.phone}</td>
                       <td className="py-3 px-4 text-slate-600">{c._count.leads}</td>

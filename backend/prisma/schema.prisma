@@ -84,6 +84,7 @@ model UserPermission {
 
 model Customer {
   id          String   @id @default(uuid())
+  number      Int      @default(autoincrement()) @unique
   name        String
   phone       String   @unique
   whatsapp    String?
@@ -103,6 +104,7 @@ model Customer {
 
 model Lead {
   id              String    @id @default(uuid())
+  number          Int       @default(autoincrement()) @unique
   name            String
   phone           String
   phoneNormalized String    @map("phone_normalized")
@@ -268,6 +270,7 @@ model Product {
 
 model Order {
   id              String    @id @default(uuid())
+  number          Int       @default(autoincrement()) @unique
   leadId          String    @map("lead_id")
   lead            Lead      @relation(fields: [leadId], references: [id])
   customerId      String    @map("customer_id")

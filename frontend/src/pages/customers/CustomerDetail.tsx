@@ -5,6 +5,7 @@ import api from '../../services/api';
 type LeadStatus = { id: string; name: string; slug: string };
 type Lead = {
   id: string;
+  number: number;
   name: string;
   phone: string;
   source: string;
@@ -23,6 +24,8 @@ type OrderItem = {
 
 type Order = {
   id: string;
+  number: number;
+  wooCommerceId?: number | null;
   status: string;
   paymentType: string;
   shippingName: string;
@@ -34,6 +37,7 @@ type Order = {
 
 type Customer = {
   id: string;
+  number: number;
   name: string;
   phone: string;
   whatsapp?: string | null;
@@ -87,6 +91,10 @@ export default function CustomerDetail() {
         <h2 className="font-semibold text-slate-700 mb-4">البيانات</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
+            <span className="text-slate-500 text-sm">رقم العميل</span>
+            <p className="font-mono font-semibold text-slate-600">#{customer.number}</p>
+          </div>
+          <div>
             <span className="text-slate-500 text-sm">الاسم</span>
             <p className="font-medium text-slate-800">{customer.name}</p>
           </div>
@@ -128,6 +136,7 @@ export default function CustomerDetail() {
             <table className="w-full">
               <thead className="bg-slate-50 border-b">
                 <tr>
+                  <th className="text-right py-2 px-4 font-semibold text-slate-700">#</th>
                   <th className="text-right py-2 px-4 font-semibold text-slate-700">الاسم</th>
                   <th className="text-right py-2 px-4 font-semibold text-slate-700">المصدر</th>
                   <th className="text-right py-2 px-4 font-semibold text-slate-700">الحالة</th>
@@ -138,6 +147,7 @@ export default function CustomerDetail() {
               <tbody>
                 {customer.leads.map((lead) => (
                   <tr key={lead.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="py-2 px-4 text-slate-400 text-xs font-mono">#{lead.number}</td>
                     <td className="py-2 px-4 text-slate-800">{lead.name}</td>
                     <td className="py-2 px-4 text-slate-600">{lead.source}</td>
                     <td className="py-2 px-4 text-slate-600">{lead.status?.name ?? '—'}</td>
@@ -166,6 +176,7 @@ export default function CustomerDetail() {
             <table className="w-full">
               <thead className="bg-slate-50 border-b">
                 <tr>
+                  <th className="text-right py-2 px-4 font-semibold text-slate-700">رقم الطلب</th>
                   <th className="text-right py-2 px-4 font-semibold text-slate-700">التاريخ</th>
                   <th className="text-right py-2 px-4 font-semibold text-slate-700">الحالة</th>
                   <th className="text-right py-2 px-4 font-semibold text-slate-700">الدفع</th>
@@ -176,6 +187,13 @@ export default function CustomerDetail() {
               <tbody>
                 {customer.orders.map((order) => (
                   <tr key={order.id} className="border-b border-slate-100 hover:bg-slate-50">
+                    <td className="py-2 px-4 font-mono text-xs">
+                      {order.wooCommerceId ? (
+                        <span className="text-blue-700 font-semibold">#{order.wooCommerceId}</span>
+                      ) : (
+                        <span className="text-slate-500">#{order.number} <span className="text-orange-400 text-[10px]">مؤقت</span></span>
+                      )}
+                    </td>
                     <td className="py-2 px-4 text-slate-600 text-sm">
                       {new Date(order.createdAt).toLocaleDateString('ar-EG')}
                     </td>

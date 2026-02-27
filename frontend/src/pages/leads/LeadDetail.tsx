@@ -33,6 +33,7 @@ type ProductInterest = {
 };
 type LeadDetail = {
   id: string;
+  number: number;
   name: string;
   phone: string;
   whatsapp: string | null;
@@ -56,7 +57,7 @@ const UTM_FIELDS = ['مصدر الزيارة', 'وسيلة الزيارة', 'ا�
 const COMM_TYPE_LABELS: Record<string, string> = {
   whatsapp: 'واتساب',
   call: 'مكالمة',
-  physical: 'تواصل فيزيائي',
+  physical: 'مقابلة',
   email: 'إيميل',
 };
 
@@ -351,6 +352,10 @@ export default function LeadDetailPage() {
             <div className="flex gap-4 flex-col sm:flex-row">
               {/* Right: data */}
               <dl className="flex-1 space-y-3 text-sm">
+                <div className="flex items-start">
+                  <dt className="text-slate-500 w-24 shrink-0">رقم الليد</dt>
+                  <dd className="font-mono font-semibold text-slate-600">#{lead.number}</dd>
+                </div>
                 {([
                   { label: 'الاسم', value: lead.name },
                   { label: 'الموبايل', value: lead.phone },

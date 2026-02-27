@@ -5,6 +5,8 @@ import api from '../../services/api';
 
 type Order = {
   id: string;
+  number: number;
+  wooCommerceId?: number | null;
   status: string;
   paymentType: string;
   shippingName: string;
@@ -87,6 +89,7 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
               <table className="w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr>
+                    <th className="text-right py-3 px-4 font-semibold text-slate-700">رقم الطلب</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">التاريخ</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">العميل / الشحن</th>
                     <th className="text-right py-3 px-4 font-semibold text-slate-700">الحالة</th>
@@ -97,6 +100,15 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                 <tbody>
                   {data.orders.map((o) => (
                     <tr key={o.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="py-3 px-4 font-mono text-xs">
+                        {o.wooCommerceId ? (
+                          <span className="text-blue-700 font-semibold">#{o.wooCommerceId}</span>
+                        ) : (
+                          <span className="text-slate-500">
+                            #{o.number} <span className="text-orange-400 text-[10px]">مؤقت</span>
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 px-4 text-slate-600">
                         {new Date(o.createdAt).toLocaleDateString('ar-EG')}
                       </td>

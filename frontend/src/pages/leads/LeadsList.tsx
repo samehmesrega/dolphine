@@ -11,6 +11,7 @@ type LeadStatus = {
 
 type Lead = {
   id: string;
+  number: number;
   name: string;
   phone: string;
   whatsapp?: string | null;
@@ -294,6 +295,7 @@ export default function LeadsList() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-600">
             <tr>
+              <th className="text-right p-3">#</th>
               <th className="text-right p-3">الاسم</th>
               <th className="text-right p-3">الموبايل</th>
               <th className="text-right p-3">الحالة</th>
@@ -305,13 +307,13 @@ export default function LeadsList() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td className="p-4 text-slate-500" colSpan={6}>
+                <td className="p-4 text-slate-500" colSpan={7}>
                   جاري التحميل...
                 </td>
               </tr>
             ) : isError ? (
               <tr>
-                <td className="p-4 text-red-600" colSpan={6}>
+                <td className="p-4 text-red-600" colSpan={7}>
                   فشل تحميل القائمة: {(() => {
                     const e = listError as { response?: { data?: { error?: string }; status?: number }; message?: string };
                     if (e?.response?.data?.error) return e.response.data.error;
@@ -322,13 +324,14 @@ export default function LeadsList() {
               </tr>
             ) : (data?.leads?.length ?? 0) === 0 ? (
               <tr>
-                <td className="p-4 text-slate-500" colSpan={6}>
+                <td className="p-4 text-slate-500" colSpan={7}>
                   لا يوجد ليدز
                 </td>
               </tr>
             ) : (
               data!.leads.map((l) => (
                 <tr key={l.id} className="border-t hover:bg-slate-50">
+                  <td className="p-3 text-slate-400 text-xs font-mono">#{l.number}</td>
                   <td className="p-3 text-slate-800">
                     <Link to={`/leads/${l.id}`} className="text-blue-600 hover:underline font-medium">
                       {l.name}
