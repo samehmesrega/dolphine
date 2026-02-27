@@ -7,9 +7,17 @@ import { authMiddleware, type AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-function getPermissions(role: { slug: string; rolePermissions?: { permission: { slug: string } }[] }) {
+function getPermissions(
+  role: { slug: string; rolePermissions?: { permission: { slug: string } }[] },
+  userPerms: { grant: boolean; permission: { slug: string } }[] = [],
+) {
   if (role.slug === 'super_admin') return ['*'];
-  return (role.rolePermissions ?? []).map((rp) => rp.permission.slug);
+  const set = new Set((role.rolePermissions ?? []).map((rp) => rp.permission.slug));
+  for (const up of userPerms) {
+    if (up.grant) set.add(up.permission.slug);
+    else set.delete(up.permission.slug);
+  }
+  return Array.from(set);
 }
 
 router.post('/login', async (req: Request, res: Response) => {
@@ -22,7 +30,10 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { email: String(email).trim().toLowerCase() },
-      include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+      include: {
+        role: { include: { rolePermissions: { include: { permission: true } } } },
+        userPermissions: { include: { permission: true } },
+      },
     });
     if (!user || !user.isActive) {
       res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
@@ -41,7 +52,7 @@ router.post('/login', async (req: Request, res: Response) => {
       { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
     );
 
-    const permissions = getPermissions(user.role);
+    const permissions = getPermissions(user.role, user.userPermissions);
 
     res.json({
       token,

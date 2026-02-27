@@ -229,17 +229,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
     if (data.address !== undefined) updateData.address = data.address;
     if (data.statusId !== undefined) updateData.statusId = data.statusId;
     if (data.assignedToId !== undefined) {
-      const callerId = (req as AuthRequest).user?.userId;
-      if (callerId) {
-        const callerUser = await prisma.user.findUnique({
-          where: { id: callerId },
-          include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
-        });
-        const perms = callerUser?.role?.rolePermissions?.map((rp) => rp.permission.slug) ?? [];
-        if (!perms.includes('leads.assign')) {
-          res.status(403).json({ error: 'ليس لديك صلاحية تعيين الليدز' });
-          return;
-        }
+      const perms = (req as AuthRequest).user?.permissions ?? [];
+      if (!perms.includes('*') && !perms.includes('leads.assign')) {
+        res.status(403).json({ error: 'ليس لديك صلاحية تعيين الليدز' });
+        return;
       }
       updateData.assignedToId = data.assignedToId;
     }

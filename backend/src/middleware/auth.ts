@@ -30,17 +30,27 @@ export async function authMiddleware(
     const decoded = jwt.verify(token, config.jwt.secret) as { userId: string; email: string };
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      include: { role: { include: { rolePermissions: { include: { permission: true } } } } },
+      include: {
+        role: { include: { rolePermissions: { include: { permission: true } } } },
+        userPermissions: { include: { permission: true } },
+      },
     });
     if (!user || !user.isActive) {
       res.status(401).json({ error: 'غير مصرح', message: 'الحساب غير فعال' });
       return;
     }
     const roleSlug = user.role.slug;
-    const permissions =
-      roleSlug === 'super_admin'
-        ? ['*']
-        : (user.role.rolePermissions?.map((rp) => rp.permission.slug) ?? []);
+    let permissions: string[];
+    if (roleSlug === 'super_admin') {
+      permissions = ['*'];
+    } else {
+      const rolePerms = new Set(user.role.rolePermissions?.map((rp) => rp.permission.slug) ?? []);
+      for (const up of user.userPermissions ?? []) {
+        if (up.grant) rolePerms.add(up.permission.slug);
+        else rolePerms.delete(up.permission.slug);
+      }
+      permissions = Array.from(rolePerms);
+    }
     req.user = { userId: user.id, email: user.email, permissions, roleSlug };
     next();
   } catch {

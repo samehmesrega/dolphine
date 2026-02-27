@@ -44,6 +44,29 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+// ترتيب الأولوية للصفحة الرئيسية — أول إدخال مسموح بيه يُعرض
+const HOME_PRIORITY: Array<{ permission: string | null; to: string }> = [
+  { permission: 'dashboard.view', to: '/' },
+  { permission: null,             to: '/tasks' },    // المهام: مفتوحة للكل
+  { permission: 'leads.view',     to: '/leads' },
+  { permission: 'orders.view',    to: '/orders' },
+  { permission: 'reports.view',   to: '/reports' },
+];
+
+function HomeRedirect() {
+  const { hasPermission } = useAuth();
+
+  for (const entry of HOME_PRIORITY) {
+    if (!entry.permission || hasPermission(entry.permission)) {
+      // لو الصفحة المستهدفة هي نفس الـ route الحالي → ارسم المحتوى مباشرة
+      if (entry.to === '/') return <Dashboard />;
+      return <Navigate to={entry.to} replace />;
+    }
+  }
+
+  return <Navigate to="/login" replace />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
@@ -56,7 +79,7 @@ function AppRoutes() {
           </PrivateRoute>
         }
       >
-        <Route index element={<Dashboard />} />
+        <Route index element={<HomeRedirect />} />
         <Route path="leads" element={<LeadsList />} />
         <Route path="leads/:id" element={<LeadDetail />} />
         <Route path="leads/:id/create-order" element={<CreateOrder />} />

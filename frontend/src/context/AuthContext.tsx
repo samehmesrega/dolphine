@@ -30,9 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!token) return;
-    const stored = localStorage.getItem('dolphin_user');
-    const parsed = stored ? JSON.parse(stored) : null;
-    if (parsed?.permissions != null && Array.isArray(parsed.permissions)) return;
+    // دايماً نجدد الصلاحيات من السيرفر عشان أي تغيير في الـ permissions يتطبق فوراً
     api.get('/auth/me')
       .then(({ data }) => {
         const u = { ...data.user, permissions: data.user.permissions ?? [] };
