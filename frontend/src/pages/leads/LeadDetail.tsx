@@ -528,8 +528,64 @@ export default function LeadDetailPage() {
 
       </div>{/* end top grid */}
 
-      {/* Callback Requests + Communication Form - نصف/نصف */}
+      {/* Communication Form + Callback Requests - نصف/نصف */}
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        {/* Communication Form */}
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="font-semibold text-slate-700 mb-4">إضافة تواصُل</h2>
+          <form onSubmit={handleCommSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-slate-600 mb-2">نوع التواصُل</label>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(COMM_TYPE_LABELS).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setCommForm((p) => ({ ...p, type: value }))}
+                    className={`px-4 py-2 rounded-lg text-sm border transition ${
+                      commForm.type === value
+                        ? 'bg-slate-700 text-white border-slate-700 font-medium'
+                        : 'border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">ملاحظات</label>
+              <textarea
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 min-h-[80px] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                value={commForm.notes}
+                onChange={(e) => setCommForm((p) => ({ ...p, notes: e.target.value }))}
+                placeholder="ملخص ما تم مع الليد..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">تحديث الحالة</label>
+              <select
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                value={commForm.statusId}
+                onChange={(e) => setCommForm((p) => ({ ...p, statusId: e.target.value }))}
+              >
+                <option value="">— بدون تغيير —</option>
+                {statuses?.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            {commError && <p className="text-sm text-red-600">{commError}</p>}
+            <button
+              type="submit"
+              disabled={addCommMutation.isPending}
+              className="w-full py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
+            >
+              {addCommMutation.isPending ? 'جاري الحفظ...' : 'حفظ التواصُل'}
+            </button>
+          </form>
+        </div>
 
         {/* Callback Requests */}
         <div className="bg-white rounded-xl shadow p-6">
@@ -637,63 +693,7 @@ export default function LeadDetailPage() {
           )}
         </div>
 
-        {/* Communication Form */}
-        <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="font-semibold text-slate-700 mb-4">إضافة تواصُل</h2>
-          <form onSubmit={handleCommSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm text-slate-600 mb-2">نوع التواصُل</label>
-              <div className="flex flex-wrap gap-2">
-                {Object.entries(COMM_TYPE_LABELS).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setCommForm((p) => ({ ...p, type: value }))}
-                    className={`px-4 py-2 rounded-lg text-sm border transition ${
-                      commForm.type === value
-                        ? 'bg-slate-700 text-white border-slate-700 font-medium'
-                        : 'border-slate-300 text-slate-600 hover:border-slate-400 hover:bg-slate-50'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600 mb-1">ملاحظات</label>
-              <textarea
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 min-h-[80px] text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                value={commForm.notes}
-                onChange={(e) => setCommForm((p) => ({ ...p, notes: e.target.value }))}
-                placeholder="ملخص ما تم مع الليد..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-600 mb-1">تحديث الحالة</label>
-              <select
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-                value={commForm.statusId}
-                onChange={(e) => setCommForm((p) => ({ ...p, statusId: e.target.value }))}
-              >
-                <option value="">— بدون تغيير —</option>
-                {statuses?.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
-            </div>
-            {commError && <p className="text-sm text-red-600">{commError}</p>}
-            <button
-              type="submit"
-              disabled={addCommMutation.isPending}
-              className="w-full py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-800 disabled:opacity-50 text-sm font-medium"
-            >
-              {addCommMutation.isPending ? 'جاري الحفظ...' : 'حفظ التواصُل'}
-            </button>
-          </form>
-        </div>
-
-      </div>{/* end grid: callback + comm form */}
+      </div>{/* end grid: comm form + callback */}
 
       {/* Communications List */}
       <div className="mt-6 bg-white rounded-xl shadow overflow-hidden">
