@@ -43,6 +43,7 @@ async function main() {
     { name: 'التقارير', slug: 'reports.view', module: 'reports' },
     { name: 'سجل التدقيق', slug: 'audit.view', module: 'audit' },
     { name: 'تعيين الليدز', slug: 'leads.assign', module: 'leads' },
+    { name: 'إدارة المهام', slug: 'tasks.manage', module: 'tasks' },
   ];
   for (const p of permissions) {
     await prisma.permission.upsert({
@@ -103,16 +104,18 @@ async function main() {
       }
     }
   }
-  // مدير السيلز فقط: صلاحية تعيين الليدز
+  // مدير السيلز فقط: صلاحية تعيين الليدز + إدارة المهام
   const salesManagerRole = await prisma.role.findUnique({ where: { slug: 'sales_manager' } });
   if (salesManagerRole) {
-    const assignPerm = await prisma.permission.findUnique({ where: { slug: 'leads.assign' } });
-    if (assignPerm) {
-      await prisma.rolePermission.upsert({
-        where: { roleId_permissionId: { roleId: salesManagerRole.id, permissionId: assignPerm.id } },
-        update: {},
-        create: { roleId: salesManagerRole.id, permissionId: assignPerm.id },
-      });
+    for (const slug of ['leads.assign', 'tasks.manage']) {
+      const perm = await prisma.permission.findUnique({ where: { slug } });
+      if (perm) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: salesManagerRole.id, permissionId: perm.id } },
+          update: {},
+          create: { roleId: salesManagerRole.id, permissionId: perm.id },
+        });
+      }
     }
   }
   // أوبريشنز: داشبورد، منتجات، شيفتات، ربْط
