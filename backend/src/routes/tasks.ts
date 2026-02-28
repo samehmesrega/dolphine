@@ -5,73 +5,38 @@ import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// ====== Re-contact + Status-followup check ======
-async function runReContactCheck(userId: string, isManager: boolean) {
+// ====== فحص قواعد المهام التلقائية ======
+async function runRulesCheck(userId: string, isManager: boolean) {
   const rules = await prisma.taskRule.findMany({ where: { isActive: true } });
 
   for (const rule of rules) {
-    // cast مؤقت حتى يتجدد Prisma client بعد db push
-    const r = rule as typeof rule & { triggerType?: string; afterHours?: number | null };
+    const r = rule as any;
+    const cutoff = new Date(Date.now() - r.afterHours * 3600000);
 
-    // --- no_contact: ليد بدون تواصل X يوم في حالة X ---
-    if ((r.triggerType === 'no_contact' || !r.triggerType) && r.afterDays) {
-      const cutoff = new Date(Date.now() - r.afterDays * 86400000);
+    // ليدز في حالة معينة ومر عليها X ساعة من تغيير الحالة، بدون مهمة pending من نفس القاعدة
+    const leads = await (prisma.lead.findMany as Function)({
+      where: {
+        status: { slug: r.statusSlug },
+        lastStatusChangedAt: { lte: cutoff },
+        assignedToId: isManager ? { not: null } : userId,
+        NOT: [
+          { tasks: { some: { type: 'rule_task', status: 'pending' } } },
+        ],
+      },
+      select: { id: true, name: true, assignedToId: true },
+    }) as { id: string; name: string; assignedToId: string | null }[];
 
-      const leads = await prisma.lead.findMany({
-        where: {
-          status: { slug: r.statusSlug },
-          assignedToId: isManager ? { not: null } : userId,
-          NOT: [
-            { communications: { some: { createdAt: { gte: cutoff } } } },
-            { tasks: { some: { type: 're_contact', status: 'pending' } } },
-          ],
+    for (const lead of leads) {
+      if (!lead.assignedToId) continue;
+      await prisma.task.create({
+        data: {
+          type: 'rule_task',
+          title: `${r.action}: ${lead.name}`,
+          leadId: lead.id,
+          assignedToId: lead.assignedToId,
+          status: 'pending',
         },
-        select: { id: true, name: true, assignedToId: true },
       });
-
-      for (const lead of leads) {
-        if (!lead.assignedToId) continue;
-        await prisma.task.create({
-          data: {
-            type: 're_contact',
-            title: `إعادة تواصل: ${lead.name} (${r.afterDays} أيام بدون تواصل)`,
-            leadId: lead.id,
-            assignedToId: lead.assignedToId,
-            status: 'pending',
-          },
-        });
-      }
-    }
-
-    // --- status_change: ليد تغيرت حالته لـ X منذ Y ساعة ---
-    if (r.triggerType === 'status_change' && r.afterHours) {
-      const afterHours = r.afterHours;
-      const cutoffHours = new Date(Date.now() - afterHours * 3600000);
-
-      const leads = await (prisma.lead.findMany as Function)({
-        where: {
-          status: { slug: r.statusSlug },
-          lastStatusChangedAt: { lte: cutoffHours },
-          assignedToId: isManager ? { not: null } : userId,
-          NOT: [
-            { tasks: { some: { type: 'status_followup', status: 'pending' } } },
-          ],
-        },
-        select: { id: true, name: true, assignedToId: true },
-      }) as { id: string; name: string; assignedToId: string | null }[];
-
-      for (const lead of leads) {
-        if (!lead.assignedToId) continue;
-        await prisma.task.create({
-          data: {
-            type: 'status_followup',
-            title: `متابعة: ${lead.name} (في حالة "${r.statusSlug}" منذ ${afterHours} ساعة)`,
-            leadId: lead.id,
-            assignedToId: lead.assignedToId,
-            status: 'pending',
-          },
-        });
-      }
     }
   }
 }
@@ -87,11 +52,11 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const userId = req.user!.userId;
     const isManager = hasTasksManage(req);
 
-    // شغل re-contact check
+    // شغل فحص قواعد المهام التلقائية
     try {
-      await runReContactCheck(userId, isManager);
+      await runRulesCheck(userId, isManager);
     } catch (e) {
-      console.error('[tasks] re-contact check error:', e);
+      console.error('[tasks] rules check error:', e);
     }
 
     const status = typeof req.query.status === 'string' ? req.query.status : 'pending';

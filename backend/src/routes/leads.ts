@@ -298,7 +298,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
             leadId: id,
             assignedToId: lead.assignedToId,
             status: 'pending',
-            type: { in: ['new_lead', 're_contact', 'status_followup'] },
+            type: { in: ['new_lead', 're_contact', 'status_followup', 'rule_task'] },
           },
           data: { status: 'done', completedAt: new Date(), completedById: authReq.user?.userId ?? null },
         });
@@ -439,7 +439,7 @@ router.post('/:id/communications', async (req: Request, res: Response) => {
         leadId: id,
         assignedToId: userId,
         status: 'pending',
-        type: { in: ['new_lead', 're_contact', 'status_followup', 'callback_replied'] },
+        type: { in: ['new_lead', 're_contact', 'status_followup', 'rule_task', 'callback_replied'] },
       },
       data: { status: 'done', completedAt: new Date(), completedById: userId },
     });

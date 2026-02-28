@@ -430,17 +430,13 @@ model Task {
 }
 
 model TaskRule {
-  id          String   @id @default(uuid())
-  name        String
-  triggerType String   @default("no_contact") @map("trigger_type")
-  // "no_contact"    → afterDays يُستخدم: ليد بدون تواصل X يوم في حالة X
-  // "status_change" → afterHours يُستخدم: ليد تغيرت حالته لـ X منذ Y ساعة
-  statusSlug  String   @map("status_slug")
-  afterDays   Int?     @map("after_days")
-  afterHours  Int?     @map("after_hours")
-  isActive    Boolean  @default(true) @map("is_active")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id         String   @id @default(uuid())
+  action     String
+  statusSlug String   @map("status_slug")
+  afterHours Int      @map("after_hours")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
   @@map("task_rules")
 }
