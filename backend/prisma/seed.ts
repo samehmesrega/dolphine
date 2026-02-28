@@ -185,6 +185,13 @@ async function main() {
     });
   }
 
+  // ملء lastStatusChangedAt للليدز القديمة اللي مش عندها قيمة
+  await prisma.$executeRawUnsafe(`
+    UPDATE leads
+    SET last_status_changed_at = updated_at
+    WHERE last_status_changed_at IS NULL
+  `);
+
   console.log('تم تنفيذ Seed بنجاح');
 }
 

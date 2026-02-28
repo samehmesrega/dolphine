@@ -402,7 +402,7 @@ model Notification {
 
 model Task {
   id            String    @id @default(uuid())
-  type          String    // 'new_lead' | 're_contact' | 'order_issue' | 'callback_replied' | 'manual'
+  type          String    // 'new_lead' | 'rule_task' | 'callback_replied' | 'manual'
   title         String
   description   String?
   status        String    @default("pending") // 'pending' | 'done' | 'snoozed'
@@ -415,6 +415,9 @@ model Task {
 
   orderId       String?   @map("order_id")
   order         Order?    @relation(fields: [orderId], references: [id])
+
+  ruleId        String?   @map("rule_id")
+  rule          TaskRule? @relation(fields: [ruleId], references: [id])
 
   snoozedUntil  DateTime? @map("snoozed_until")
   completedAt   DateTime? @map("completed_at")
@@ -437,6 +440,8 @@ model TaskRule {
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
+
+  tasks      Task[]
 
   @@map("task_rules")
 }

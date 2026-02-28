@@ -18,7 +18,7 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/login', { email, password });
       login(data.token, data.user);
-      navigate('/');
+      navigate('/dashboard');
     } catch (err: any) {
       const msg = err.response?.data?.error
         || (err.response?.status === 500 && 'خطأ في الخادم. تحقق من تشغيل الـ Backend وقاعدة البيانات.')

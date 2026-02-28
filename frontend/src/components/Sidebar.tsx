@@ -40,7 +40,7 @@ type GroupEntry = { type: 'group'; label: string; icon: string; children: ChildI
 type NavEntry = SimpleEntry | GroupEntry;
 
 const NAV: NavEntry[] = [
-  { type: 'item', to: '/', label: 'داشبورد', icon: 'home', permission: 'dashboard.view' },
+  { type: 'item', to: '/dashboard', label: 'داشبورد', icon: 'home', permission: 'dashboard.view' },
   { type: 'item', to: '/leads', label: 'ليدز', icon: 'users', permission: 'leads.view' },
   { type: 'item', to: '/customers', label: 'عملاء', icon: 'userGroup', permission: 'customers.view' },
   { type: 'item', to: '/tasks', label: 'المهام', icon: 'checkCircle' },
@@ -241,7 +241,7 @@ export default function Sidebar() {
                 <NavLink
                   key={entry.to}
                   to={entry.to}
-                  end={entry.to === '/'}
+                  end={entry.to === '/dashboard'}
                   title={entry.label}
                   className={({ isActive }) =>
                     `flex items-center justify-center p-2.5 rounded-lg mb-1 transition ${
@@ -259,7 +259,7 @@ export default function Sidebar() {
               <NavLink
                 key={entry.to}
                 to={entry.to}
-                end={entry.to === '/'}
+                end={entry.to === '/dashboard'}
                 className={({ isActive }) =>
                   `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm ${
                     isActive

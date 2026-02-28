@@ -20,7 +20,7 @@ async function runRulesCheck(userId: string, isManager: boolean) {
         lastStatusChangedAt: { lte: cutoff },
         assignedToId: isManager ? { not: null } : userId,
         NOT: [
-          { tasks: { some: { type: 'rule_task', status: 'pending' } } },
+          { tasks: { some: { ruleId: r.id, status: 'pending' } } },
         ],
       },
       select: { id: true, name: true, assignedToId: true },
@@ -28,12 +28,13 @@ async function runRulesCheck(userId: string, isManager: boolean) {
 
     for (const lead of leads) {
       if (!lead.assignedToId) continue;
-      await prisma.task.create({
+      await (prisma.task.create as Function)({
         data: {
           type: 'rule_task',
           title: `${r.action}: ${lead.name}`,
           leadId: lead.id,
           assignedToId: lead.assignedToId,
+          ruleId: r.id,
           status: 'pending',
         },
       });
