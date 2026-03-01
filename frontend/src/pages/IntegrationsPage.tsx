@@ -80,7 +80,8 @@ function useProducts() {
   });
 }
 
-const CORE_FIELDS: { key: keyof Omit<FieldMapping, 'customFields'>; label: string; placeholder: string }[] = [
+type CoreFieldKey = 'name' | 'phone' | 'email' | 'address';
+const CORE_FIELDS: { key: CoreFieldKey; label: string; placeholder: string }[] = [
   { key: 'name',    label: 'الاسم',    placeholder: 'مثال: text-1' },
   { key: 'phone',   label: 'التليفون', placeholder: 'مثال: phone-1' },
   { key: 'email',   label: 'الإيميل',  placeholder: 'مثال: email-1 (اختياري)' },
