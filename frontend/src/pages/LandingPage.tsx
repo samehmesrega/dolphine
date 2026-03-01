@@ -15,7 +15,7 @@ export default function LandingPage() {
           <span className="text-xl font-bold tracking-tight">دولفين</span>
         </div>
         <Link
-          to={token ? '/' : '/login'}
+          to={token ? '/dashboard' : '/login'}
           className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors text-sm"
         >
           {token ? 'لوحة التحكم' : 'تسجيل الدخول'}
@@ -34,7 +34,7 @@ export default function LandingPage() {
           وتحليل الأداء — كل ذلك من مكان واحد.
         </p>
         <Link
-          to={token ? '/' : '/login'}
+          to={token ? '/dashboard' : '/login'}
           className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3.5 rounded-xl transition-colors text-base shadow-lg shadow-blue-600/30"
         >
           {token ? 'الدخول للوحة التحكم' : 'ابدأ الآن'}
@@ -61,13 +61,42 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Powered by */}
+      <section className="border-t border-white/10 py-16">
+        <div className="max-w-4xl mx-auto px-6 md:px-12 text-center">
+          <p className="text-slate-500 text-xs uppercase tracking-widest mb-4">تم التطوير بواسطة</p>
+          <h3 className="text-2xl font-bold text-white mb-3">Digitex</h3>
+          <p className="text-slate-400 text-sm max-w-lg mx-auto mb-8 leading-relaxed">
+            شركة ديجتيكس للحلول الرقمية — المطوّر والمشغّل لمشاريع
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-8">
+            {BRANDS.map((b) => (
+              <div key={b.name} className="flex items-center gap-2.5 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br flex items-center justify-center text-white font-bold text-sm" style={{ background: b.gradient }}>
+                  {b.initial}
+                </div>
+                <span className="text-white font-semibold text-sm">{b.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-white/10 py-6 text-center text-slate-500 text-sm">
-        دولفين &copy; {new Date().getFullYear()} — نظام إدارة الليدز والمبيعات
+        <span>دولفين &copy; {new Date().getFullYear()}</span>
+        <span className="mx-2">—</span>
+        <span>تم التطوير بواسطة <span className="text-slate-400 font-medium">Digitex</span></span>
       </footer>
     </div>
   );
 }
+
+const BRANDS = [
+  { name: 'Print In', initial: 'P', gradient: 'linear-gradient(135deg, #3b82f6, #1d4ed8)' },
+  { name: 'Baked In', initial: 'B', gradient: 'linear-gradient(135deg, #f59e0b, #d97706)' },
+  { name: 'Coroida', initial: 'C', gradient: 'linear-gradient(135deg, #10b981, #059669)' },
+];
 
 const FEATURES = [
   {
