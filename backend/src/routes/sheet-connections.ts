@@ -19,6 +19,11 @@ const fieldMappingSchema = z.object({
   phone:        z.string().optional(),
   email:        z.string().optional(),
   address:      z.string().optional(),
+  createdAt:    z.string().optional(),
+  statusColumn: z.string().optional(),
+  statusMapping: z.record(z.string(), z.string()).optional(),
+  userColumn:   z.string().optional(),
+  userMapping:  z.record(z.string(), z.string()).optional(),
   customFields: z.array(z.object({
     label: z.string().min(1),
     field: z.string().min(1),
@@ -129,6 +134,31 @@ router.get('/:id/headers', async (req: Request, res: Response) => {
   }
 });
 
+// جلب القيم المميزة من عمود معين
+router.get('/:id/column-values', async (req: Request, res: Response) => {
+  try {
+    const conn = await prisma.sheetConnection.findUnique({ where: { id: String(req.params.id) } });
+    if (!conn) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
+
+    const column = String(req.query.column ?? '');
+    if (!column) { res.status(400).json({ error: 'اسم العمود مطلوب' }); return; }
+
+    const { headers, rows } = await readRows(conn.spreadsheetId, conn.sheetName, 2);
+    const colIndex = headers.indexOf(column);
+    if (colIndex < 0) { res.json({ values: [] }); return; }
+
+    const distinctValues = [...new Set(
+      rows.map(row => (row[colIndex] ?? '').trim()).filter(Boolean)
+    )];
+
+    res.json({ values: distinctValues });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'خطأ في قراءة البيانات';
+    console.error('Read column values error:', msg);
+    res.status(400).json({ error: msg });
+  }
+});
+
 // تحديث field mapping
 router.patch('/:id/mapping', async (req: Request, res: Response) => {
   try {
@@ -198,6 +228,11 @@ type FieldMapping = {
   phone?: string;
   email?: string;
   address?: string;
+  createdAt?: string;
+  statusColumn?: string;
+  statusMapping?: Record<string, string>;
+  userColumn?: string;
+  userMapping?: Record<string, string>;
   customFields?: Array<{ label: string; field: string; type?: string }>;
 };
 
@@ -219,6 +254,16 @@ export async function createLeadFromRow(
   const email = (mapping.email ? (rowData[mapping.email] ?? '').trim() : '') || undefined;
   const address = (mapping.address ? (rowData[mapping.address] ?? '').trim() : '') || undefined;
 
+  // تاريخ الإنشاء من الشيت
+  let parsedCreatedAt: Date | undefined;
+  if (mapping.createdAt) {
+    const rawDate = (rowData[mapping.createdAt] ?? '').trim();
+    if (rawDate) {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) parsedCreatedAt = d;
+    }
+  }
+
   // حقول مخصصة
   const leadCustomFields: Record<string, unknown> = {};
   const productCustomFields: Record<string, unknown> = {};
@@ -230,8 +275,16 @@ export async function createLeadFromRow(
     }
   }
 
-  const status = await prisma.leadStatus.findUnique({ where: { slug: 'new' } });
-  if (!status) return { created: false, skipped: false, error: 'حالة "new" غير موجودة' };
+  // تحديد حالة الليد من الشيت أو الافتراضية
+  let statusSlug = 'new';
+  if (mapping.statusColumn && mapping.statusMapping) {
+    const sheetStatusValue = (rowData[mapping.statusColumn] ?? '').trim();
+    if (sheetStatusValue && mapping.statusMapping[sheetStatusValue]) {
+      statusSlug = mapping.statusMapping[sheetStatusValue];
+    }
+  }
+  const status = await prisma.leadStatus.findUnique({ where: { slug: statusSlug } });
+  if (!status) return { created: false, skipped: false, error: `حالة "${statusSlug}" غير موجودة` };
 
   const customer = await prisma.customer.upsert({
     where: { phone: phoneNormalized },
@@ -239,7 +292,17 @@ export async function createLeadFromRow(
     create: { phone: phoneNormalized, name, email, address },
   });
 
-  const assignedToId = await getNextAssignedUserId();
+  // تعيين المسؤول من الشيت أو التوزيع التلقائي
+  let assignedToId: string | null = null;
+  if (mapping.userColumn && mapping.userMapping) {
+    const sheetUserValue = (rowData[mapping.userColumn] ?? '').trim();
+    if (sheetUserValue && mapping.userMapping[sheetUserValue]) {
+      assignedToId = mapping.userMapping[sheetUserValue];
+    }
+  }
+  if (!assignedToId) {
+    assignedToId = await getNextAssignedUserId();
+  }
 
   const lead = await prisma.lead.create({
     data: {
@@ -254,6 +317,7 @@ export async function createLeadFromRow(
       statusId: status.id,
       customerId: customer.id,
       ...(assignedToId ? { assignedToId } : {}),
+      ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
     },
   });
 

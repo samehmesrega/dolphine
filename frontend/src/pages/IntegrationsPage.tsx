@@ -11,6 +11,11 @@ type FieldMapping = {
   phone?: string;
   email?: string;
   address?: string;
+  createdAt?: string;
+  statusColumn?: string;
+  statusMapping?: Record<string, string>;
+  userColumn?: string;
+  userMapping?: Record<string, string>;
   customFields?: CustomFieldDef[];
 };
 
@@ -307,6 +312,29 @@ function useGoogleConfig() {
   });
 }
 
+type LeadStatusOption = { id: string; name: string; slug: string };
+type UserOption = { id: string; name: string };
+
+function useLeadStatuses() {
+  return useQuery({
+    queryKey: ['lead-statuses'],
+    queryFn: async () => {
+      const { data } = await api.get<{ statuses: LeadStatusOption[] }>('/lead-statuses');
+      return data.statuses;
+    },
+  });
+}
+
+function useUsers() {
+  return useQuery({
+    queryKey: ['users-list'],
+    queryFn: async () => {
+      const { data } = await api.get<{ users: UserOption[] }>('/users');
+      return data.users;
+    },
+  });
+}
+
 function SheetMappingEditor({ connection }: { connection: SheetConnection }) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
@@ -317,7 +345,21 @@ function SheetMappingEditor({ connection }: { connection: SheetConnection }) {
   const [headersLoading, setHeadersLoading] = useState(false);
   const [headersError, setHeadersError] = useState('');
 
+  // State for status mapping
+  const [statusColumn, setStatusColumn] = useState<string>(connection.fieldMapping?.statusColumn ?? '');
+  const [statusMapping, setStatusMapping] = useState<Record<string, string>>(connection.fieldMapping?.statusMapping ?? {});
+  const [statusValues, setStatusValues] = useState<string[]>([]);
+  const [loadingStatusValues, setLoadingStatusValues] = useState(false);
+
+  // State for user mapping
+  const [userColumn, setUserColumn] = useState<string>(connection.fieldMapping?.userColumn ?? '');
+  const [userMapping, setUserMapping] = useState<Record<string, string>>(connection.fieldMapping?.userMapping ?? {});
+  const [userValues, setUserValues] = useState<string[]>([]);
+  const [loadingUserValues, setLoadingUserValues] = useState(false);
+
   const { data: products } = useProducts();
+  const { data: leadStatuses } = useLeadStatuses();
+  const { data: users } = useUsers();
 
   const fetchHeaders = async () => {
     setHeadersLoading(true);
@@ -330,6 +372,44 @@ function SheetMappingEditor({ connection }: { connection: SheetConnection }) {
       setHeadersError(e?.response?.data?.error || 'خطأ في قراءة أعمدة الشيت');
     } finally {
       setHeadersLoading(false);
+    }
+  };
+
+  const fetchColumnValues = async (columnName: string): Promise<string[]> => {
+    if (!columnName) return [];
+    try {
+      const { data } = await api.get<{ values: string[] }>(
+        `/sheet-connections/${connection.id}/column-values?column=${encodeURIComponent(columnName)}`
+      );
+      return data.values;
+    } catch {
+      return [];
+    }
+  };
+
+  const handleStatusColumnChange = async (col: string) => {
+    setStatusColumn(col);
+    setStatusMapping({});
+    if (col) {
+      setLoadingStatusValues(true);
+      const values = await fetchColumnValues(col);
+      setStatusValues(values);
+      setLoadingStatusValues(false);
+    } else {
+      setStatusValues([]);
+    }
+  };
+
+  const handleUserColumnChange = async (col: string) => {
+    setUserColumn(col);
+    setUserMapping({});
+    if (col) {
+      setLoadingUserValues(true);
+      const values = await fetchColumnValues(col);
+      setUserValues(values);
+      setLoadingUserValues(false);
+    } else {
+      setUserValues([]);
     }
   };
 
@@ -361,6 +441,19 @@ function SheetMappingEditor({ connection }: { connection: SheetConnection }) {
       const v = mapping[key]?.trim();
       if (v) cleaned[key] = v;
     }
+    // createdAt
+    const createdAtCol = mapping.createdAt?.trim();
+    if (createdAtCol) cleaned.createdAt = createdAtCol;
+    // status mapping
+    if (statusColumn) {
+      cleaned.statusColumn = statusColumn;
+      if (Object.keys(statusMapping).length > 0) cleaned.statusMapping = statusMapping;
+    }
+    // user mapping
+    if (userColumn) {
+      cleaned.userColumn = userColumn;
+      if (Object.keys(userMapping).length > 0) cleaned.userMapping = userMapping;
+    }
     const validCustom = customFields.filter((f) => f.label.trim() && f.field.trim());
     if (validCustom.length > 0) cleaned.customFields = validCustom;
     saveMutation.mutate(cleaned);
@@ -371,7 +464,22 @@ function SheetMappingEditor({ connection }: { connection: SheetConnection }) {
     setMapping(connection.fieldMapping ?? {});
     setCustomFields(connection.fieldMapping?.customFields ?? []);
     setSelectedProductId(connection.productId ?? '');
-    if (!open) fetchHeaders();
+    setStatusColumn(connection.fieldMapping?.statusColumn ?? '');
+    setStatusMapping(connection.fieldMapping?.statusMapping ?? {});
+    setUserColumn(connection.fieldMapping?.userColumn ?? '');
+    setUserMapping(connection.fieldMapping?.userMapping ?? {});
+    setStatusValues([]);
+    setUserValues([]);
+    if (!open) {
+      fetchHeaders();
+      // load saved column values
+      if (connection.fieldMapping?.statusColumn) {
+        fetchColumnValues(connection.fieldMapping.statusColumn).then(setStatusValues);
+      }
+      if (connection.fieldMapping?.userColumn) {
+        fetchColumnValues(connection.fieldMapping.userColumn).then(setUserValues);
+      }
+    }
     setOpen(!open);
   };
 
@@ -426,6 +534,99 @@ function SheetMappingEditor({ connection }: { connection: SheetConnection }) {
                     </select>
                   </div>
                 ))}
+              </div>
+
+              {/* تاريخ الإنشاء */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">تاريخ الإنشاء</p>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-700 w-24 shrink-0">تاريخ الإنشاء</label>
+                  <select
+                    value={mapping.createdAt ?? ''}
+                    onChange={(e) => setMapping(prev => ({ ...prev, createdAt: e.target.value }))}
+                    className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+                  >
+                    <option value="">-- بدون (يستخدم تاريخ الاستيراد) --</option>
+                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                <p className="text-xs text-slate-400">اختر عمود التاريخ لاستخدامه كتاريخ إنشاء الليد بدلاً من تاريخ الاستيراد</p>
+              </div>
+
+              {/* تعيين الحالات */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">تعيين الحالات</p>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-700 w-24 shrink-0">عمود الحالة</label>
+                  <select
+                    value={statusColumn}
+                    onChange={(e) => handleStatusColumnChange(e.target.value)}
+                    className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+                  >
+                    <option value="">-- بدون (كل الليدز = جديد) --</option>
+                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                {loadingStatusValues && <p className="text-slate-500 text-xs">جاري قراءة القيم...</p>}
+                {statusColumn && statusValues.length > 0 && (
+                  <div className="border border-slate-200 rounded p-3 space-y-2">
+                    <p className="text-xs text-slate-500">حدد الحالة المقابلة في دولفين لكل قيمة في الشيت:</p>
+                    {statusValues.map(sheetVal => (
+                      <div key={sheetVal} className="flex items-center gap-2">
+                        <span className="text-sm text-slate-700 w-40 shrink-0 truncate" title={sheetVal}>{sheetVal}</span>
+                        <span className="text-slate-400 text-sm">←</span>
+                        <select
+                          value={statusMapping[sheetVal] ?? ''}
+                          onChange={(e) => setStatusMapping(prev => ({ ...prev, [sheetVal]: e.target.value }))}
+                          className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+                        >
+                          <option value="">-- جديد (افتراضي) --</option>
+                          {(leadStatuses ?? []).map(s => (
+                            <option key={s.slug} value={s.slug}>{s.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* تعيين المسؤولين */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">تعيين المسؤولين</p>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-700 w-24 shrink-0">عمود المسؤول</label>
+                  <select
+                    value={userColumn}
+                    onChange={(e) => handleUserColumnChange(e.target.value)}
+                    className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+                  >
+                    <option value="">-- بدون (توزيع تلقائي) --</option>
+                    {headers.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                {loadingUserValues && <p className="text-slate-500 text-xs">جاري قراءة القيم...</p>}
+                {userColumn && userValues.length > 0 && (
+                  <div className="border border-slate-200 rounded p-3 space-y-2">
+                    <p className="text-xs text-slate-500">حدد المسؤول في دولفين لكل اسم في الشيت:</p>
+                    {userValues.map(sheetVal => (
+                      <div key={sheetVal} className="flex items-center gap-2">
+                        <span className="text-sm text-slate-700 w-40 shrink-0 truncate" title={sheetVal}>{sheetVal}</span>
+                        <span className="text-slate-400 text-sm">←</span>
+                        <select
+                          value={userMapping[sheetVal] ?? ''}
+                          onChange={(e) => setUserMapping(prev => ({ ...prev, [sheetVal]: e.target.value }))}
+                          className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+                        >
+                          <option value="">-- توزيع تلقائي --</option>
+                          {(users ?? []).map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* حقول مخصصة */}

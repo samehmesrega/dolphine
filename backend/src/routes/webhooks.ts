@@ -249,6 +249,9 @@ router.post('/sheets/:token', async (req: Request, res: Response) => {
 
     const mapping = (connection.fieldMapping ?? {}) as {
       name?: string; phone?: string; email?: string; address?: string;
+      createdAt?: string;
+      statusColumn?: string; statusMapping?: Record<string, string>;
+      userColumn?: string; userMapping?: Record<string, string>;
       customFields?: Array<{ label: string; field: string; type?: string }>;
     };
 
