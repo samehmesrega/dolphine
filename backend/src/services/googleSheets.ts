@@ -32,8 +32,20 @@ export async function readHeaders(spreadsheetId: string, sheetName: string): Pro
   const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text();
-    if (res.status === 403) throw new Error('لا يمكن الوصول للشيت. تأكد من مشاركته كـ "أي شخص لديه الرابط يمكنه العرض"');
+    console.error(`[Google Sheets API] ${res.status} response:`, text);
+    if (res.status === 403) {
+      // تحليل رسالة الخطأ من Google لتوضيح السبب
+      const lower = text.toLowerCase();
+      if (lower.includes('sheets api has not been enabled') || lower.includes('sheets api') && lower.includes('disabled')) {
+        throw new Error('Google Sheets API غير مفعّل. فعّله من Google Cloud Console → APIs & Services → Enable APIs');
+      }
+      if (lower.includes('api key not valid') || lower.includes('api_key_invalid')) {
+        throw new Error('مفتاح API غير صالح. تأكد من صحة المفتاح');
+      }
+      throw new Error('لا يمكن الوصول للشيت. تأكد من مشاركته كـ "أي شخص لديه الرابط يمكنه العرض" وأن Google Sheets API مفعّل');
+    }
     if (res.status === 404) throw new Error('الشيت غير موجود. تأكد من صحة الرابط واسم الورقة');
+    if (res.status === 400) throw new Error(`خطأ في الطلب: تأكد من صحة اسم الورقة. ${text}`);
     throw new Error(`خطأ Google Sheets API: ${res.status} ${text}`);
   }
 
