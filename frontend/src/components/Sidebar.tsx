@@ -61,7 +61,7 @@ const NAV: NavEntry[] = [
     icon: 'cog',
     children: [
       { to: '/shifts', label: 'شيفتات', permission: 'shifts.manage' },
-      { to: '/integrations', label: 'الربط (ووردبريس)', permission: 'integrations.manage' },
+      { to: '/integrations', label: 'الربط والتكامل', permission: 'integrations.manage' },
       { to: '/lead-statuses', label: 'حالات الليد', permission: 'shifts.manage' },
       { to: '/task-rules', label: 'قواعد المهام', permission: 'tasks.manage' },
     ],

@@ -6,6 +6,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import { normalizePhone } from '../utils/phone';
 import { getNextAssignedUserId } from '../services/roundRobin';
+import { createLeadFromRow } from './sheet-connections';
 
 const router = Router();
 
@@ -226,6 +227,49 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
   } catch (err: unknown) {
     console.error('[webhook] خطأ غير متوقع:', err);
     res.status(500).json({ error: 'خطأ في معالجة النموذج' });
+  }
+});
+
+// POST /api/webhooks/sheets/:token — استقبال ليد من Google Apps Script
+router.post('/sheets/:token', async (req: Request, res: Response) => {
+  try {
+    const token = String(req.params.token);
+    const connection = await prisma.sheetConnection.findUnique({ where: { token } });
+    if (!connection || !connection.isActive) {
+      console.log('[sheets-webhook] رابط غير صالح، token:', token.slice(0, 8) + '...');
+      res.status(404).json({ error: 'رابط غير صالح أو منتهي' });
+      return;
+    }
+
+    const rowData = (req.body?.row ?? {}) as Record<string, string>;
+    if (!rowData || typeof rowData !== 'object' || Object.keys(rowData).length === 0) {
+      res.status(200).json({ success: true, skipped: true, reason: 'empty_row' });
+      return;
+    }
+
+    const mapping = (connection.fieldMapping ?? {}) as {
+      name?: string; phone?: string; email?: string; address?: string;
+      customFields?: Array<{ label: string; field: string; type?: string }>;
+    };
+
+    const result = await createLeadFromRow(rowData, mapping, connection.name, connection.productId);
+
+    if (result.created) {
+      // تحديث عداد الصفوف
+      await prisma.sheetConnection.update({
+        where: { id: connection.id },
+        data: { lastSyncedRow: { increment: 1 }, updatedAt: new Date() },
+      });
+      console.log('[sheets-webhook] تم إنشاء ليد من شيت:', connection.name);
+      res.status(201).json({ success: true });
+    } else if (result.skipped) {
+      res.status(200).json({ success: true, skipped: true, reason: 'no_valid_phone' });
+    } else {
+      res.status(200).json({ success: false, error: result.error });
+    }
+  } catch (err: unknown) {
+    console.error('[sheets-webhook] خطأ:', err);
+    res.status(500).json({ error: 'خطأ في معالجة البيانات' });
   }
 });
 

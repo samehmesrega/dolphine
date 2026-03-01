@@ -270,6 +270,533 @@ function MappingEditor({ connection }: { connection: FormConnection }) {
   );
 }
 
+// ==================== Google Sheets ====================
+
+type SheetConnection = {
+  id: string;
+  name: string;
+  spreadsheetId: string;
+  sheetName: string;
+  token: string;
+  fieldMapping: FieldMapping | null;
+  productId: string | null;
+  product: { id: string; name: string } | null;
+  lastSyncedRow: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function useSheetConnections() {
+  return useQuery({
+    queryKey: ['sheet-connections'],
+    queryFn: async () => {
+      const { data } = await api.get<{ connections: SheetConnection[] }>('/sheet-connections');
+      return data.connections;
+    },
+  });
+}
+
+function useGoogleConfig() {
+  return useQuery({
+    queryKey: ['google-sheets-config'],
+    queryFn: async () => {
+      const { data } = await api.get<{ configured: boolean; apiKeyMasked: string | null }>('/sheet-connections/google-config');
+      return data;
+    },
+  });
+}
+
+function SheetMappingEditor({ connection }: { connection: SheetConnection }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [mapping, setMapping] = useState<FieldMapping>(connection.fieldMapping ?? {});
+  const [customFields, setCustomFields] = useState<CustomFieldDef[]>(connection.fieldMapping?.customFields ?? []);
+  const [selectedProductId, setSelectedProductId] = useState<string>(connection.productId ?? '');
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [headersLoading, setHeadersLoading] = useState(false);
+  const [headersError, setHeadersError] = useState('');
+
+  const { data: products } = useProducts();
+
+  const fetchHeaders = async () => {
+    setHeadersLoading(true);
+    setHeadersError('');
+    try {
+      const { data } = await api.get<{ headers: string[] }>(`/sheet-connections/${connection.id}/headers`);
+      setHeaders(data.headers);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setHeadersError(e?.response?.data?.error || 'خطأ في قراءة أعمدة الشيت');
+    } finally {
+      setHeadersLoading(false);
+    }
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async (data: FieldMapping) => {
+      await api.patch(`/sheet-connections/${connection.id}/mapping`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sheet-connections'] });
+      setOpen(false);
+    },
+  });
+
+  const productMutation = useMutation({
+    mutationFn: async () => {
+      await api.patch(`/sheet-connections/${connection.id}`, { productId: selectedProductId || null });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sheet-connections'] }),
+  });
+
+  const addCustomField = () => setCustomFields((prev) => [...prev, { label: '', field: '' }]);
+  const updateCustomField = (i: number, key: keyof CustomFieldDef, val: string) =>
+    setCustomFields((prev) => prev.map((f, idx) => (idx === i ? { ...f, [key]: val } : f)));
+  const removeCustomField = (i: number) => setCustomFields((prev) => prev.filter((_, idx) => idx !== i));
+
+  const handleSave = () => {
+    const cleaned: FieldMapping = {};
+    for (const { key } of CORE_FIELDS) {
+      const v = mapping[key]?.trim();
+      if (v) cleaned[key] = v;
+    }
+    const validCustom = customFields.filter((f) => f.label.trim() && f.field.trim());
+    if (validCustom.length > 0) cleaned.customFields = validCustom;
+    saveMutation.mutate(cleaned);
+    productMutation.mutate();
+  };
+
+  const handleOpen = () => {
+    setMapping(connection.fieldMapping ?? {});
+    setCustomFields(connection.fieldMapping?.customFields ?? []);
+    setSelectedProductId(connection.productId ?? '');
+    if (!open) fetchHeaders();
+    setOpen(!open);
+  };
+
+  return (
+    <div className="mt-3 border-t border-slate-100 pt-3">
+      <button type="button" onClick={handleOpen} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+        {open ? 'إخفاء' : 'ضبط تعيين الأعمدة'}
+        {connection.fieldMapping && !open && <span className="mr-1 text-green-600 text-xs">(مضبوط)</span>}
+        {connection.product && !open && <span className="mr-2 text-purple-600 text-xs">({connection.product.name})</span>}
+      </button>
+
+      {open && (
+        <div className="mt-3 max-w-xl space-y-4">
+          {headersLoading && <p className="text-slate-500 text-sm">جاري قراءة أعمدة الشيت...</p>}
+          {headersError && <p className="text-red-600 text-sm">{headersError}</p>}
+
+          {headers.length > 0 && (
+            <>
+              {/* المنتج المرتبط */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">المنتج المرتبط</p>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-slate-700 w-24 shrink-0">المنتج</label>
+                  <select
+                    value={selectedProductId}
+                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+                  >
+                    <option value="">-- بدون منتج --</option>
+                    {(products ?? []).map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* الحقول الأساسية - dropdowns */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">الحقول الأساسية</p>
+                {CORE_FIELDS.map(({ key, label }) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <label className="text-sm text-slate-700 w-24 shrink-0">{label}</label>
+                    <select
+                      value={mapping[key] ?? ''}
+                      onChange={(e) => setMapping((prev) => ({ ...prev, [key]: e.target.value }))}
+                      className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+                    >
+                      <option value="">-- اختر عمود --</option>
+                      {headers.map((h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+
+              {/* حقول مخصصة */}
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide">حقول مخصصة</p>
+                {customFields.map((cf, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={cf.label}
+                      onChange={(e) => updateCustomField(i, 'label', e.target.value)}
+                      placeholder="اسم الحقل"
+                      className="border border-slate-300 rounded px-2 py-1 text-sm w-36"
+                    />
+                    <span className="text-slate-400 text-sm">←</span>
+                    <select
+                      value={cf.field}
+                      onChange={(e) => updateCustomField(i, 'field', e.target.value)}
+                      className="border border-slate-300 rounded px-2 py-1 text-sm flex-1"
+                    >
+                      <option value="">-- اختر عمود --</option>
+                      {headers.map((h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                    <select
+                      value={cf.type ?? 'customer'}
+                      onChange={(e) => updateCustomField(i, 'type', e.target.value as 'customer' | 'product')}
+                      className="border border-slate-300 rounded px-2 py-1 text-sm w-36"
+                    >
+                      <option value="customer">بيانات عميل</option>
+                      <option value="product">بيانات منتج</option>
+                    </select>
+                    <button type="button" onClick={() => removeCustomField(i)} className="text-red-500 hover:text-red-700 text-sm px-1">
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={addCustomField}
+                  className="text-sm text-blue-600 hover:text-blue-700 border border-blue-200 rounded px-3 py-1 hover:bg-blue-50"
+                >
+                  + إضافة حقل مخصص
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saveMutation.isPending || productMutation.isPending}
+                  className="bg-slate-700 text-white px-3 py-1.5 rounded text-sm hover:bg-slate-600 disabled:opacity-50"
+                >
+                  {saveMutation.isPending || productMutation.isPending ? 'جاري الحفظ...' : 'حفظ التعيين'}
+                </button>
+                <button type="button" onClick={() => setOpen(false)} className="text-sm text-slate-500 hover:text-slate-700">
+                  إلغاء
+                </button>
+              </div>
+              {saveMutation.isSuccess && <p className="text-green-600 text-xs">تم الحفظ.</p>}
+              {saveMutation.isError && <p className="text-red-600 text-xs">حدث خطأ أثناء الحفظ.</p>}
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SheetAppsScript({ webhookUrl }: { webhookUrl: string }) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const script = `// ضع هذا الكود في Google Apps Script
+// Extensions → Apps Script → الصق الكود → اضغط حفظ
+// ثم شغّل installTriggers مرة واحدة فقط
+
+function onFormSubmit(e) {
+  sendRow(e.range.getRow());
+}
+
+function sendRow(rowNum) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  var row = sheet.getRange(rowNum, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+  var data = {};
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i]) data[headers[i]] = row[i] ? String(row[i]) : '';
+  }
+
+  UrlFetchApp.fetch('${webhookUrl}', {
+    method: 'post',
+    contentType: 'application/json',
+    payload: JSON.stringify({ row: data }),
+    muteHttpExceptions: true
+  });
+}
+
+// شغّل هذه الدالة مرة واحدة فقط لتفعيل الإرسال التلقائي
+function installTriggers() {
+  var triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(function(t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('onFormSubmit')
+    .forSpreadsheet(SpreadsheetApp.getActiveSpreadsheet())
+    .onFormSubmit()
+    .create();
+}`;
+
+  const copyScript = () => {
+    navigator.clipboard.writeText(script);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="mt-2">
+      <button type="button" onClick={() => setOpen(!open)} className="text-sm text-purple-600 hover:text-purple-700 font-medium">
+        {open ? 'إخفاء' : 'كود الإرسال التلقائي (Apps Script)'}
+      </button>
+      {open && (
+        <div className="mt-2 bg-slate-50 border border-slate-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-slate-600">انسخ هذا الكود وضعه في Google Apps Script في الشيت</p>
+            <button type="button" onClick={copyScript} className="text-sm bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded">
+              {copied ? 'تم النسخ' : 'نسخ الكود'}
+            </button>
+          </div>
+          <pre className="text-xs text-slate-700 overflow-x-auto whitespace-pre leading-relaxed max-h-64 overflow-y-auto font-mono bg-white border border-slate-100 rounded p-2" dir="ltr">
+            {script}
+          </pre>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoogleSheetsSection() {
+  const queryClient = useQueryClient();
+  const { data: googleConfig, isLoading: loadingGConfig } = useGoogleConfig();
+  const { data: sheetConns = [], isLoading: loadingSheets } = useSheetConnections();
+
+  // API Key
+  const [apiKey, setApiKey] = useState('');
+  const saveApiKeyMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/sheet-connections/google-config', { apiKey: apiKey.trim() });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['google-sheets-config'] });
+      setApiKey('');
+    },
+  });
+
+  // Add connection
+  const [sheetName, setSheetName] = useState('');
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [sheetTab, setSheetTab] = useState('');
+  const createSheetMutation = useMutation({
+    mutationFn: async () => {
+      await api.post('/sheet-connections', {
+        name: sheetName.trim(),
+        spreadsheetUrl: sheetUrl.trim(),
+        sheetName: sheetTab.trim() || undefined,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sheet-connections'] });
+      setSheetName('');
+      setSheetUrl('');
+      setSheetTab('');
+    },
+  });
+
+  // Delete
+  const deleteSheetMutation = useMutation({
+    mutationFn: (id: string) => api.delete(`/sheet-connections/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['sheet-connections'] }),
+  });
+
+  // Import
+  const [importing, setImporting] = useState<string | null>(null);
+  const [importResult, setImportResult] = useState<{ id: string; msg: string } | null>(null);
+
+  const handleImport = async (id: string, all: boolean) => {
+    if (all && !window.confirm('هذا سيستورد كل الصفوف من البداية. متأكد؟')) return;
+    setImporting(id);
+    setImportResult(null);
+    try {
+      const endpoint = all ? `/sheet-connections/${id}/import-all` : `/sheet-connections/${id}/import`;
+      const { data } = await api.post<{ created: number; skipped: number; failed: number; totalRows: number }>(endpoint);
+      setImportResult({ id, msg: `تم: ${data.created} ليد جديد، ${data.skipped} تخطي، ${data.failed} فشل (من ${data.totalRows} صف)` });
+      queryClient.invalidateQueries({ queryKey: ['sheet-connections'] });
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      setImportResult({ id, msg: e?.response?.data?.error || 'خطأ في الاستيراد' });
+    } finally {
+      setImporting(null);
+    }
+  };
+
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const sheetWebhookUrl = (token: string) => `${apiBase}/api/webhooks/sheets/${token}`;
+  const copySheetUrl = (id: string, token: string) => {
+    navigator.clipboard.writeText(sheetWebhookUrl(token));
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  return (
+    <section className="bg-white rounded-xl shadow p-6">
+      <h2 className="text-lg font-semibold text-slate-800 mb-2">Google Sheets → ليدز</h2>
+      <p className="text-slate-600 text-sm mb-4">
+        اربط شيت جوجل لاستيراد الليدز. اعمل الشيت "أي شخص لديه الرابط يمكنه العرض"، حدد أعمدة الماپنج، واستورد الليدز يدوياً أو تلقائياً.
+      </p>
+
+      {/* Google API Key */}
+      <div className="mb-6 p-4 bg-slate-50 rounded-lg border border-slate-100">
+        <div className="flex items-center gap-2 mb-3">
+          <p className="text-sm font-medium text-slate-700">مفتاح Google Sheets API</p>
+          {loadingGConfig ? (
+            <span className="text-slate-400 text-xs">جاري...</span>
+          ) : (
+            <span
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${
+                googleConfig?.configured ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'
+              }`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${googleConfig?.configured ? 'bg-green-500' : 'bg-amber-500'}`} />
+              {googleConfig?.configured ? 'مضبوط' : 'غير مضبوط'}
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2 max-w-xl">
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder={googleConfig?.apiKeyMasked || 'AIza...'}
+            className="border border-slate-300 rounded-lg px-3 py-2 flex-1 text-sm"
+            autoComplete="off"
+          />
+          <button
+            type="button"
+            onClick={() => saveApiKeyMutation.mutate()}
+            disabled={!apiKey.trim() || saveApiKeyMutation.isPending}
+            className="bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-600 disabled:opacity-50 text-sm"
+          >
+            {saveApiKeyMutation.isPending ? 'جاري...' : 'حفظ'}
+          </button>
+        </div>
+        {saveApiKeyMutation.isSuccess && <p className="text-green-600 text-xs mt-1">تم الحفظ.</p>}
+        {saveApiKeyMutation.isError && <p className="text-red-600 text-xs mt-1">خطأ في حفظ المفتاح</p>}
+        {googleConfig?.apiKeyMasked && !apiKey && (
+          <p className="text-xs text-slate-500 mt-1">اتركه فارغاً للإبقاء على القيمة الحالية ({googleConfig.apiKeyMasked})</p>
+        )}
+      </div>
+
+      {/* إضافة اتصال */}
+      <div className="mb-6">
+        <div className="flex flex-wrap gap-3">
+          <input
+            type="text"
+            placeholder="اسم الاتصال (مثلاً: ليدز فيسبوك)"
+            value={sheetName}
+            onChange={(e) => setSheetName(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 w-52"
+          />
+          <input
+            type="text"
+            placeholder="رابط Google Sheets"
+            value={sheetUrl}
+            onChange={(e) => setSheetUrl(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 flex-1 min-w-[200px]"
+          />
+          <input
+            type="text"
+            placeholder="اسم الورقة (Sheet1)"
+            value={sheetTab}
+            onChange={(e) => setSheetTab(e.target.value)}
+            className="border border-slate-300 rounded-lg px-3 py-2 w-40"
+          />
+          <button
+            type="button"
+            onClick={() => createSheetMutation.mutate()}
+            disabled={!sheetName.trim() || !sheetUrl.trim() || createSheetMutation.isPending}
+            className="bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-600 disabled:opacity-50"
+          >
+            {createSheetMutation.isPending ? 'جاري...' : 'إضافة شيت'}
+          </button>
+        </div>
+        {createSheetMutation.isError && (
+          <p className="text-red-600 text-sm mt-2">
+            {(createSheetMutation.error as { response?: { data?: { error?: string } } })?.response?.data?.error || 'خطأ في إنشاء الاتصال'}
+          </p>
+        )}
+      </div>
+
+      {/* قائمة الاتصالات */}
+      {loadingSheets ? (
+        <p className="text-slate-500">جاري التحميل...</p>
+      ) : sheetConns.length === 0 ? (
+        <p className="text-slate-500">لا توجد اتصالات شيت. أضف اتصالاً جديداً.</p>
+      ) : (
+        <ul className="space-y-4">
+          {sheetConns.map((sc) => (
+            <li key={sc.id} className="border border-slate-200 rounded-lg p-4">
+              <div className="flex flex-wrap items-start gap-3 justify-between">
+                <div>
+                  <p className="font-medium text-slate-800">{sc.name}</p>
+                  <p className="text-xs text-slate-500">{sc.sheetName} — {sc.lastSyncedRow} صف مستورد</p>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => handleImport(sc.id, false)}
+                    disabled={importing === sc.id}
+                    className="text-sm bg-green-100 text-green-800 hover:bg-green-200 px-3 py-1 rounded"
+                  >
+                    {importing === sc.id ? 'جاري...' : 'استيراد الجديد'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleImport(sc.id, true)}
+                    disabled={importing === sc.id}
+                    className="text-sm bg-blue-100 text-blue-800 hover:bg-blue-200 px-3 py-1 rounded"
+                  >
+                    استيراد الكل
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => window.confirm('حذف هذا الاتصال؟') && deleteSheetMutation.mutate(sc.id)}
+                    disabled={deleteSheetMutation.isPending}
+                    className="text-sm text-red-600 hover:text-red-700"
+                  >
+                    حذف
+                  </button>
+                </div>
+              </div>
+
+              {importResult?.id === sc.id && (
+                <p className={`text-sm mt-2 ${importResult.msg.includes('خطأ') ? 'text-red-600' : 'text-green-700'}`}>
+                  {importResult.msg}
+                </p>
+              )}
+
+              {/* Webhook URL */}
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <code className="text-xs bg-slate-100 px-2 py-1 rounded max-w-xs truncate block" dir="ltr">
+                  {sheetWebhookUrl(sc.token)}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => copySheetUrl(sc.id, sc.token)}
+                  className="text-sm bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded"
+                >
+                  {copiedId === sc.id ? 'تم النسخ' : 'نسخ الرابط'}
+                </button>
+              </div>
+
+              <SheetAppsScript webhookUrl={sheetWebhookUrl(sc.token)} />
+              <SheetMappingEditor connection={sc} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function IntegrationsPage() {
   const queryClient = useQueryClient();
   const { data: connections = [], isLoading: loadingConn } = useFormConnections();
@@ -330,7 +857,7 @@ export default function IntegrationsPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-slate-800">الربط مع ووردبريس وووكومرس</h1>
+      <h1 className="text-2xl font-bold text-slate-800">الربط والتكامل</h1>
 
       {/* ووكومرس */}
       <section className="bg-white rounded-xl shadow p-6">
@@ -509,6 +1036,9 @@ export default function IntegrationsPage() {
           </ul>
         )}
       </section>
+
+      {/* Google Sheets */}
+      <GoogleSheetsSection />
     </div>
   );
 }
