@@ -37,7 +37,7 @@ export async function readHeaders(spreadsheetId: string, sheetName: string): Pro
     throw new Error(`خطأ Google Sheets API: ${res.status} ${text}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as { values?: string[][] };
   return (data.values?.[0] ?? []) as string[];
 }
 
@@ -61,6 +61,6 @@ export async function readRows(
     throw new Error(`خطأ Google Sheets API: ${res.status} ${text}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as { values?: string[][] };
   return { headers, rows: (data.values ?? []) as string[][] };
 }

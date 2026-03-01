@@ -118,7 +118,7 @@ router.post('/', async (req: Request, res: Response) => {
 // جلب أسماء أعمدة الشيت
 router.get('/:id/headers', async (req: Request, res: Response) => {
   try {
-    const conn = await prisma.sheetConnection.findUnique({ where: { id: req.params.id } });
+    const conn = await prisma.sheetConnection.findUnique({ where: { id: String(req.params.id) } });
     if (!conn) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
     const headers = await readHeaders(conn.spreadsheetId, conn.sheetName);
     res.json({ headers });
@@ -132,7 +132,7 @@ router.get('/:id/headers', async (req: Request, res: Response) => {
 // تحديث field mapping
 router.patch('/:id/mapping', async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = String(req.params.id);
     const parsed = fieldMappingSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json({ error: 'بيانات غير صحيحة' }); return; }
     const existing = await prisma.sheetConnection.findUnique({ where: { id } });
@@ -151,7 +151,7 @@ router.patch('/:id/mapping', async (req: Request, res: Response) => {
 // تحديث اتصال (productId, sheetName, isActive)
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
-    const id = req.params.id;
+    const id = String(req.params.id);
     const { productId, sheetName, isActive } = req.body as {
       productId?: string | null;
       sheetName?: string;
@@ -180,9 +180,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
 // حذف اتصال
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const existing = await prisma.sheetConnection.findUnique({ where: { id: req.params.id } });
+    const id = String(req.params.id);
+    const existing = await prisma.sheetConnection.findUnique({ where: { id } });
     if (!existing) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
-    await prisma.sheetConnection.delete({ where: { id: req.params.id } });
+    await prisma.sheetConnection.delete({ where: { id } });
     res.status(204).send();
   } catch (err) {
     console.error('Delete sheet connection error:', err);
@@ -296,7 +297,7 @@ function findPhoneInRow(row: Record<string, string>): string | null {
 // استيراد صفوف جديدة فقط
 router.post('/:id/import', async (req: Request, res: Response) => {
   try {
-    const conn = await prisma.sheetConnection.findUnique({ where: { id: req.params.id } });
+    const conn = await prisma.sheetConnection.findUnique({ where: { id: String(req.params.id) } });
     if (!conn) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
 
     const mapping = (conn.fieldMapping ?? {}) as FieldMapping;
@@ -348,7 +349,7 @@ router.post('/:id/import', async (req: Request, res: Response) => {
 // استيراد كل الصفوف (إعادة من البداية)
 router.post('/:id/import-all', async (req: Request, res: Response) => {
   try {
-    const conn = await prisma.sheetConnection.findUnique({ where: { id: req.params.id } });
+    const conn = await prisma.sheetConnection.findUnique({ where: { id: String(req.params.id) } });
     if (!conn) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
 
     // إعادة تعيين lastSyncedRow
