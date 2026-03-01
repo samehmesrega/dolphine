@@ -15,7 +15,7 @@ export default function LandingPage() {
           <span className="text-xl font-bold tracking-tight">دولفين</span>
         </div>
         <Link
-          to={token ? '/' : '/login'}
+          to={token ? '/dashboard' : '/login'}
           className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-6 py-2.5 rounded-xl transition-colors text-sm"
         >
           {token ? 'لوحة التحكم' : 'تسجيل الدخول'}
@@ -34,7 +34,7 @@ export default function LandingPage() {
           وتحليل الأداء — كل ذلك من مكان واحد.
         </p>
         <Link
-          to={token ? '/' : '/login'}
+          to={token ? '/dashboard' : '/login'}
           className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3.5 rounded-xl transition-colors text-base shadow-lg shadow-blue-600/30"
         >
           {token ? 'الدخول للوحة التحكم' : 'ابدأ الآن'}
