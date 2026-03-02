@@ -267,6 +267,25 @@ export async function createLeadFromRow(
   // حقول مخصصة
   const leadCustomFields: Record<string, unknown> = {};
   const productCustomFields: Record<string, unknown> = {};
+
+  // استخراج UTMs تلقائياً من أعمدة الشيت
+  const utmLabels: Record<string, string> = {
+    utm_source:   'مصدر الزيارة',
+    utm_medium:   'وسيلة الزيارة',
+    utm_campaign: 'الحملة الإعلانية',
+    utm_content:  'محتوى الإعلان',
+    utm_term:     'كلمة البحث',
+  };
+  for (const [utmKey, label] of Object.entries(utmLabels)) {
+    // بحث بالاسم الدقيق أو بدون حساسية الحالة
+    for (const [col, val] of Object.entries(rowData)) {
+      if (col.toLowerCase() === utmKey.toLowerCase() && val.trim()) {
+        leadCustomFields[label] = val.trim();
+        break;
+      }
+    }
+  }
+
   for (const def of mapping.customFields ?? []) {
     const val = (rowData[def.field] ?? '').trim();
     if (val) {
