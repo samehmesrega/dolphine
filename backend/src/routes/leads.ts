@@ -206,6 +206,44 @@ type LeadUpdateData = {
   lastStatusChangedAt?: Date;
 };
 
+// حذف مجمّع للليدز
+router.post('/bulk-delete', async (req: Request, res: Response) => {
+  try {
+    const callerId = (req as AuthRequest).user?.userId;
+    if (callerId) {
+      const callerUser = await prisma.user.findUnique({
+        where: { id: callerId },
+        include: { role: true },
+      });
+      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+        res.status(403).json({ error: 'ليس لديك صلاحية حذف الليدز' });
+        return;
+      }
+    }
+    const { leadIds } = req.body as { leadIds?: string[] };
+    if (!Array.isArray(leadIds) || leadIds.length === 0) {
+      res.status(400).json({ error: 'يجب تحديد ليد واحد على الأقل' });
+      return;
+    }
+    // التحقق من عدم وجود طلبات مرتبطة
+    const leadsWithOrders = await prisma.lead.findMany({
+      where: { id: { in: leadIds }, orders: { some: {} } },
+      select: { id: true, name: true, number: true },
+    });
+    if (leadsWithOrders.length > 0) {
+      const names = leadsWithOrders.map(l => `#${l.number} ${l.name}`).join('، ');
+      res.status(400).json({ error: `لا يمكن حذف ليدز لها طلبات: ${names}` });
+      return;
+    }
+    const result = await prisma.lead.deleteMany({ where: { id: { in: leadIds } } });
+    res.json({ deleted: result.count });
+  } catch (err: unknown) {
+    console.error('Bulk delete leads error:', err);
+    res.status(500).json({ error: 'خطأ في حذف الليدز' });
+  }
+});
+
 router.patch('/:id', async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);

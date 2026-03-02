@@ -209,6 +209,60 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
   }
 });
 
+// حذف مجمّع للطلبات
+router.post('/bulk-delete', async (req: Request, res: Response) => {
+  try {
+    const callerId = (req as AuthRequest).user?.userId;
+    if (callerId) {
+      const callerUser = await prisma.user.findUnique({
+        where: { id: callerId },
+        include: { role: true },
+      });
+      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+        res.status(403).json({ error: 'ليس لديك صلاحية حذف الطلبات' });
+        return;
+      }
+    }
+    const { orderIds } = req.body as { orderIds?: string[] };
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      res.status(400).json({ error: 'يجب تحديد طلب واحد على الأقل' });
+      return;
+    }
+    const result = await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+    res.json({ deleted: result.count });
+  } catch (err: unknown) {
+    console.error('Bulk delete orders error:', err);
+    res.status(500).json({ error: 'خطأ في حذف الطلبات' });
+  }
+});
+
+// حذف طلب واحد
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const callerId = (req as AuthRequest).user?.userId;
+    if (callerId) {
+      const callerUser = await prisma.user.findUnique({
+        where: { id: callerId },
+        include: { role: true },
+      });
+      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+        res.status(403).json({ error: 'ليس لديك صلاحية حذف الطلبات' });
+        return;
+      }
+    }
+    const id = String(req.params.id);
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) { res.status(404).json({ error: 'الطلب غير موجود' }); return; }
+    await prisma.order.delete({ where: { id } });
+    res.status(204).send();
+  } catch (err: unknown) {
+    console.error('Delete order error:', err);
+    res.status(500).json({ error: 'خطأ في حذف الطلب' });
+  }
+});
+
 router.get('/:id', async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);

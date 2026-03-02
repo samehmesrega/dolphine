@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 
 type LeadStatus = {
   id: string;
@@ -77,6 +78,9 @@ async function createLead(payload: { name: string; phone: string; whatsapp?: str
 
 export default function LeadsList() {
   const qc = useQueryClient();
+  const { user: currentUser } = useAuth();
+  const canBulkDelete = ['super_admin', 'admin', 'sales_manager'].includes(currentUser?.role?.slug ?? '');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [statusId, setStatusId] = useState<string>('');
   const [assignedToId, setAssignedToId] = useState<string>('');
@@ -85,10 +89,49 @@ export default function LeadsList() {
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [exporting, setExporting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   const [form, setForm] = useState({ name: '', phone: '', whatsapp: '', email: '', address: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: async (leadIds: string[]) => {
+      const { data } = await api.post('/leads/bulk-delete', { leadIds });
+      return data as { deleted: number };
+    },
+    onSuccess: (data) => {
+      setSelectedIds(new Set());
+      setDeleteError('');
+      qc.invalidateQueries({ queryKey: ['leads'] });
+      alert(`تم حذف ${data.deleted} ليد بنجاح`);
+    },
+    onError: (err: any) => {
+      setDeleteError(err.response?.data?.error || 'خطأ في حذف الليدز');
+    },
+  });
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`هل أنت متأكد من حذف ${selectedIds.size} ليد؟ لا يمكن التراجع عن هذا الإجراء.`)) return;
+    bulkDeleteMutation.mutate([...selectedIds]);
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!data?.leads) return;
+    const allIds = data.leads.map(l => l.id);
+    const allSelected = allIds.every(id => selectedIds.has(id));
+    if (allSelected) setSelectedIds(new Set());
+    else setSelectedIds(new Set(allIds));
+  };
 
   const { data: statuses } = useQuery({
     queryKey: ['lead-statuses'],
@@ -292,10 +335,30 @@ export default function LeadsList() {
         </div>
       </div>
 
+      {canBulkDelete && selectedIds.size > 0 && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex items-center justify-between">
+          <span className="text-sm text-red-700 font-medium">تم تحديد {selectedIds.size} عنصر</span>
+          <div className="flex items-center gap-3">
+            {deleteError && <span className="text-sm text-red-600">{deleteError}</span>}
+            <button type="button" onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-600 hover:text-slate-800">إلغاء التحديد</button>
+            <button type="button" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}
+              className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-red-700 disabled:opacity-50">
+              {bulkDeleteMutation.isPending ? 'جاري الحذف...' : 'حذف المحدد'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
+              {canBulkDelete && (
+                <th className="px-3 py-3 w-10">
+                  <input type="checkbox" checked={!!data?.leads?.length && data.leads.every(l => selectedIds.has(l.id))}
+                    onChange={toggleSelectAll} className="rounded border-slate-300" />
+                </th>
+              )}
               <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">#</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الاسم</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الموبايل</th>
@@ -308,13 +371,13 @@ export default function LeadsList() {
           <tbody>
             {isLoading ? (
               <tr>
-                <td className="p-4 text-slate-500" colSpan={7}>
+                <td className="p-4 text-slate-500" colSpan={canBulkDelete ? 8 : 7}>
                   جاري التحميل...
                 </td>
               </tr>
             ) : isError ? (
               <tr>
-                <td className="p-4 text-red-600" colSpan={7}>
+                <td className="p-4 text-red-600" colSpan={canBulkDelete ? 8 : 7}>
                   فشل تحميل القائمة: {(() => {
                     const e = listError as { response?: { data?: { error?: string }; status?: number }; message?: string };
                     if (e?.response?.data?.error) return e.response.data.error;
@@ -325,13 +388,18 @@ export default function LeadsList() {
               </tr>
             ) : (data?.leads?.length ?? 0) === 0 ? (
               <tr>
-                <td className="p-4 text-slate-500" colSpan={7}>
+                <td className="p-4 text-slate-500" colSpan={canBulkDelete ? 8 : 7}>
                   لا يوجد ليدز
                 </td>
               </tr>
             ) : (
               data!.leads.map((l) => (
-                <tr key={l.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
+                <tr key={l.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${selectedIds.has(l.id) ? 'bg-blue-50' : ''}`}>
+                  {canBulkDelete && (
+                    <td className="px-3 py-3">
+                      <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggleSelect(l.id)} className="rounded border-slate-300" />
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-slate-400 text-sm">#{l.number}</td>
                   <td className="px-4 py-3 text-slate-700">
                     <Link to={`/leads/${l.id}`} className="text-blue-600 hover:underline font-medium">

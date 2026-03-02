@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
+import { AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -47,6 +48,77 @@ router.get('/', async (req: Request, res: Response) => {
   } catch (err: unknown) {
     console.error('Customers list error:', err);
     res.status(500).json({ error: 'خطأ في تحميل قائمة العملاء' });
+  }
+});
+
+// حذف مجمّع للعملاء
+router.post('/bulk-delete', async (req: Request, res: Response) => {
+  try {
+    const callerId = (req as AuthRequest).user?.userId;
+    if (callerId) {
+      const callerUser = await prisma.user.findUnique({
+        where: { id: callerId },
+        include: { role: true },
+      });
+      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+        res.status(403).json({ error: 'ليس لديك صلاحية حذف العملاء' });
+        return;
+      }
+    }
+    const { customerIds } = req.body as { customerIds?: string[] };
+    if (!Array.isArray(customerIds) || customerIds.length === 0) {
+      res.status(400).json({ error: 'يجب تحديد عميل واحد على الأقل' });
+      return;
+    }
+    // التحقق من عدم وجود ليدز أو طلبات مرتبطة
+    const customersWithRelations = await prisma.customer.findMany({
+      where: { id: { in: customerIds }, OR: [{ leads: { some: {} } }, { orders: { some: {} } }] },
+      select: { id: true, name: true, number: true },
+    });
+    if (customersWithRelations.length > 0) {
+      const names = customersWithRelations.map(c => `#${c.number} ${c.name}`).join('، ');
+      res.status(400).json({ error: `لا يمكن حذف عملاء لهم ليدز أو طلبات: ${names}` });
+      return;
+    }
+    const result = await prisma.customer.deleteMany({ where: { id: { in: customerIds } } });
+    res.json({ deleted: result.count });
+  } catch (err: unknown) {
+    console.error('Bulk delete customers error:', err);
+    res.status(500).json({ error: 'خطأ في حذف العملاء' });
+  }
+});
+
+// حذف عميل واحد
+router.delete('/:id', async (req: Request, res: Response) => {
+  try {
+    const callerId = (req as AuthRequest).user?.userId;
+    if (callerId) {
+      const callerUser = await prisma.user.findUnique({
+        where: { id: callerId },
+        include: { role: true },
+      });
+      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+        res.status(403).json({ error: 'ليس لديك صلاحية حذف العملاء' });
+        return;
+      }
+    }
+    const id = String(req.params.id);
+    const customer = await prisma.customer.findUnique({
+      where: { id },
+      include: { leads: { take: 1 }, orders: { take: 1 } },
+    });
+    if (!customer) { res.status(404).json({ error: 'العميل غير موجود' }); return; }
+    if (customer.leads.length > 0 || customer.orders.length > 0) {
+      res.status(400).json({ error: 'لا يمكن حذف عميل له ليدز أو طلبات مرتبطة' });
+      return;
+    }
+    await prisma.customer.delete({ where: { id } });
+    res.status(204).send();
+  } catch (err: unknown) {
+    console.error('Delete customer error:', err);
+    res.status(500).json({ error: 'خطأ في حذف العميل' });
   }
 });
 
