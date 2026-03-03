@@ -209,6 +209,29 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
   }
 });
 
+// حذف جميع الطلبات
+router.post('/delete-all', async (req: Request, res: Response) => {
+  try {
+    const callerId = (req as AuthRequest).user?.userId;
+    if (callerId) {
+      const callerUser = await prisma.user.findUnique({
+        where: { id: callerId },
+        include: { role: true },
+      });
+      if (!callerUser || !['super_admin', 'admin'].includes(callerUser.role?.slug ?? '')) {
+        res.status(403).json({ error: 'ليس لديك صلاحية' });
+        return;
+      }
+    }
+    await prisma.task.updateMany({ where: { orderId: { not: null } }, data: { orderId: null } });
+    const result = await prisma.order.deleteMany();
+    res.json({ deleted: result.count });
+  } catch (err: unknown) {
+    console.error('Delete all orders error:', err);
+    res.status(500).json({ error: 'خطأ في حذف الطلبات' });
+  }
+});
+
 // حذف مجمّع للطلبات
 router.post('/bulk-delete', async (req: Request, res: Response) => {
   try {
