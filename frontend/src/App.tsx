@@ -28,6 +28,7 @@ import ProfilePage from './pages/ProfilePage';
 import LeadStatusesPage from './pages/LeadStatusesPage';
 import TasksPage from './pages/TasksPage';
 import TaskRulesPage from './pages/TaskRulesPage';
+import DualNamePage from './pages/DualNamePage';
 
 // تقليل إعادة جلب البيانات: البيانات تعتبر «حديثة» لمدة دقيقة
 const queryClient = new QueryClient({
@@ -106,6 +107,7 @@ function AppRoutes() {
         <Route path="/lead-statuses" element={<LeadStatusesPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/task-rules" element={<TaskRulesPage />} />
+        <Route path="/dual-name" element={<DualNamePage />} />
       </Route>
     </Routes>
   );

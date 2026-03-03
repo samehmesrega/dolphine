@@ -20,6 +20,7 @@ const ICONS: Record<string, string> = {
   chevronRight: 'M9 5l7 7-7 7',
   chevronLeft: 'M15 19l-7-7 7-7',
   chevronDown: 'M19 9l-7 7-7-7',
+  dualName: 'M21 7.5V18M15 7.5V18M3 16.811V8.69c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811z',
 };
 
 function NavIcon({ name, className = 'w-5 h-5' }: { name: string; className?: string }) {
@@ -75,6 +76,7 @@ const NAV: NavEntry[] = [
       { to: '/roles', label: 'الأدوار والصلاحيات', permission: 'users.manage' },
     ],
   },
+  { type: 'item', to: '/dual-name', label: 'Dual Name', icon: 'dualName' },
   { type: 'item', to: '/audit', label: 'سجل التدقيق', icon: 'clipboard', permission: 'audit.view' },
 ];
 
