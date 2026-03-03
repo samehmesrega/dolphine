@@ -8,6 +8,8 @@ export default function DualNamePage() {
   const [textA, setTextA] = useState('');
   const [textB, setTextB] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const [recordProgress, setRecordProgress] = useState(0);
   const [error, setError] = useState('');
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,6 +70,54 @@ export default function DualNamePage() {
     }
   };
 
+  const handleRecord = () => {
+    if (!sceneRef.current || !modelRef.current || recording) return;
+    const canvas = sceneRef.current.renderer.domElement as HTMLCanvasElement;
+    const stream = canvas.captureStream(30);
+    const chunks: Blob[] = [];
+    const recorder = new MediaRecorder(stream, {
+      mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+        ? 'video/webm;codecs=vp9'
+        : 'video/webm',
+    });
+
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `DualName_${textA.trim()}_${textB.trim()}.webm`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      sceneRef.current.controls.autoRotate = false;
+      setRecording(false);
+      setRecordProgress(0);
+    };
+
+    // Enable auto-rotate during recording
+    sceneRef.current.controls.autoRotate = true;
+    sceneRef.current.controls.autoRotateSpeed = 4;
+    setRecording(true);
+    setRecordProgress(0);
+    recorder.start();
+
+    // Update progress every second
+    let elapsed = 0;
+    const timer = setInterval(() => {
+      elapsed += 1;
+      setRecordProgress(elapsed);
+      if (elapsed >= 5) clearInterval(timer);
+    }, 1000);
+
+    // Stop after 5 seconds
+    setTimeout(() => {
+      clearInterval(timer);
+      recorder.stop();
+      stream.getTracks().forEach((t) => t.stop());
+    }, 5000);
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
@@ -97,13 +147,21 @@ export default function DualNamePage() {
               onChange={(e) => setTextB(e.target.value.toUpperCase())}
             />
           </div>
-          <div className="w-full sm:w-auto">
+          <div className="flex gap-2 w-full sm:w-auto">
             <button
               onClick={handleGenerate}
               disabled={generating || !textA.trim() || !textB.trim()}
-              className="w-full bg-blue-600 text-white rounded-lg px-6 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px]"
+              className="flex-1 sm:flex-none bg-blue-600 text-white rounded-lg px-6 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px]"
             >
               {generating ? 'جاري الإنشاء...' : 'إنشاء'}
+            </button>
+            <button
+              onClick={handleRecord}
+              disabled={!modelRef.current || recording || generating}
+              className="flex-1 sm:flex-none bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-red-700 disabled:opacity-50 min-h-[44px]"
+              title="تصوير فيديو 5 ثواني"
+            >
+              {recording ? `${5 - recordProgress}s` : 'تصوير'}
             </button>
           </div>
         </div>
@@ -118,6 +176,12 @@ export default function DualNamePage() {
             <div className="bg-white rounded-xl px-6 py-4 shadow-lg text-sm text-slate-700">
               جاري إنشاء المجسم...
             </div>
+          </div>
+        )}
+        {recording && (
+          <div className="absolute top-3 left-3 flex items-center gap-2 bg-red-600 text-white text-xs font-medium px-3 py-1.5 rounded-full shadow-lg">
+            <span className="w-2 h-2 bg-white rounded-full animate-pulse" />
+            REC {5 - recordProgress}s
           </div>
         )}
         {!modelRef.current && !generating && (
