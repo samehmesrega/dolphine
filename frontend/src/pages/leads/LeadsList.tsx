@@ -91,6 +91,7 @@ export default function LeadsList() {
   const [exporting, setExporting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
+  const [showAddForm, setShowAddForm] = useState(false);
   const [form, setForm] = useState({ name: '', phone: '', whatsapp: '', email: '', address: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -212,53 +213,64 @@ export default function LeadsList() {
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-slate-800">ليدز</h1>
-        {isFetching && <span className="text-sm text-slate-500">جاري التحديث...</span>}
+        <div className="flex items-center gap-3">
+          {isFetching && <span className="text-sm text-slate-500">جاري التحديث...</span>}
+          <button
+            type="button"
+            onClick={() => setShowAddForm(v => !v)}
+            className="bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 transition-colors"
+          >
+            {showAddForm ? 'إخفاء' : 'إضافة ليد'}
+          </button>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
-        <h2 className="font-semibold text-slate-700 mb-3">إضافة ليد يدوي</h2>
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3">
-          <input
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
-            placeholder="الاسم"
-            value={form.name}
-            onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-            required
-          />
-          <input
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
-            placeholder="رقم الموبايل"
-            value={form.phone}
-            onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
-            required
-          />
-          <input
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
-            placeholder="واتساب (اختياري)"
-            value={form.whatsapp}
-            onChange={(e) => setForm((p) => ({ ...p, whatsapp: e.target.value }))}
-          />
-          <input
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
-            placeholder="إيميل (اختياري)"
-            value={form.email}
-            onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
-          />
-          <button
-            disabled={submitting}
-            className="bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 disabled:opacity-50"
-          >
-            {submitting ? 'جاري الحفظ...' : 'حفظ'}
-          </button>
-          <input
-            className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors md:col-span-5"
-            placeholder="العنوان (اختياري)"
-            value={form.address}
-            onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
-          />
-        </form>
-        {error && <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
-      </div>
+      {showAddForm && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
+          <h2 className="font-semibold text-slate-700 mb-3">إضافة ليد يدوي</h2>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <input
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
+              placeholder="الاسم"
+              value={form.name}
+              onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+              required
+            />
+            <input
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
+              placeholder="رقم الموبايل"
+              value={form.phone}
+              onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+              required
+            />
+            <input
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
+              placeholder="واتساب (اختياري)"
+              value={form.whatsapp}
+              onChange={(e) => setForm((p) => ({ ...p, whatsapp: e.target.value }))}
+            />
+            <input
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
+              placeholder="إيميل (اختياري)"
+              value={form.email}
+              onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
+            />
+            <button
+              disabled={submitting}
+              className="bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 disabled:opacity-50"
+            >
+              {submitting ? 'جاري الحفظ...' : 'حفظ'}
+            </button>
+            <input
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors md:col-span-5"
+              placeholder="العنوان (اختياري)"
+              value={form.address}
+              onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+            />
+          </form>
+          {error && <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
@@ -326,12 +338,6 @@ export default function LeadsList() {
           >
             {exporting ? 'جاري التصدير...' : 'تصدير CSV'}
           </button>
-          <div className="flex items-center justify-between text-sm text-slate-500">
-            <span>الإجمالي: {data?.total ?? '--'}</span>
-            <span>
-              صفحة {data?.page ?? page} / {data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : '--'}
-            </span>
-          </div>
         </div>
       </div>
 
@@ -429,21 +435,28 @@ export default function LeadsList() {
         </table>
       </div>
 
-      <div className="flex gap-2 justify-end mt-4">
-        <button
-          className="px-3 py-2 border rounded-lg disabled:opacity-50"
-          disabled={page <= 1}
-          onClick={() => setPage((p) => Math.max(1, p - 1))}
-        >
-          السابق
-        </button>
-        <button
-          className="px-3 py-2 border rounded-lg disabled:opacity-50"
-          disabled={!!data && page >= Math.ceil(data.total / data.pageSize)}
-          onClick={() => setPage((p) => p + 1)}
-        >
-          التالي
-        </button>
+      <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <span>الإجمالي: {data?.total ?? '--'}</span>
+          <span className="text-slate-300">|</span>
+          <span>صفحة {data?.page ?? page} / {data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : '--'}</span>
+        </div>
+        <div className="flex gap-2">
+          <button
+            className="px-3 py-2 border rounded-lg disabled:opacity-50"
+            disabled={page <= 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            السابق
+          </button>
+          <button
+            className="px-3 py-2 border rounded-lg disabled:opacity-50"
+            disabled={!!data && page >= Math.ceil(data.total / data.pageSize)}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            التالي
+          </button>
+        </div>
       </div>
     </div>
   );
