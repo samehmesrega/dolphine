@@ -4,8 +4,6 @@ import { buildAmbigram } from '../engine/AmbigramBuilder.js';
 // @ts-ignore
 import { createScene, fitCameraToObject } from '../engine/SceneManager.js';
 // @ts-ignore
-import { exportToSTL } from '../engine/STLExporter.js';
-// @ts-ignore
 import { CURATED_FONTS, DEFAULT_FONT } from '../engine/curated-fonts.js';
 
 type FontEntry = { name: string; file: string; category: string };
@@ -76,12 +74,6 @@ export default function DualNamePage() {
     }
   };
 
-  const handleDownload = () => {
-    if (!modelRef.current) return;
-    const filename = `DualName_${textA.trim()}_${textB.trim()}.stl`;
-    exportToSTL(modelRef.current, filename);
-  };
-
   return (
     <div className="h-full flex flex-col">
       <div className="flex items-center justify-between mb-4">
@@ -90,7 +82,7 @@ export default function DualNamePage() {
 
       {/* Controls */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1">الاسم الأول (Side A)</label>
             <input
@@ -98,7 +90,7 @@ export default function DualNamePage() {
               placeholder="SAMEH"
               maxLength={10}
               value={textA}
-              onChange={(e) => setTextA(e.target.value)}
+              onChange={(e) => setTextA(e.target.value.toUpperCase())}
             />
           </div>
           <div>
@@ -108,7 +100,7 @@ export default function DualNamePage() {
               placeholder="NABIL"
               maxLength={10}
               value={textB}
-              onChange={(e) => setTextB(e.target.value)}
+              onChange={(e) => setTextB(e.target.value.toUpperCase())}
             />
           </div>
           <div>
@@ -134,21 +126,13 @@ export default function DualNamePage() {
               className="w-full"
             />
           </div>
-          <div className="flex gap-2">
+          <div>
             <button
               onClick={handleGenerate}
               disabled={generating || !textA.trim() || !textB.trim()}
-              className="flex-1 bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px]"
+              className="w-full bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px]"
             >
               {generating ? 'جاري الإنشاء...' : 'إنشاء'}
-            </button>
-            <button
-              onClick={handleDownload}
-              disabled={!modelRef.current}
-              className="bg-slate-700 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-800 disabled:opacity-50 min-h-[44px]"
-              title="تحميل STL"
-            >
-              STL
             </button>
           </div>
         </div>
