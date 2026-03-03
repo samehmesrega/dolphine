@@ -138,12 +138,12 @@ export default function CustomersList() {
                           onChange={toggleSelectAll} className="rounded border-slate-300" />
                       </th>
                     )}
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">#</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 hidden md:table-cell">#</th>
                     <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">الاسم</th>
                     <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">الجوال</th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">الليدز</th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">الطلبات</th>
-                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">التاريخ</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 hidden md:table-cell">الليدز</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 hidden md:table-cell">الطلبات</th>
+                    <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500 hidden md:table-cell">التاريخ</th>
                     <th className="text-right py-3 px-4 text-xs font-semibold text-slate-500">إجراء</th>
                   </tr>
                 </thead>
@@ -155,12 +155,12 @@ export default function CustomersList() {
                           <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="rounded border-slate-300" />
                         </td>
                       )}
-                      <td className="py-3 px-4 text-slate-400 text-sm">#{c.number}</td>
+                      <td className="py-3 px-4 text-slate-400 text-sm hidden md:table-cell">#{c.number}</td>
                       <td className="py-3 px-4 text-slate-800">{c.name}</td>
                       <td className="py-3 px-4 text-slate-600 dir-ltr text-right">{c.phone}</td>
-                      <td className="py-3 px-4 text-slate-600">{c._count.leads}</td>
-                      <td className="py-3 px-4 text-slate-600">{c._count.orders}</td>
-                      <td className="py-3 px-4 text-slate-500 text-sm">
+                      <td className="py-3 px-4 text-slate-600 hidden md:table-cell">{c._count.leads}</td>
+                      <td className="py-3 px-4 text-slate-600 hidden md:table-cell">{c._count.orders}</td>
+                      <td className="py-3 px-4 text-slate-500 text-sm hidden md:table-cell">
                         {new Date(c.createdAt).toLocaleDateString('ar-EG')}
                       </td>
                       <td className="py-3 px-4">
@@ -182,18 +182,18 @@ export default function CustomersList() {
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1 border rounded disabled:opacity-50 text-slate-700"
+                  className="px-4 py-2.5 border rounded-lg disabled:opacity-50 text-slate-700 text-sm min-h-[44px]"
                 >
                   السابق
                 </button>
-                <span className="px-3 py-1 text-slate-600">
+                <span className="px-3 py-2.5 text-slate-600">
                   {page} / {totalPages}
                 </span>
                 <button
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1 border rounded disabled:opacity-50 text-slate-700"
+                  className="px-4 py-2.5 border rounded-lg disabled:opacity-50 text-slate-700 text-sm min-h-[44px]"
                 >
                   التالي
                 </button>

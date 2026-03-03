@@ -331,6 +331,7 @@ export default function LeadsList() {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-100">
             <tr>
@@ -340,13 +341,13 @@ export default function LeadsList() {
                     onChange={toggleSelectAll} className="rounded border-slate-300" />
                 </th>
               )}
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">#</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 hidden md:table-cell">#</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الاسم</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الموبايل</th>
               <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الحالة</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">المعيّن له</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">المصدر</th>
-              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">تاريخ الإنشاء</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 hidden lg:table-cell">المعيّن له</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 hidden md:table-cell">المصدر</th>
+              <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 hidden md:table-cell">تاريخ الإنشاء</th>
             </tr>
           </thead>
           <tbody>
@@ -381,7 +382,7 @@ export default function LeadsList() {
                       <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggleSelect(l.id)} className="rounded border-slate-300" />
                     </td>
                   )}
-                  <td className="px-4 py-3 text-slate-400 text-sm">#{l.number}</td>
+                  <td className="px-4 py-3 text-slate-400 text-sm hidden md:table-cell">#{l.number}</td>
                   <td className="px-4 py-3 text-slate-700">
                     <Link to={`/leads/${l.id}`} className="text-blue-600 hover:underline font-medium">
                       {l.name}
@@ -400,17 +401,18 @@ export default function LeadsList() {
                       {l.status?.name}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-slate-700">{l.assignedTo?.name ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-700">{l.source}</td>
-                  <td className="px-4 py-3 text-slate-700">{new Date(l.createdAt).toLocaleString('ar-EG')}</td>
+                  <td className="px-4 py-3 text-slate-700 hidden lg:table-cell">{l.assignedTo?.name ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-700 hidden md:table-cell">{l.source}</td>
+                  <td className="px-4 py-3 text-slate-700 hidden md:table-cell">{new Date(l.createdAt).toLocaleString('ar-EG')}</td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
-      <div className="flex items-center justify-between mt-4">
+      <div className="flex items-center justify-between mt-4 flex-wrap gap-2">
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <span>الإجمالي: {data?.total ?? '--'}</span>
           <span className="text-slate-300">|</span>
@@ -418,14 +420,14 @@ export default function LeadsList() {
         </div>
         <div className="flex gap-2">
           <button
-            className="px-3 py-2 border rounded-lg disabled:opacity-50"
+            className="px-4 py-2.5 border rounded-lg disabled:opacity-50 text-sm min-h-[44px]"
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
           >
             السابق
           </button>
           <button
-            className="px-3 py-2 border rounded-lg disabled:opacity-50"
+            className="px-4 py-2.5 border rounded-lg disabled:opacity-50 text-sm min-h-[44px]"
             disabled={!!data && page >= Math.ceil(data.total / data.pageSize)}
             onClick={() => setPage((p) => p + 1)}
           >

@@ -83,10 +83,12 @@ function GroupNav({
   group,
   hasPermission,
   roleSlug,
+  onNavigate,
 }: {
   group: GroupEntry;
   hasPermission: (p: string) => boolean;
   roleSlug?: string;
+  onNavigate?: () => void;
 }) {
   const location = useLocation();
   const visibleChildren = group.children.filter((c) => {
@@ -127,6 +129,7 @@ function GroupNav({
             <NavLink
               key={child.to}
               to={child.to}
+              onClick={onNavigate}
               className={({ isActive }) =>
                 `block px-3 py-1.5 rounded-lg mb-0.5 transition text-sm ${
                   isActive
@@ -149,10 +152,12 @@ function GroupIcon({
   group,
   hasPermission,
   roleSlug,
+  onNavigate,
 }: {
   group: GroupEntry;
   hasPermission: (p: string) => boolean;
   roleSlug?: string;
+  onNavigate?: () => void;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -171,7 +176,7 @@ function GroupIcon({
     <button
       type="button"
       title={group.label}
-      onClick={() => navigate(visibleChildren[0].to)}
+      onClick={() => { navigate(visibleChildren[0].to); onNavigate?.(); }}
       className={`w-full flex items-center justify-center p-2.5 rounded-lg mb-1 transition ${
         isAnyChildActive
           ? 'bg-amber-600 text-white'
@@ -184,7 +189,7 @@ function GroupIcon({
 }
 
 // ============ Sidebar ============
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { user, logout, hasPermission } = useAuth();
   const roleSlug = user?.role?.slug;
   const navigate = useNavigate();
@@ -243,6 +248,7 @@ export default function Sidebar() {
                   to={entry.to}
                   end={entry.to === '/dashboard'}
                   title={entry.label}
+                  onClick={onNavigate}
                   className={({ isActive }) =>
                     `flex items-center justify-center p-2.5 rounded-lg mb-1 transition ${
                       isActive
@@ -260,6 +266,7 @@ export default function Sidebar() {
                 key={entry.to}
                 to={entry.to}
                 end={entry.to === '/dashboard'}
+                onClick={onNavigate}
                 className={({ isActive }) =>
                   `flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm ${
                     isActive
@@ -274,9 +281,9 @@ export default function Sidebar() {
             );
           }
           if (collapsed) {
-            return <GroupIcon key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} />;
+            return <GroupIcon key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} onNavigate={onNavigate} />;
           }
-          return <GroupNav key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} />;
+          return <GroupNav key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} onNavigate={onNavigate} />;
         })}
       </nav>
 
@@ -287,6 +294,7 @@ export default function Sidebar() {
             <NavLink
               to="/profile"
               title="ملفي الشخصي"
+              onClick={onNavigate}
               className={({ isActive }) =>
                 `p-2 rounded-lg transition ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`
               }

@@ -160,10 +160,10 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                       </th>
                     )}
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">رقم الطلب</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">التاريخ</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 hidden md:table-cell">التاريخ</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">العميل / الشحن</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الحالة</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">الدفع</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500 hidden md:table-cell">الدفع</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-slate-500">إجراء</th>
                   </tr>
                 </thead>
@@ -185,7 +185,7 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-slate-600">
+                      <td className="py-3 px-4 text-slate-600 hidden md:table-cell">
                         {new Date(o.createdAt).toLocaleDateString('ar-EG')}
                       </td>
                       <td className="py-3 px-4">
@@ -197,7 +197,7 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                           {STATUS_LABELS[o.status] ?? o.status}
                         </span>
                       </td>
-                      <td className="py-3 px-4">{o.paymentType === 'full' ? 'كامل' : 'جزئي'}</td>
+                      <td className="py-3 px-4 hidden md:table-cell">{o.paymentType === 'full' ? 'كامل' : 'جزئي'}</td>
                       <td className="py-3 px-4">
                         <Link to={`/orders/${o.id}`} className="text-blue-600 hover:text-blue-800 font-medium">
                           تفاصيل
@@ -214,18 +214,18 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                   type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => p - 1)}
-                  className="px-3 py-1 border rounded disabled:opacity-50 text-slate-700 text-sm transition-colors hover:bg-slate-50"
+                  className="px-4 py-2.5 border rounded-lg disabled:opacity-50 text-slate-700 text-sm transition-colors hover:bg-slate-50 min-h-[44px]"
                 >
                   السابق
                 </button>
-                <span className="px-3 py-1 text-slate-600">
+                <span className="px-3 py-2.5 text-slate-600">
                   {page} / {totalPages}
                 </span>
                 <button
                   type="button"
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
-                  className="px-3 py-1 border rounded disabled:opacity-50 text-slate-700 text-sm transition-colors hover:bg-slate-50"
+                  className="px-4 py-2.5 border rounded-lg disabled:opacity-50 text-slate-700 text-sm transition-colors hover:bg-slate-50 min-h-[44px]"
                 >
                   التالي
                 </button>
