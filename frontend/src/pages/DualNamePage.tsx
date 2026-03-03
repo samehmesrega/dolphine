@@ -3,16 +3,10 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { buildAmbigram } from '../engine/AmbigramBuilder.js';
 // @ts-ignore
 import { createScene, fitCameraToObject } from '../engine/SceneManager.js';
-// @ts-ignore
-import { CURATED_FONTS, DEFAULT_FONT } from '../engine/curated-fonts.js';
-
-type FontEntry = { name: string; file: string; category: string };
 
 export default function DualNamePage() {
   const [textA, setTextA] = useState('');
   const [textB, setTextB] = useState('');
-  const [fontFile, setFontFile] = useState(DEFAULT_FONT.file);
-  const [fontSize, setFontSize] = useState(72);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
@@ -54,8 +48,8 @@ export default function DualNamePage() {
       const group = await buildAmbigram({
         textA: textA.trim(),
         textB: textB.trim(),
-        fontUrl: `/fonts/${fontFile}`,
-        fontSize,
+        fontUrl: '/fonts/Kanit-Bold.ttf',
+        fontSize: 72,
       });
 
       if (group.children.length === 0) {
@@ -82,8 +76,8 @@ export default function DualNamePage() {
 
       {/* Controls */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end">
-          <div>
+        <div className="flex flex-col sm:flex-row gap-3 items-end">
+          <div className="flex-1 w-full">
             <label className="block text-xs font-medium text-slate-500 mb-1">الاسم الأول (Side A)</label>
             <input
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -93,7 +87,7 @@ export default function DualNamePage() {
               onChange={(e) => setTextA(e.target.value.toUpperCase())}
             />
           </div>
-          <div>
+          <div className="flex-1 w-full">
             <label className="block text-xs font-medium text-slate-500 mb-1">الاسم الثاني (Side B)</label>
             <input
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
@@ -103,34 +97,11 @@ export default function DualNamePage() {
               onChange={(e) => setTextB(e.target.value.toUpperCase())}
             />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">الخط</label>
-            <select
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
-              value={fontFile}
-              onChange={(e) => setFontFile(e.target.value)}
-            >
-              {(CURATED_FONTS as FontEntry[]).map((f) => (
-                <option key={f.file} value={f.file}>{f.name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">الحجم: {fontSize}</label>
-            <input
-              type="range"
-              min={36}
-              max={144}
-              value={fontSize}
-              onChange={(e) => setFontSize(Number(e.target.value))}
-              className="w-full"
-            />
-          </div>
-          <div>
+          <div className="w-full sm:w-auto">
             <button
               onClick={handleGenerate}
               disabled={generating || !textA.trim() || !textB.trim()}
-              className="w-full bg-blue-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px]"
+              className="w-full bg-blue-600 text-white rounded-lg px-6 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50 min-h-[44px]"
             >
               {generating ? 'جاري الإنشاء...' : 'إنشاء'}
             </button>

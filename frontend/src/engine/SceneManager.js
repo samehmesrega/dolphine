@@ -10,7 +10,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 export function createScene(container) {
   // Scene
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x1a1a2e);
+  scene.background = new THREE.Color(0xf8fafc);
 
   // Camera
   const aspect = container.clientWidth / container.clientHeight;
@@ -53,11 +53,6 @@ export function createScene(container) {
   const backLight = new THREE.DirectionalLight(0xffffff, 0.2);
   backLight.position.set(0, -100, -200);
   scene.add(backLight);
-
-  // Grid helper (subtle)
-  const grid = new THREE.GridHelper(400, 40, 0x333355, 0x222244);
-  grid.position.y = -1;
-  scene.add(grid);
 
   // Animation loop
   let animationId;
