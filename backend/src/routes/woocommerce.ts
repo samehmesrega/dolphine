@@ -2,9 +2,11 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../db';
 import {
   fetchWooCommerceProducts,
+  fetchWooCommerceOrders,
   getWooCommerceConfigForUI,
   isConfigured,
 } from '../services/woocommerce';
+import { normalizePhone } from '../utils/phone';
 import { z } from 'zod';
 
 const router = Router();
@@ -123,6 +125,148 @@ router.post('/sync-products', async (_req: Request, res: Response) => {
   } catch (err) {
     const message = err instanceof Error ? err.message : 'خطأ غير متوقع';
     res.status(502).json({ error: `فشل مزامنة المنتجات: ${message}` });
+  }
+});
+
+// ==================== استيراد طلبات ووكومرس ====================
+
+function mapWcStatus(wcStatus: string): string {
+  switch (wcStatus) {
+    case 'completed':
+    case 'processing':
+      return 'accounts_confirmed';
+    case 'cancelled':
+    case 'refunded':
+    case 'failed':
+      return 'rejected';
+    default:
+      return 'pending_accounts';
+  }
+}
+
+const MAX_IMPORT_PAGES = 50;
+
+router.post('/import-orders', async (_req: Request, res: Response) => {
+  const configured = await isConfigured();
+  if (!configured) {
+    res.status(503).json({ error: 'إعدادات ووكومرس غير مكتملة.' });
+    return;
+  }
+
+  try {
+    const after = (_req.body as { after?: string }).after || '2026-01-01T00:00:00';
+    let page = 1;
+    const perPage = 100;
+    let importedCount = 0;
+    let skippedCount = 0;
+    const unmatched: Array<{ wcId: number; phone: string; reason: string }> = [];
+
+    // Pre-load all products for fast lookup
+    const allProducts = await prisma.product.findMany({
+      select: { id: true, wooCommerceId: true },
+    });
+    const productMap = new Map(allProducts.map(p => [p.wooCommerceId, p.id]));
+
+    do {
+      const wcOrders = await fetchWooCommerceOrders(page, perPage, after);
+
+      for (const wc of wcOrders) {
+        // Skip already imported
+        const exists = await prisma.order.findUnique({
+          where: { wooCommerceId: wc.id },
+          select: { id: true },
+        });
+        if (exists) { skippedCount++; continue; }
+
+        // Normalize phone
+        const rawPhone = wc.billing.phone;
+        const normalized = normalizePhone(rawPhone);
+        if (!normalized) {
+          unmatched.push({ wcId: wc.id, phone: rawPhone, reason: 'invalid_phone' });
+          continue;
+        }
+
+        // Find lead by phone
+        const lead = await prisma.lead.findFirst({
+          where: { phoneNormalized: normalized },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, name: true, customerId: true, phone: true, email: true, whatsapp: true, address: true },
+        });
+        if (!lead) {
+          unmatched.push({ wcId: wc.id, phone: rawPhone, reason: 'no_lead' });
+          continue;
+        }
+
+        // Ensure customer exists
+        let customerId = lead.customerId;
+        if (!customerId) {
+          const customer = await prisma.customer.upsert({
+            where: { phone: normalized },
+            update: { name: lead.name },
+            create: { phone: normalized, name: lead.name, email: lead.email, whatsapp: lead.whatsapp, address: lead.address },
+          });
+          await prisma.lead.update({ where: { id: lead.id }, data: { customerId: customer.id } });
+          customerId = customer.id;
+        }
+
+        // Build shipping name
+        const shippingName =
+          [wc.shipping.first_name, wc.shipping.last_name].filter(Boolean).join(' ') ||
+          [wc.billing.first_name, wc.billing.last_name].filter(Boolean).join(' ') ||
+          lead.name;
+
+        const dolphinStatus = mapWcStatus(wc.status);
+
+        // Skip orders with no line items
+        if (!wc.line_items || wc.line_items.length === 0) {
+          unmatched.push({ wcId: wc.id, phone: rawPhone, reason: 'no_items' });
+          continue;
+        }
+
+        // Create order + items in transaction
+        await prisma.$transaction(async (tx) => {
+          const order = await tx.order.create({
+            data: {
+              leadId: lead.id,
+              customerId: customerId!,
+              wooCommerceId: wc.id,
+              status: dolphinStatus,
+              paymentType: 'full',
+              shippingName,
+              shippingPhone: rawPhone,
+              shippingCity: wc.shipping.city || wc.billing.city || undefined,
+              shippingAddress: wc.shipping.address_1 || wc.billing.address_1 || undefined,
+              notes: `Imported from WooCommerce (WC #${wc.id})`,
+              createdAt: new Date(wc.date_created),
+            },
+          });
+
+          for (const item of wc.line_items) {
+            const productId = item.product_id ? productMap.get(item.product_id) : undefined;
+            await tx.orderItem.create({
+              data: {
+                orderId: order.id,
+                productId: productId || undefined,
+                productName: productId ? undefined : item.name,
+                quantity: item.quantity,
+                price: parseFloat(item.price) || 0,
+              },
+            });
+          }
+        });
+
+        importedCount++;
+      }
+
+      if (wcOrders.length < perPage) break;
+      page++;
+    } while (page <= MAX_IMPORT_PAGES);
+
+    res.json({ success: true, imported: importedCount, skipped: skippedCount, unmatched });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'خطأ غير متوقع';
+    console.error('WC import error:', err);
+    res.status(502).json({ error: `فشل استيراد الطلبات: ${message}` });
   }
 });
 

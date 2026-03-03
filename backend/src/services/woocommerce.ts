@@ -155,6 +155,27 @@ export async function createWooCommerceOrder(payload: WCOrderPayload): Promise<n
   return order.id;
 }
 
+export type WCOrderResponse = {
+  id: number;
+  status: string;
+  date_created: string;
+  billing: { first_name: string; last_name: string; address_1: string; city: string; phone: string };
+  shipping: { first_name: string; last_name: string; address_1: string; city: string };
+  line_items: Array<{ product_id: number; name: string; quantity: number; price: string }>;
+  payment_method: string;
+  total: string;
+};
+
+export async function fetchWooCommerceOrders(
+  page = 1,
+  perPage = 100,
+  after?: string,
+): Promise<WCOrderResponse[]> {
+  let path = `/orders?per_page=${perPage}&page=${page}&orderby=date&order=asc`;
+  if (after) path += `&after=${after}`;
+  return wcFetch<WCOrderResponse[]>(path);
+}
+
 export async function fetchWooCommerceProducts(page = 1, perPage = 100): Promise<
   Array<{
     id: number;

@@ -1022,6 +1022,20 @@ export default function IntegrationsPage() {
     },
   });
 
+  const [importResult, setImportResult] = useState<{
+    imported: number;
+    skipped: number;
+    unmatched: Array<{ wcId: number; phone: string; reason: string }>;
+  } | null>(null);
+
+  const importOrdersMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await api.post('/woocommerce/import-orders', { after: '2026-01-01T00:00:00' });
+      return data as { imported: number; skipped: number; unmatched: Array<{ wcId: number; phone: string; reason: string }> };
+    },
+    onSuccess: (data) => setImportResult(data),
+  });
+
   React.useEffect(() => {
     if (wooConfig) {
       setWooBaseUrl(wooConfig.baseUrl);
@@ -1156,6 +1170,52 @@ export default function IntegrationsPage() {
               )}
               {saveWooMutation.isSuccess && <p className="text-green-600 text-sm">تم الحفظ.</p>}
             </form>
+
+            {wooConfig?.configured && (
+              <div className="mt-6 pt-6 border-t border-slate-200">
+                <h3 className="text-md font-semibold text-slate-700 mb-2">استيراد الطلبات من ووكومرس</h3>
+                <p className="text-slate-500 text-sm mb-3">
+                  جلب الطلبات من ووكومرس (من بداية 2026) وربطها بالليدز الموجودين حسب رقم الهاتف.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setImportResult(null); importOrdersMutation.mutate(); }}
+                  disabled={importOrdersMutation.isPending}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 text-sm"
+                >
+                  {importOrdersMutation.isPending ? 'جاري الاستيراد...' : 'استيراد طلبات ووكومرس'}
+                </button>
+
+                {importOrdersMutation.isError && (
+                  <p className="text-red-600 text-sm mt-2">
+                    {(importOrdersMutation.error as { response?: { data?: { error?: string } } })?.response?.data?.error ||
+                      (importOrdersMutation.error as Error)?.message || 'فشل الاستيراد'}
+                  </p>
+                )}
+
+                {importResult && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-green-600 text-sm">
+                      تم استيراد {importResult.imported} طلب، تخطي {importResult.skipped} (مستورد مسبقاً)
+                    </p>
+                    {importResult.unmatched.length > 0 && (
+                      <details className="text-sm">
+                        <summary className="text-amber-600 cursor-pointer">
+                          {importResult.unmatched.length} طلب لم يتم ربطه
+                        </summary>
+                        <ul className="mt-2 space-y-1 max-h-48 overflow-y-auto bg-slate-50 rounded p-2">
+                          {importResult.unmatched.map((u) => (
+                            <li key={u.wcId} className="text-slate-600">
+                              WC #{u.wcId} — {u.phone || 'بدون رقم'} — {u.reason === 'no_lead' ? 'لا يوجد ليد' : u.reason === 'no_items' ? 'بدون منتجات' : 'رقم غير صالح'}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </>
         )}
       </section>
