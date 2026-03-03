@@ -88,7 +88,6 @@ export default function LeadsList() {
   const [order, setOrder] = useState<string>('desc');
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const [exporting, setExporting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -182,31 +181,11 @@ export default function LeadsList() {
     }
   };
 
-  const handleExport = async () => {
-    setExporting(true);
-    try {
-      const { data } = await api.get('/leads', {
-        params: {
-          search: search.trim() || undefined,
-          statusId: statusId || undefined,
-          assignedToId: assignedToId || undefined,
-          sortBy,
-          order,
-          page: 1,
-          pageSize: 1000,
-        },
-      });
-      const list = (data as { leads: Lead[] }).leads ?? [];
-      if (list.length === 0) {
-        alert('لا توجد بيانات للتصدير');
-        return;
-      }
-      downloadLeadsCsv(list);
-    } catch {
-      alert('فشل التصدير');
-    } finally {
-      setExporting(false);
-    }
+  const handleExportSelected = () => {
+    if (!data?.leads || selectedIds.size === 0) return;
+    const selected = data.leads.filter(l => selectedIds.has(l.id));
+    if (selected.length === 0) return;
+    downloadLeadsCsv(selected);
   };
 
   return (
@@ -273,7 +252,7 @@ export default function LeadsList() {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-3 items-end">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <input
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
             placeholder="بحث: اسم / فون / إيميل"
@@ -330,23 +309,19 @@ export default function LeadsList() {
             <option value="name-desc">الاسم (ي-أ)</option>
             <option value="statusId-asc">الحالة</option>
           </select>
-          <button
-            type="button"
-            onClick={handleExport}
-            disabled={exporting}
-            className="border border-slate-300 text-slate-600 rounded-lg px-4 py-2 text-sm font-medium hover:bg-slate-50 transition-colors disabled:opacity-40"
-          >
-            {exporting ? 'جاري التصدير...' : 'تصدير CSV'}
-          </button>
         </div>
       </div>
 
       {canBulkDelete && selectedIds.size > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-4 flex items-center justify-between">
-          <span className="text-sm text-red-700 font-medium">تم تحديد {selectedIds.size} عنصر</span>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-4 flex items-center justify-between">
+          <span className="text-sm text-blue-700 font-medium">تم تحديد {selectedIds.size} عنصر</span>
           <div className="flex items-center gap-3">
             {deleteError && <span className="text-sm text-red-600">{deleteError}</span>}
             <button type="button" onClick={() => setSelectedIds(new Set())} className="text-sm text-slate-600 hover:text-slate-800">إلغاء التحديد</button>
+            <button type="button" onClick={handleExportSelected}
+              className="border border-slate-300 bg-white text-slate-700 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors">
+              تصدير CSV
+            </button>
             <button type="button" onClick={handleBulkDelete} disabled={bulkDeleteMutation.isPending}
               className="bg-red-600 text-white px-4 py-1.5 rounded-lg text-sm hover:bg-red-700 disabled:opacity-50">
               {bulkDeleteMutation.isPending ? 'جاري الحذف...' : 'حذف المحدد'}
