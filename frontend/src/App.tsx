@@ -8,6 +8,7 @@ import ModuleSwitcher from './shared/Layout/ModuleSwitcher';
 import Login from './modules/auth/pages/Login';
 
 const LeadsModule = lazy(() => import('./modules/leads'));
+const MarketingModule = lazy(() => import('./modules/marketing'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,18 @@ function AppRoutes() {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
+
+      {/* Marketing module (has its own shell) */}
+      <Route
+        path="/marketing/*"
+        element={
+          <PrivateRoute>
+            <Suspense fallback={<div className="p-8 text-center text-slate-400">جاري التحميل...</div>}>
+              <MarketingModule />
+            </Suspense>
+          </PrivateRoute>
+        }
+      />
 
       {/* Protected routes */}
       <Route

@@ -21,6 +21,7 @@ import type { Response as ExpressResponse, NextFunction } from 'express';
 // Module routes
 import authRoutes from './modules/auth/routes';
 import leadsRoutes from './modules/leads/routes';
+import marketingRoutes from './modules/marketing/routes';
 
 // يسمح بـ users.manage أو مدير السيلز
 function requireUsersAccess(
@@ -119,7 +120,7 @@ app.get('/health', (_req: Request, res: Response) => {
     status: 'ok',
     app: 'dolphin-platform',
     version: '2.0.0',
-    modules: ['auth', 'leads'],
+    modules: ['auth', 'leads', 'marketing'],
   });
 });
 
@@ -130,6 +131,10 @@ app.use('/api/v1/auth', authLimiter, authRoutes);
 
 // Leads module (backwards compatible: /api/v1/leads/*)
 app.use('/api/v1/leads', authMiddleware, leadsRoutes);
+
+// Marketing module
+app.use('/api/v1/marketing', authMiddleware, marketingRoutes);
+app.use('/api/marketing', authMiddleware, marketingRoutes);
 
 // Webhooks (public, rate-limited)
 // Keeping old path for backwards compatibility with WordPress plugins

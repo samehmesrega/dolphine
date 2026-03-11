@@ -27,7 +27,7 @@ async function main() {
       slug: 'marketing',
       icon: '📢',
       description: 'إدارة المحتوى والحملات واللاندنج بيدجز',
-      isActive: false, // will be enabled in Phase 2
+      isActive: true,
       order: 2,
     },
   });
@@ -123,9 +123,65 @@ async function main() {
     });
   }
 
+  // === Seed Marketing Projects ===
+  const projects = [
+    { name: 'Print In', slug: 'print-in', language: 'ar' },
+    { name: 'Picked In', slug: 'picked-in', language: 'ar' },
+    { name: 'Choroida', slug: 'choroida', language: 'ar' },
+  ];
+
+  for (const p of projects) {
+    await prisma.mktProject.upsert({
+      where: { slug: p.slug },
+      update: {},
+      create: p,
+    });
+  }
+
+  // === Seed Tag Categories & Tags ===
+  const tagCategories = [
+    { name: 'Season', tags: ['Ramadan', 'Valentine\'s', 'Back to School', 'Mother\'s Day', 'National Day', 'Black Friday', 'Summer'] },
+    { name: 'Content Type', tags: ['UGC', 'Product Shot', 'Lifestyle', 'Motion Graphics', 'Unboxing', 'Tutorial', 'Testimonial'] },
+    { name: 'Platform', tags: ['Meta', 'TikTok', 'Snapchat', 'Google'] },
+  ];
+
+  for (const cat of tagCategories) {
+    const category = await prisma.tagCategory.upsert({
+      where: { name: cat.name },
+      update: {},
+      create: { name: cat.name, isFixed: true },
+    });
+
+    for (const tagName of cat.tags) {
+      await prisma.tag.upsert({
+        where: { name_categoryId: { name: tagName, categoryId: category.id } },
+        update: {},
+        create: { name: tagName, categoryId: category.id },
+      });
+    }
+  }
+
+  // === Seed Creative Code Config ===
+  const existingConfig = await prisma.creativeCodeConfig.findFirst();
+  if (!existingConfig) {
+    await prisma.creativeCodeConfig.create({
+      data: {
+        segments: [
+          { name: 'Language', order: 1, values: [{ code: '1', label: 'Arabic' }, { code: '2', label: 'English' }] },
+          { name: 'Project', order: 2, values: [{ code: '1', label: 'Print In' }, { code: '2', label: 'Picked In' }, { code: '3', label: 'Choroida' }] },
+          { name: 'Product', order: 3, values: [{ code: '1', label: 'Dual Name' }, { code: '2', label: 'Slipperz' }, { code: '3', label: 'Decor Lamp' }] },
+        ],
+        separator: '-',
+        seqDigits: 3,
+      },
+    });
+  }
+
   console.log('Seeding complete!');
   console.log(`  - Leads module: ${leadsModule.id}`);
   console.log(`  - Marketing module: ${marketingModule.id}`);
+  console.log(`  - Projects: ${projects.length}`);
+  console.log(`  - Tag categories: ${tagCategories.length}`);
 }
 
 main()

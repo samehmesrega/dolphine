@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../modules/auth/context/AuthContext';
+// import { useAuth } from '../../modules/auth/context/AuthContext';
 
 interface ModuleCard {
   slug: string;
@@ -34,14 +34,8 @@ const MODULES: ModuleCard[] = [
 
 export default function ModuleSwitcher() {
   const navigate = useNavigate();
-  const { hasPermission } = useAuth();
-
-  // For now, all users have access to leads. Marketing will be permission-gated later.
-  const availableModules = MODULES.filter((m) => {
-    if (m.slug === 'leads') return true;
-    if (m.slug === 'marketing') return hasPermission('marketing.view') || hasPermission('*');
-    return false;
-  });
+  // TODO: gate modules with hasPermission() in production
+  const availableModules = MODULES;
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">

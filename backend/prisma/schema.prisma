@@ -44,6 +44,15 @@ model User {
   notifications      Notification[]
   moduleAccess       ModuleAccess[]
 
+  // Relations - Marketing module
+  createdCreatives      Creative[]          @relation("CreativeCreator")
+  requestedCreatives    CreativeRequest[]   @relation("RequestRequester")
+  assignedRequests      CreativeRequest[]   @relation("RequestAssignee")
+  submittedIdeas        Idea[]              @relation("IdeaSubmitter")
+  ideaComments          IdeaComment[]       @relation("IdeaCommenter")
+  competitorReferences  CompetitorReference[] @relation("CompetitorAdder")
+  assignedScripts       Script[]            @relation("ScriptAssignee")
+
   @@map("users")
 }
 
@@ -506,4 +515,305 @@ model TaskRule {
   tasks Task[]
 
   @@map("task_rules")
+}
+
+// =============================================================
+// MARKETING: الكرييتيف والتاجز والطلبات والأداء
+// =============================================================
+
+model MktProject {
+  id        String         @id @default(uuid())
+  name      String         @unique // "Print In", "Picked In", "Choroida"
+  slug      String         @unique
+  language  String         @default("ar") // "ar" | "en"
+  isActive  Boolean        @default(true) @map("is_active")
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  products         MktProduct[]
+  creatives        Creative[]
+  creativeRequests CreativeRequest[]
+  ideas            Idea[]
+  scripts          Script[]
+
+  @@map("mkt_projects")
+}
+
+model MktProduct {
+  id            String     @id @default(uuid())
+  name          String     // "Dual Name", "Slipperz"
+  projectId     String     @map("project_id")
+  project       MktProject @relation(fields: [projectId], references: [id])
+  wooCommerceId Int?       @map("woo_commerce_id") // linked from Leads module
+  isActive      Boolean    @default(true) @map("is_active")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  creatives        Creative[]
+  creativeRequests CreativeRequest[]
+
+  @@map("mkt_products")
+}
+
+enum CreativeType {
+  IMAGE
+  VIDEO
+  CAROUSEL
+  REEL
+}
+
+enum CreativeStatus {
+  REQUESTED
+  IN_PRODUCTION
+  DONE
+  PUBLISHED
+  TESTING
+  WINNER
+  LOSER
+}
+
+model Creative {
+  id           String         @id @default(uuid())
+  code         String         @unique // auto-generated: "1-2-3-001"
+  name         String
+  description  String?
+  type         CreativeType
+  driveUrl     String?        @map("drive_url")
+  thumbnailUrl String?        @map("thumbnail_url")
+  projectId    String         @map("project_id")
+  project      MktProject     @relation(fields: [projectId], references: [id])
+  productId    String?        @map("product_id")
+  product      MktProduct?    @relation(fields: [productId], references: [id])
+  language     String         @default("ar")
+  creatorId    String         @map("creator_id")
+  creator      User           @relation("CreativeCreator", fields: [creatorId], references: [id])
+  status       CreativeStatus @default(REQUESTED)
+  requestId    String?        @map("request_id")
+  request      CreativeRequest? @relation(fields: [requestId], references: [id])
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+
+  tags         CreativeTag[]
+  performances CreativePerformance[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([code])
+  @@map("mkt_creatives")
+}
+
+model CreativeCodeConfig {
+  id        String   @id @default(uuid())
+  segments  Json     // configurable segments with codes and labels
+  separator String   @default("-")
+  seqDigits Int      @default(3) @map("seq_digits")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("mkt_creative_code_config")
+}
+
+model TagCategory {
+  id      String  @id @default(uuid())
+  name    String  @unique // "Season", "Content Type", "Platform"
+  isFixed Boolean @default(true) @map("is_fixed")
+
+  tags Tag[]
+
+  @@map("mkt_tag_categories")
+}
+
+model Tag {
+  id         String       @id @default(uuid())
+  name       String       // "Ramadan", "UGC", "Meta"
+  categoryId String?      @map("category_id")
+  category   TagCategory? @relation(fields: [categoryId], references: [id])
+
+  creatives CreativeTag[]
+
+  @@unique([name, categoryId])
+  @@map("mkt_tags")
+}
+
+model CreativeTag {
+  id         String   @id @default(uuid())
+  creativeId String   @map("creative_id")
+  creative   Creative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  tagId      String   @map("tag_id")
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@unique([creativeId, tagId])
+  @@map("mkt_creative_tags")
+}
+
+model SavedFilter {
+  id      String @id @default(uuid())
+  name    String // "Ramadan Dual Name Videos"
+  userId  String @map("user_id")
+  filters Json   // { projectId: "x", tags: ["y"], status: "PUBLISHED", type: "VIDEO" }
+
+  @@map("mkt_saved_filters")
+}
+
+enum RequestStatus {
+  NEW
+  IN_PRODUCTION
+  DONE
+  CANCELLED
+}
+
+model CreativeRequest {
+  id            String        @id @default(uuid())
+  title         String
+  projectId     String        @map("project_id")
+  project       MktProject    @relation(fields: [projectId], references: [id])
+  productId     String?       @map("product_id")
+  product       MktProduct?   @relation(fields: [productId], references: [id])
+  platform      String        // "meta", "tiktok", "snapchat"
+  language      String        @default("ar")
+  instructions  String
+  referenceUrls Json?         @map("reference_urls")
+  deadline      DateTime?
+  status        RequestStatus @default(NEW)
+  requestedBy   String        @map("requested_by")
+  requester     User          @relation("RequestRequester", fields: [requestedBy], references: [id])
+  assignedTo    String?       @map("assigned_to")
+  assignee      User?         @relation("RequestAssignee", fields: [assignedTo], references: [id])
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  creatives Creative[]
+
+  @@index([status])
+  @@map("mkt_creative_requests")
+}
+
+model CreativePerformance {
+  id          String   @id @default(uuid())
+  creativeId  String   @map("creative_id")
+  creative    Creative @relation(fields: [creativeId], references: [id], onDelete: Cascade)
+  date        DateTime
+  platform    String   // "meta", "google", "tiktok", "snapchat"
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  spend       Float    @default(0)
+  leads       Int      @default(0)
+  orders      Int      @default(0)
+  revenue     Float    @default(0)
+
+  @@unique([creativeId, date, platform])
+  @@map("mkt_creative_performance")
+}
+
+// --- Ideas & Scripts ---
+
+enum IdeaStatus {
+  NEW
+  APPROVED
+  IN_PRODUCTION
+  DONE
+  REJECTED
+}
+
+model Idea {
+  id            String     @id @default(uuid())
+  title         String
+  description   String
+  projectId     String     @map("project_id")
+  project       MktProject @relation(fields: [projectId], references: [id])
+  platform      String?
+  contentType   String?    @map("content_type")
+  status        IdeaStatus @default(NEW)
+  submittedBy   String     @map("submitted_by")
+  submitter     User       @relation("IdeaSubmitter", fields: [submittedBy], references: [id])
+  referenceUrls Json?      @map("reference_urls")
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+
+  comments IdeaComment[]
+  scripts  Script[]
+
+  @@index([status])
+  @@map("mkt_ideas")
+}
+
+model IdeaComment {
+  id        String   @id @default(uuid())
+  ideaId    String   @map("idea_id")
+  idea      Idea     @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation("IdeaCommenter", fields: [userId], references: [id])
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("mkt_idea_comments")
+}
+
+model CompetitorReference {
+  id             String   @id @default(uuid())
+  title          String
+  url            String
+  screenshotUrl  String?  @map("screenshot_url")
+  competitorName String?  @map("competitor_name")
+  platform       String
+  notes          String?
+  tags           Json?
+  addedBy        String   @map("added_by")
+  adder          User     @relation("CompetitorAdder", fields: [addedBy], references: [id])
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("mkt_competitor_references")
+}
+
+enum ScriptStatus {
+  DRAFT
+  APPROVED
+  IN_PRODUCTION
+  DONE
+}
+
+model Script {
+  id         String       @id @default(uuid())
+  ideaId     String?      @map("idea_id")
+  idea       Idea?        @relation(fields: [ideaId], references: [id])
+  title      String
+  projectId  String       @map("project_id")
+  project    MktProject   @relation(fields: [projectId], references: [id])
+  platform   String
+  audience   String?
+  language   String       @default("ar")
+  status     ScriptStatus @default(DRAFT)
+  assignedTo String?      @map("assigned_to")
+  assignee   User?        @relation("ScriptAssignee", fields: [assignedTo], references: [id])
+  createdAt  DateTime     @default(now()) @map("created_at")
+  updatedAt  DateTime     @updatedAt @map("updated_at")
+
+  scenes   ScriptScene[]
+  versions ScriptVersion[]
+
+  @@map("mkt_scripts")
+}
+
+model ScriptScene {
+  id          String  @id @default(uuid())
+  scriptId    String  @map("script_id")
+  script      Script  @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  order       Int
+  description String
+  cameraAngle String? @map("camera_angle")
+  setting     String?
+  textOverlay String? @map("text_overlay")
+  voiceover   String?
+  durationSec Int?    @map("duration_sec")
+
+  @@map("mkt_script_scenes")
+}
+
+model ScriptVersion {
+  id        String   @id @default(uuid())
+  scriptId  String   @map("script_id")
+  script    Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  version   Int
+  content   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("mkt_script_versions")
 }
