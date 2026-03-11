@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#0ea5e9"/>
+  <ellipse cx="256" cy="280" rx="150" ry="108" fill="rgba(255,255,255,0.2)"/>
+  <path d="M148 280 Q256 136 364 280" fill="none" stroke="#fff" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="256" cy="226" r="26" fill="#fff"/>
+  <text x="256" y="420" text-anchor="middle" font-family="Arial,sans-serif" font-size="72" font-weight="bold" fill="#fff">Dolphin</text>
+</svg>

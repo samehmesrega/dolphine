@@ -1,0 +1,25 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: dolphin-platform-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: dolphin_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - dolphin_platform_pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: dolphin-platform-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - dolphin_platform_redisdata:/data
+
+volumes:
+  dolphin_platform_pgdata:
+  dolphin_platform_redisdata:

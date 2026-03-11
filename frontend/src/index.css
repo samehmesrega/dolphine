@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Cairo', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* العناوين تستخدم Tajawal — أثقل وأكثر حضوراً للعربية */
+h1, h2, h3 {
+  font-family: 'Tajawal', 'Cairo', sans-serif;
+  font-weight: 700;
+}

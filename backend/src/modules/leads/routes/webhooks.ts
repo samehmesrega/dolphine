@@ -1,0 +1,279 @@
+/**
+ * ويب هوك استقبال الليدز من ووردبريس (بدون مصادقة - الاعتماد على token في الرابط)
+ */
+
+import { Router, Request, Response } from 'express';
+import { prisma } from '../../../db';
+import { normalizePhone } from '../../../shared/utils/phone';
+import { getNextAssignedUserId } from '../services/roundRobin';
+import { createLeadFromRow } from './sheet-connections';
+
+const router = Router();
+
+type Payload = Record<string, unknown>;
+
+// Forminator يبعت البيانات كـ { fields: [{name, value}, ...] }
+// هنحوّلها لـ flat object قبل المعالجة
+function normalizeForminatorBody(body: Payload): Payload {
+  if (Array.isArray(body.fields)) {
+    const flat: Payload = {};
+    for (const field of body.fields as Array<{ name?: string; value?: unknown }>) {
+      if (field.name) flat[field.name] = field.value;
+    }
+    return flat;
+  }
+  return body;
+}
+
+function pickPhone(obj: Payload): string | null {
+  const v = obj.phone ?? obj['your-phone'] ?? obj.tel ?? obj.mobile ?? obj['phone-1'] ?? obj['tel-1'];
+  if (typeof v === 'string' && v.trim().length >= 6) return v.trim();
+  for (const k of Object.keys(obj)) {
+    const key = k.toLowerCase();
+    if (key.includes('phone') || key.includes('tel') || key.includes('mobile') || key.includes('رقم')) {
+      const val = obj[k];
+      const s = typeof val === 'string' ? val.trim() : Array.isArray(val) ? String(val[0] ?? '').trim() : '';
+      if (s.length >= 6) return s;
+    }
+  }
+  return null;
+}
+
+function pickName(obj: Payload): string {
+  for (const k of ['name', 'your-name', 'name-1', 'full-name', 'fullname', 'الاسم']) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 200);
+  }
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase().includes('name') || k.includes('اسم')) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 200);
+    }
+  }
+  return 'وارد من النموذج';
+}
+
+function pickEmail(obj: Payload): string | undefined {
+  for (const k of ['email', 'your-email', 'email-1', 'البريد']) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 255);
+  }
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase().includes('email') || k.includes('بريد')) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 255);
+    }
+  }
+  return undefined;
+}
+
+function pickAddress(obj: Payload): string | undefined {
+  for (const k of ['address', 'your-address', 'address-1', 'العنوان']) {
+    const v = obj[k];
+    if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 500);
+  }
+  for (const k of Object.keys(obj)) {
+    if (k.toLowerCase().includes('address') || k.toLowerCase().includes('street') || k.includes('عنوان')) {
+      const v = obj[k];
+      if (typeof v === 'string' && v.trim()) return v.trim().slice(0, 500);
+    }
+  }
+  return undefined;
+}
+
+// POST /api/webhooks/leads/:token
+router.post('/leads/:token', async (req: Request, res: Response) => {
+  try {
+    const token = String(req.params.token);
+    const connection = await prisma.formConnection.findUnique({ where: { token } });
+    if (!connection) {
+      console.log('[webhook] رابط غير صالح، token:', token.slice(0, 8) + '...');
+      res.status(404).json({ error: 'رابط غير صالح أو منتهي' });
+      return;
+    }
+
+    let body = req.body;
+    if (typeof body !== 'object' || body === null) {
+      body = {};
+    }
+    const raw: Payload = normalizeForminatorBody(body as Payload);
+    console.log('[webhook] استلام طلب، الحقول:', Object.keys(raw).join(', ') || '(فارغ)');
+
+    // استخدام fieldMapping لو موجود، وإلا الكشف التلقائي
+    const mapping = (connection.fieldMapping ?? {}) as Record<string, string>;
+
+    const getField = (key: string): unknown =>
+      mapping[key] ? raw[mapping[key]] : undefined;
+
+    const phoneRaw = (mapping.phone ? String(getField('phone') ?? '').trim() : null) || pickPhone(raw);
+    if (!phoneRaw) {
+      console.log('[webhook] تجاهل: لم يُعثر على رقم هاتف. البيانات:', JSON.stringify(raw));
+      res.status(200).json({ success: true, skipped: true, reason: 'no_phone' });
+      return;
+    }
+
+    const phoneNormalized = normalizePhone(phoneRaw);
+    if (!phoneNormalized) {
+      console.log('[webhook] تجاهل: رقم هاتف غير صالح:', phoneRaw);
+      res.status(200).json({ success: true, skipped: true, reason: 'invalid_phone' });
+      return;
+    }
+
+    const mappedName = mapping.name ? String(getField('name') ?? '').trim() : '';
+    const name = mappedName || pickName(raw);
+    const mappedEmail = mapping.email ? String(getField('email') ?? '').trim() : '';
+    const email = (mappedEmail || pickEmail(raw)) || undefined;
+    const mappedAddress = mapping.address ? String(getField('address') ?? '').trim() : '';
+    const address = (mappedAddress || pickAddress(raw)) || undefined;
+    // الحقول المخصصة التي عرّفها المستخدم في الـ mapping
+    const leadCustomFields: Record<string, unknown> = {};
+    const productCustomFields: Record<string, unknown> = {};
+    const customFieldDefs = Array.isArray(mapping.customFields)
+      ? (mapping.customFields as Array<{ label: string; field: string; type?: string }>)
+      : [];
+    for (const def of customFieldDefs) {
+      const val = String(raw[def.field] ?? '').trim();
+      console.log(`[webhook] customField: label="${def.label}" field="${def.field}" type="${def.type ?? 'customer'}" rawValue=${JSON.stringify(raw[def.field])} result="${val}"`);
+      if (val) {
+        if ((def as { label: string; field: string; type?: string }).type === 'product') {
+          productCustomFields[def.label] = val;
+        } else {
+          leadCustomFields[def.label] = val;
+        }
+      }
+    }
+    // استخراج UTMs تلقائياً من current_url اللي Forminator بيبعته
+    const utmLabels: Record<string, string> = {
+      utm_source:   'مصدر الزيارة',
+      utm_medium:   'وسيلة الزيارة',
+      utm_campaign: 'الحملة الإعلانية',
+      utm_content:  'محتوى الإعلان',
+      utm_term:     'كلمة البحث',
+    };
+    const currentUrl = typeof raw.current_url === 'string' ? raw.current_url : '';
+    if (currentUrl) {
+      try {
+        const urlParams = new URL(currentUrl).searchParams;
+        for (const [key, label] of Object.entries(utmLabels)) {
+          const val = urlParams.get(key)?.trim();
+          if (val && !leadCustomFields[label]) leadCustomFields[label] = val;
+        }
+      } catch { /* URL غير صالح، نتجاهله */ }
+    }
+    // fallback: لو في حقول utm_* مباشرة في الفورم (hidden fields)
+    for (const [key, label] of Object.entries(utmLabels)) {
+      const val = typeof raw[key] === 'string' ? (raw[key] as string).trim() : '';
+      if (val && !leadCustomFields[label]) leadCustomFields[label] = val;
+    }
+
+    console.log('[webhook] leadCustomFields:', JSON.stringify(leadCustomFields));
+    console.log('[webhook] productCustomFields:', JSON.stringify(productCustomFields));
+
+    const status = await prisma.leadStatus.findUnique({ where: { slug: 'new' } });
+    if (!status) {
+      console.error('[webhook] حالة الليد الافتراضية "new" غير موجودة في قاعدة البيانات');
+      res.status(500).json({ error: 'حالة الليد الافتراضية غير موجودة' });
+      return;
+    }
+
+    const customer = await prisma.customer.upsert({
+      where: { phone: phoneNormalized },
+      update: {
+        whatsapp: typeof raw.whatsapp === 'string' ? raw.whatsapp : undefined,
+        email,
+        address,
+      },
+      create: {
+        phone: phoneNormalized,
+        name,
+        email,
+        address,
+      },
+    });
+
+    const assignedToId = await getNextAssignedUserId();
+
+    const lead = await prisma.lead.create({
+      data: {
+        name,
+        phone: phoneRaw,
+        phoneNormalized,
+        email,
+        address,
+        customFields: leadCustomFields as object,
+        source: 'form',
+        sourceDetail: connection.shortcode || connection.name,
+        statusId: status.id,
+        customerId: customer.id,
+        ...(assignedToId ? { assignedToId } : {}),
+      },
+      include: { status: true, customer: true, assignedTo: { select: { id: true, name: true } } },
+    });
+
+    if (connection.productId) {
+      await prisma.productInterest.create({
+        data: {
+          leadId: lead.id,
+          productId: connection.productId,
+          quantity: 1,
+          customFields: productCustomFields as object,
+        },
+      });
+      console.log('[webhook] تم إنشاء اهتمام منتج تلقائياً للمنتج:', connection.productId);
+    }
+
+    console.log('[webhook] تم إنشاء ليد:', lead.id, lead.name);
+    res.status(201).json({ success: true, lead: { id: lead.id, name: lead.name } });
+  } catch (err: unknown) {
+    console.error('[webhook] خطأ غير متوقع:', err);
+    res.status(500).json({ error: 'خطأ في معالجة النموذج' });
+  }
+});
+
+// POST /api/webhooks/sheets/:token — استقبال ليد من Google Apps Script
+router.post('/sheets/:token', async (req: Request, res: Response) => {
+  try {
+    const token = String(req.params.token);
+    const connection = await prisma.sheetConnection.findUnique({ where: { token } });
+    if (!connection || !connection.isActive) {
+      console.log('[sheets-webhook] رابط غير صالح، token:', token.slice(0, 8) + '...');
+      res.status(404).json({ error: 'رابط غير صالح أو منتهي' });
+      return;
+    }
+
+    const rowData = (req.body?.row ?? {}) as Record<string, string>;
+    if (!rowData || typeof rowData !== 'object' || Object.keys(rowData).length === 0) {
+      res.status(200).json({ success: true, skipped: true, reason: 'empty_row' });
+      return;
+    }
+
+    const mapping = (connection.fieldMapping ?? {}) as {
+      name?: string; phone?: string; email?: string; address?: string;
+      createdAt?: string;
+      statusColumn?: string; statusMapping?: Record<string, string>;
+      userColumn?: string; userMapping?: Record<string, string>;
+      customFields?: Array<{ label: string; field: string; type?: string }>;
+    };
+
+    const result = await createLeadFromRow(rowData, mapping, connection.name, connection.productId);
+
+    if (result.created) {
+      // تحديث عداد الصفوف
+      await prisma.sheetConnection.update({
+        where: { id: connection.id },
+        data: { lastSyncedRow: { increment: 1 }, updatedAt: new Date() },
+      });
+      console.log('[sheets-webhook] تم إنشاء ليد من شيت:', connection.name);
+      res.status(201).json({ success: true });
+    } else if (result.skipped) {
+      res.status(200).json({ success: true, skipped: true, reason: 'no_valid_phone' });
+    } else {
+      res.status(200).json({ success: false, error: result.error });
+    }
+  } catch (err: unknown) {
+    console.error('[sheets-webhook] خطأ:', err);
+    res.status(500).json({ error: 'خطأ في معالجة البيانات' });
+  }
+});
+
+export default router;

@@ -1,0 +1,37 @@
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  console.error('[SECURITY] JWT_SECRET غير مضبوط في بيئة الإنتاج!');
+  process.exit(1);
+}
+
+export const config = {
+  port: parseInt(process.env.PORT || '4000', 10),
+  nodeEnv: process.env.NODE_ENV || 'development',
+  jwt: {
+    secret: process.env.JWT_SECRET || 'change-me-in-production',
+    expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+    refreshExpiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
+  },
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  },
+  leadsApiKey: process.env.LEADS_API_KEY,
+  upload: {
+    dir: process.env.UPLOAD_DIR || './uploads',
+    maxSizeMB: parseInt(process.env.MAX_FILE_SIZE_MB || '5', 10),
+  },
+  woocommerce: {
+    baseUrl: (process.env.WOOCOMMERCE_BASE_URL || '').replace(/\/$/, ''),
+    consumerKey: process.env.WOOCOMMERCE_CONSUMER_KEY || '',
+    consumerSecret: process.env.WOOCOMMERCE_CONSUMER_SECRET || '',
+  },
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
+  sentryDsn: process.env.SENTRY_DSN || '',
+  tokenEncryptionKey: process.env.TOKEN_ENCRYPTION_KEY || '',
+};
