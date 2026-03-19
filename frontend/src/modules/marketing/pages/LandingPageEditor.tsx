@@ -9,6 +9,21 @@ interface ChatMessage {
   loading?: boolean;
 }
 
+interface ABTest {
+  id: string;
+  status: string;
+  trafficSplit: number;
+  visitsA: number;
+  visitsB: number;
+  conversionsA: number;
+  conversionsB: number;
+  winnerId?: string;
+  startedAt: string;
+  completedAt?: string;
+  landingPageA: { id: string; title: string; slug: string };
+  landingPageB: { id: string; title: string; slug: string };
+}
+
 export default function LandingPageEditor() {
   const { id } = useParams<{ id: string }>();
   const queryClient = useQueryClient();
@@ -20,6 +35,9 @@ export default function LandingPageEditor() {
   const [previewMode, setPreviewMode] = useState<'mobile' | 'desktop'>('desktop');
   const [showSettings, setShowSettings] = useState(false);
   const [showVersions, setShowVersions] = useState(false);
+  const [showABTest, setShowABTest] = useState(false);
+  const [abTestPageBId, setAbTestPageBId] = useState('');
+  const [abTestSplit, setAbTestSplit] = useState(50);
 
   const { data: pageData, refetch } = useQuery({
     queryKey: ['landing-page', id],
@@ -111,6 +129,39 @@ export default function LandingPageEditor() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['lp-mappings', id] }),
   });
 
+  // A/B Tests
+  const { data: abTestsData } = useQuery({
+    queryKey: ['ab-tests'],
+    queryFn: () => mktApi.getABTests(),
+    enabled: showABTest,
+  });
+
+  const { data: allPagesData } = useQuery({
+    queryKey: ['landing-pages-list'],
+    queryFn: () => mktApi.getLandingPages(),
+    enabled: showABTest,
+  });
+
+  const abTests: ABTest[] = (abTestsData?.data?.tests || []).filter(
+    (t: ABTest) => t.landingPageA.id === id || t.landingPageB.id === id
+  );
+  const otherPages = (allPagesData?.data?.landingPages || []).filter((p: any) => p.id !== id);
+
+  const createABTestMutation = useMutation({
+    mutationFn: () =>
+      mktApi.createABTest({ landingPageAId: id!, landingPageBId: abTestPageBId, trafficSplit: abTestSplit }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ab-tests'] });
+      setAbTestPageBId('');
+    },
+  });
+
+  const endABTestMutation = useMutation({
+    mutationFn: ({ testId, winnerId }: { testId: string; winnerId?: string }) =>
+      mktApi.endABTest(testId, winnerId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['ab-tests'] }),
+  });
+
   if (!page) {
     return <div className="p-6 text-center text-gray-400">جاري التحميل...</div>;
   }
@@ -149,13 +200,19 @@ export default function LandingPageEditor() {
             </button>
           )}
           <button
-            onClick={() => { setShowVersions(!showVersions); setShowSettings(false); }}
+            onClick={() => { setShowVersions(!showVersions); setShowSettings(false); setShowABTest(false); }}
             className={`border px-3 py-1.5 rounded text-sm ${showVersions ? 'bg-purple-50 border-purple-300' : ''}`}
           >
             السجل
           </button>
           <button
-            onClick={() => { setShowSettings(!showSettings); setShowVersions(false); }}
+            onClick={() => { setShowABTest(!showABTest); setShowSettings(false); setShowVersions(false); }}
+            className={`border px-3 py-1.5 rounded text-sm ${showABTest ? 'bg-purple-50 border-purple-300' : ''}`}
+          >
+            A/B Test
+          </button>
+          <button
+            onClick={() => { setShowSettings(!showSettings); setShowVersions(false); setShowABTest(false); }}
             className={`border px-3 py-1.5 rounded text-sm ${showSettings ? 'bg-purple-50 border-purple-300' : ''}`}
           >
             الإعدادات
@@ -247,9 +304,111 @@ export default function LandingPageEditor() {
           </div>
         </div>
 
-        {/* Side panels (Versions / Settings) */}
-        {(showVersions || showSettings) && (
+        {/* Side panels (Versions / Settings / A/B Test) */}
+        {(showVersions || showSettings || showABTest) && (
           <div className="w-72 border-r bg-white overflow-y-auto">
+            {showABTest && (
+              <div className="p-4">
+                <h3 className="font-semibold mb-3">A/B Testing</h3>
+
+                {/* Active & past tests */}
+                {abTests.length > 0 && (
+                  <div className="space-y-3 mb-4">
+                    {abTests.map((t) => {
+                      const rateA = t.visitsA ? ((t.conversionsA / t.visitsA) * 100).toFixed(1) : '0';
+                      const rateB = t.visitsB ? ((t.conversionsB / t.visitsB) * 100).toFixed(1) : '0';
+                      return (
+                        <div key={t.id} className="border rounded p-3 text-xs space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className={`px-1.5 py-0.5 rounded ${t.status === 'RUNNING' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                              {t.status}
+                            </span>
+                            <span className="text-gray-400">{new Date(t.startedAt).toLocaleDateString('ar-EG')}</span>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-center">
+                            <div className="bg-blue-50 rounded p-2">
+                              <p className="font-bold text-blue-700">A</p>
+                              <p className="text-gray-600">{t.visitsA} زيارة</p>
+                              <p className="text-gray-600">{t.conversionsA} تحويل</p>
+                              <p className="font-semibold text-blue-700">{rateA}%</p>
+                            </div>
+                            <div className="bg-orange-50 rounded p-2">
+                              <p className="font-bold text-orange-700">B</p>
+                              <p className="text-gray-600">{t.visitsB} زيارة</p>
+                              <p className="text-gray-600">{t.conversionsB} تحويل</p>
+                              <p className="font-semibold text-orange-700">{rateB}%</p>
+                            </div>
+                          </div>
+                          {t.status === 'RUNNING' && (
+                            <div className="flex gap-1">
+                              <button
+                                onClick={() => endABTestMutation.mutate({ testId: t.id, winnerId: t.landingPageA.id })}
+                                className="flex-1 bg-blue-600 text-white rounded py-1 text-xs"
+                              >
+                                A فائز
+                              </button>
+                              <button
+                                onClick={() => endABTestMutation.mutate({ testId: t.id, winnerId: t.landingPageB.id })}
+                                className="flex-1 bg-orange-600 text-white rounded py-1 text-xs"
+                              >
+                                B فائز
+                              </button>
+                              <button
+                                onClick={() => endABTestMutation.mutate({ testId: t.id })}
+                                className="flex-1 border rounded py-1 text-xs"
+                              >
+                                إنهاء
+                              </button>
+                            </div>
+                          )}
+                          {t.winnerId && (
+                            <p className="text-center text-green-700 font-semibold">
+                              الفائز: {t.winnerId === t.landingPageA.id ? 'A' : 'B'}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Create new test */}
+                <div className="border rounded p-3 space-y-2">
+                  <p className="text-xs font-semibold">اختبار جديد</p>
+                  <p className="text-xs text-gray-400">هذه الصفحة = النسخة A</p>
+                  <select
+                    value={abTestPageBId}
+                    onChange={(e) => setAbTestPageBId(e.target.value)}
+                    className="w-full border rounded px-2 py-1.5 text-xs"
+                  >
+                    <option value="">اختر النسخة B...</option>
+                    {otherPages.map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))}
+                  </select>
+                  <div>
+                    <label className="text-xs text-gray-500">نسبة الترافيك لـ A: {abTestSplit}%</label>
+                    <input
+                      type="range"
+                      min={10}
+                      max={90}
+                      step={10}
+                      value={abTestSplit}
+                      onChange={(e) => setAbTestSplit(Number(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                  <button
+                    onClick={() => createABTestMutation.mutate()}
+                    disabled={!abTestPageBId || createABTestMutation.isPending}
+                    className="w-full bg-purple-600 text-white rounded py-1.5 text-xs disabled:opacity-50"
+                  >
+                    {createABTestMutation.isPending ? 'جاري الإنشاء...' : 'بدء الاختبار'}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {showVersions && (
               <div className="p-4">
                 <h3 className="font-semibold mb-3">سجل الإصدارات</h3>

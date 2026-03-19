@@ -1,10 +1,9 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import * as lpService from '../services/landing-page.service';
+import { prisma } from '../../../db';
 
 const router = Router();
-
-const API_BASE = process.env.API_BASE_URL || 'http://localhost:4000/api/v1';
 
 function getFormScript(landingPageId: string) {
   return `
@@ -21,7 +20,7 @@ document.getElementById('lp-form').addEventListener('submit', async (e) => {
   data._utm_content = urlParams.get('utm_content') || '';
   data._landing_page_id = '${landingPageId}';
   try {
-    const res = await fetch('${API_BASE}/lp/submit/${landingPageId}', {
+    const res = await fetch('/lp/submit/${landingPageId}', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
@@ -67,6 +66,13 @@ router.get('/:brand/:slug', async (req: Request, res: Response) => {
         variant === 'A'
           ? abTest.landingPageA.html
           : abTest.landingPageB.html;
+
+      // Track A/B visit
+      const visitField = variant === 'A' ? 'visitsA' : 'visitsB';
+      await prisma.aBTest.update({
+        where: { id: abTest.id },
+        data: { [visitField]: { increment: 1 } },
+      });
     }
 
     // Inject form submission script
@@ -99,6 +105,21 @@ router.post('/submit/:landingPageId', async (req: Request, res: Response) => {
       String(req.params.landingPageId),
       formData
     );
+
+    // Track A/B conversion
+    if (!result.duplicate) {
+      const abTest = await lpService.getActiveABTest(String(req.params.landingPageId));
+      if (abTest) {
+        const convField =
+          abTest.landingPageAId === String(req.params.landingPageId)
+            ? 'conversionsA'
+            : 'conversionsB';
+        await prisma.aBTest.update({
+          where: { id: abTest.id },
+          data: { [convField]: { increment: 1 } },
+        });
+      }
+    }
 
     res.json({ success: true });
   } catch (err: any) {
