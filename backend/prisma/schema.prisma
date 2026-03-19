@@ -52,6 +52,8 @@ model User {
   ideaComments          IdeaComment[]       @relation("IdeaCommenter")
   competitorReferences  CompetitorReference[] @relation("CompetitorAdder")
   assignedScripts       Script[]            @relation("ScriptAssignee")
+  createdPosts          ScheduledPost[]     @relation("PostCreator")
+  createdLandingPages   LandingPage[]       @relation("LandingPageCreator")
 
   @@map("users")
 }
@@ -555,20 +557,19 @@ model MktProduct {
 }
 
 enum CreativeType {
-  IMAGE
-  VIDEO
-  CAROUSEL
   REEL
+  VIDEO
+  STORY
+  IMAGE
+  SESSION
 }
 
 enum CreativeStatus {
-  REQUESTED
-  IN_PRODUCTION
-  DONE
-  PUBLISHED
+  ACTIVE
   TESTING
   WINNER
   LOSER
+  PAUSED
 }
 
 model Creative {
@@ -583,17 +584,19 @@ model Creative {
   project      MktProject     @relation(fields: [projectId], references: [id])
   productId    String?        @map("product_id")
   product      MktProduct?    @relation(fields: [productId], references: [id])
-  language     String         @default("ar")
-  creatorId    String         @map("creator_id")
-  creator      User           @relation("CreativeCreator", fields: [creatorId], references: [id])
-  status       CreativeStatus @default(REQUESTED)
+  language         String         @default("ar")
+  photographerName String?        @map("photographer_name")
+  creatorId        String         @map("creator_id")
+  creator          User           @relation("CreativeCreator", fields: [creatorId], references: [id])
+  status           CreativeStatus @default(ACTIVE)
   requestId    String?        @map("request_id")
   request      CreativeRequest? @relation(fields: [requestId], references: [id])
   createdAt    DateTime       @default(now()) @map("created_at")
   updatedAt    DateTime       @updatedAt @map("updated_at")
 
-  tags         CreativeTag[]
-  performances CreativePerformance[]
+  tags           CreativeTag[]
+  performances   CreativePerformance[]
+  scheduledPosts ScheduledPost[]
 
   @@index([projectId])
   @@index([status])
@@ -816,4 +819,307 @@ model ScriptVersion {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("mkt_script_versions")
+}
+
+// --- Publishing & Social Pages ---
+
+model Brand {
+  id        String       @id @default(uuid())
+  name      String       @unique // "Print In", "Picked In", "Choroida"
+  slug      String       @unique
+  language  String       @default("ar") // "ar" | "en"
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+
+  pages        SocialPage[]
+  adAccounts   AdAccount[]
+  landingPages LandingPage[]
+
+  @@map("mkt_brands")
+}
+
+model SocialPage {
+  id           String    @id @default(uuid())
+  platform     String    // "facebook", "instagram", "tiktok"
+  pageId       String    @map("page_id") // platform's page/account ID
+  pageName     String    @map("page_name")
+  accessToken  String    @map("access_token") // encrypted with AES-256-GCM
+  refreshToken String?   @map("refresh_token") // encrypted with AES-256-GCM
+  tokenExpiry  DateTime? @map("token_expiry")
+  brandId      String    @map("brand_id")
+  brand        Brand     @relation(fields: [brandId], references: [id])
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  postPages ScheduledPostPage[]
+
+  @@unique([platform, pageId])
+  @@map("mkt_social_pages")
+}
+
+enum PostType {
+  POST
+  STORY
+  REEL
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+model ScheduledPost {
+  id           String     @id @default(uuid())
+  creativeId   String?    @map("creative_id") // linked creative from library
+  creative     Creative?  @relation(fields: [creativeId], references: [id])
+  caption      String     // post text/description
+  mediaUrl     String?    @map("media_url") // Google Drive URL or direct URL
+  postType     PostType   @default(POST) @map("post_type")
+  scheduledAt  DateTime   @map("scheduled_at")
+  status       PostStatus @default(DRAFT)
+  publishedAt  DateTime?  @map("published_at")
+  publishedIds Json?      @map("published_ids") // { facebook: "post_123", instagram: "media_456" }
+  error        String?
+  createdBy    String     @map("created_by")
+  creator      User       @relation("PostCreator", fields: [createdBy], references: [id])
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  pages ScheduledPostPage[]
+
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("mkt_scheduled_posts")
+}
+
+model ScheduledPostPage {
+  id              String        @id @default(uuid())
+  scheduledPostId String        @map("scheduled_post_id")
+  scheduledPost   ScheduledPost @relation(fields: [scheduledPostId], references: [id], onDelete: Cascade)
+  socialPageId    String        @map("social_page_id")
+  socialPage      SocialPage    @relation(fields: [socialPageId], references: [id])
+  publishedId     String?       @map("published_id") // platform's post ID after publishing
+  status          PostStatus    @default(DRAFT)
+  error           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@unique([scheduledPostId, socialPageId])
+  @@map("mkt_scheduled_post_pages")
+}
+
+// =============================================================
+// MARKETING: Media Buying — حسابات الإعلانات والحملات والأداء
+// =============================================================
+
+model AdAccount {
+  id           String    @id @default(uuid())
+  platform     String    // "meta", "google", "tiktok", "snapchat"
+  accountId    String    @map("account_id") // platform's account ID
+  accountName  String    @map("account_name")
+  accessToken  String    @map("access_token") // encrypted with AES-256-GCM
+  refreshToken String?   @map("refresh_token") // encrypted with AES-256-GCM
+  tokenExpiry  DateTime? @map("token_expiry")
+  brandId      String    @map("brand_id")
+  brand        Brand     @relation(fields: [brandId], references: [id])
+  isActive     Boolean   @default(true) @map("is_active")
+  lastSyncAt   DateTime? @map("last_sync_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  campaigns Campaign[]
+  syncLogs  SyncLog[]
+
+  @@unique([platform, accountId])
+  @@map("mkt_ad_accounts")
+}
+
+model Campaign {
+  id          String     @id @default(uuid())
+  adAccountId String     @map("ad_account_id")
+  adAccount   AdAccount  @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  platformId  String     @map("platform_id") // campaign ID on the platform
+  name        String
+  status      String     // ACTIVE, PAUSED, COMPLETED
+  objective   String?    // CONVERSIONS, TRAFFIC, etc.
+  budget      Float?
+  startDate   DateTime?  @map("start_date")
+  endDate     DateTime?  @map("end_date")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  adSets  AdSet[]
+  metrics AdMetric[]
+
+  @@unique([adAccountId, platformId])
+  @@map("mkt_campaigns")
+}
+
+model AdSet {
+  id         String   @id @default(uuid())
+  campaignId String   @map("campaign_id")
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  platformId String   @map("platform_id")
+  name       String
+  status     String
+  targeting  Json?    // audience targeting details
+  budget     Float?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  ads     Ad[]
+  metrics AdMetric[]
+
+  @@unique([campaignId, platformId])
+  @@map("mkt_ad_sets")
+}
+
+model Ad {
+  id           String @id @default(uuid())
+  adSetId      String @map("ad_set_id")
+  adSet        AdSet  @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+  platformId   String @map("platform_id")
+  name         String // should contain creative code for UTM tracking
+  status       String
+  creativeCode String? @map("creative_code") // extracted from ad name (e.g., "1-2-3-001")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  metrics AdMetric[]
+
+  @@unique([adSetId, platformId])
+  @@map("mkt_ads")
+}
+
+model AdMetric {
+  id          String    @id @default(uuid())
+  date        DateTime
+  adAccountId String?   @map("ad_account_id")
+  campaignId  String?   @map("campaign_id")
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  adSetId     String?   @map("ad_set_id")
+  adSet       AdSet?    @relation(fields: [adSetId], references: [id], onDelete: Cascade)
+  adId        String?   @map("ad_id")
+  ad          Ad?       @relation(fields: [adId], references: [id], onDelete: Cascade)
+  impressions Int       @default(0)
+  clicks      Int       @default(0)
+  spend       Float     @default(0)
+  conversions Int       @default(0)
+  leads       Int       @default(0)
+  purchases   Int       @default(0)
+  revenue     Float     @default(0)
+  ctr         Float?    // clicks/impressions
+  cpc         Float?    // spend/clicks
+  cpl         Float?    // spend/leads
+  cpa         Float?    // spend/purchases
+  roas        Float?    // revenue/spend
+
+  @@unique([date, adId])
+  @@index([date])
+  @@index([campaignId])
+  @@map("mkt_ad_metrics")
+}
+
+model SyncLog {
+  id             String    @id @default(uuid())
+  adAccountId    String    @map("ad_account_id")
+  adAccount      AdAccount @relation(fields: [adAccountId], references: [id], onDelete: Cascade)
+  syncType       String    @map("sync_type") // "incremental" | "full"
+  status         String    // "success" | "failed" | "in_progress"
+  recordsUpdated Int       @default(0) @map("records_updated")
+  error          String?
+  duration       Int?      // milliseconds
+  startedAt      DateTime  @default(now()) @map("started_at")
+  completedAt    DateTime? @map("completed_at")
+
+  @@map("mkt_sync_logs")
+}
+
+// =============================================================
+// MARKETING: Landing Pages — صفحات الهبوط وبيلدر الـ AI
+// =============================================================
+
+enum LandingPageStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ABTestStatus {
+  RUNNING
+  COMPLETED
+  CANCELLED
+}
+
+model LandingPage {
+  id          String            @id @default(uuid())
+  title       String
+  slug        String            @unique
+  brandId     String            @map("brand_id")
+  brand       Brand             @relation(fields: [brandId], references: [id])
+  productId   String?           @map("product_id") // optional link to MktProduct
+  html        String            // current published HTML
+  css         String?           // optional separate CSS
+  status      LandingPageStatus @default(DRAFT)
+  createdBy   String            @map("created_by")
+  creator     User              @relation("LandingPageCreator", fields: [createdBy], references: [id])
+  publishedAt DateTime?         @map("published_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  versions      LandingPageVersion[]
+  fieldMappings FormFieldMapping[]
+  abTestsA      ABTest[]             @relation("ABTestPageA")
+  abTestsB      ABTest[]             @relation("ABTestPageB")
+
+  @@index([brandId])
+  @@index([status])
+  @@map("mkt_landing_pages")
+}
+
+model LandingPageVersion {
+  id            String      @id @default(uuid())
+  landingPageId String      @map("landing_page_id")
+  landingPage   LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+  versionNumber Int         @map("version_number")
+  html          String
+  css           String?
+  editPrompt    String?     @map("edit_prompt") // AI prompt that generated this version
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@unique([landingPageId, versionNumber])
+  @@map("mkt_landing_page_versions")
+}
+
+model FormFieldMapping {
+  id            String      @id @default(uuid())
+  landingPageId String      @map("landing_page_id")
+  landingPage   LandingPage @relation(fields: [landingPageId], references: [id], onDelete: Cascade)
+  formFieldName String      @map("form_field_name") // field name in the HTML form
+  leadField     String      @map("lead_field")       // mapped Lead model field (name, phone, email, etc.)
+
+  @@unique([landingPageId, formFieldName])
+  @@map("mkt_form_field_mappings")
+}
+
+model ABTest {
+  id             String       @id @default(uuid())
+  landingPageAId String       @map("landing_page_a_id")
+  landingPageA   LandingPage  @relation("ABTestPageA", fields: [landingPageAId], references: [id])
+  landingPageBId String       @map("landing_page_b_id")
+  landingPageB   LandingPage  @relation("ABTestPageB", fields: [landingPageBId], references: [id])
+  trafficSplit   Int          @default(50) @map("traffic_split") // percentage for page A
+  status         ABTestStatus @default(RUNNING)
+  winnerId       String?      @map("winner_id")
+  visitsA        Int          @default(0) @map("visits_a")
+  visitsB        Int          @default(0) @map("visits_b")
+  conversionsA   Int          @default(0) @map("conversions_a")
+  conversionsB   Int          @default(0) @map("conversions_b")
+  startedAt      DateTime     @default(now()) @map("started_at")
+  completedAt    DateTime?    @map("completed_at")
+
+  @@map("mkt_ab_tests")
 }

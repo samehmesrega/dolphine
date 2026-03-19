@@ -1,10 +1,35 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCreativeCodeConfig, getProjects, createProject } from '../services/marketing-api';
+import { getCreativeCodeConfig, getProjects, createProject, getAdAccounts, disconnectAdAccount, getMetaOAuthUrl, getMetaAvailableAccounts, connectMetaExisting, getBrands, getSyncSchedule, setSyncSchedule } from '../services/marketing-api';
 import { useState } from 'react';
+
+const PLATFORMS = [
+  { key: 'all', label: 'الكل' },
+  { key: 'meta', label: 'ميتا' },
+  { key: 'google', label: 'جوجل' },
+  { key: 'tiktok', label: 'تيك توك' },
+  { key: 'snapchat', label: 'سناب شات' },
+];
+
+const PLATFORM_COLORS: Record<string, string> = {
+  meta: 'bg-blue-100 text-blue-700',
+  google: 'bg-red-100 text-red-700',
+  tiktok: 'bg-slate-800 text-white',
+  snapchat: 'bg-yellow-100 text-yellow-700',
+};
+
+const PLATFORM_LABELS: Record<string, string> = {
+  meta: 'ميتا',
+  google: 'جوجل',
+  tiktok: 'تيك توك',
+  snapchat: 'سناب شات',
+};
 
 export default function MarketingSettings() {
   const qc = useQueryClient();
   const [newProject, setNewProject] = useState({ name: '', slug: '', language: 'ar' });
+  const [activePlatform, setActivePlatform] = useState('all');
+  const [brandSelect, setBrandSelect] = useState<Record<string, string>>({});
+  const [connectingId, setConnectingId] = useState<string | null>(null);
 
   const { data: configData } = useQuery({
     queryKey: ['marketing', 'creative-code-config'],
@@ -16,20 +41,212 @@ export default function MarketingSettings() {
     queryFn: () => getProjects(),
   });
 
+  const { data: brandsData } = useQuery({
+    queryKey: ['marketing', 'brands'],
+    queryFn: () => getBrands(),
+  });
+
+  const [projectError, setProjectError] = useState('');
+
   const createProjectMutation = useMutation({
     mutationFn: () => createProject(newProject),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['marketing', 'projects'] });
       setNewProject({ name: '', slug: '', language: 'ar' });
+      setProjectError('');
     },
+    onError: (err: any) => {
+      setProjectError(err.response?.data?.error || 'حدث خطأ في إنشاء المشروع');
+    },
+  });
+
+  const { data: metaAvailableData, isLoading: metaLoading } = useQuery({
+    queryKey: ['marketing', 'meta-available-accounts'],
+    queryFn: () => getMetaAvailableAccounts(),
+    retry: false,
+  });
+
+  const { data: adAccountsData, isLoading: adAccountsLoading } = useQuery({
+    queryKey: ['marketing', 'ad-accounts'],
+    queryFn: () => getAdAccounts(),
+    enabled: !metaAvailableData,
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: (id: string) => disconnectAdAccount(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['marketing', 'ad-accounts'] });
+      qc.invalidateQueries({ queryKey: ['marketing', 'meta-available-accounts'] });
+    },
+  });
+
+  const connectExistingMutation = useMutation({
+    mutationFn: (data: { accountId: string; accountName: string; brandId: string }) =>
+      connectMetaExisting(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['marketing', 'meta-available-accounts'] });
+      setConnectingId(null);
+    },
+  });
+
+  const handleMetaConnect = async () => {
+    const res = await getMetaOAuthUrl();
+    window.location.href = res.data.url;
+  };
+
+  const { data: syncScheduleData } = useQuery({
+    queryKey: ['marketing', 'sync-schedule'],
+    queryFn: () => getSyncSchedule(),
+  });
+
+  const [scheduleForm, setScheduleForm] = useState<{ enabled: boolean; unit: string; value: number } | null>(null);
+  const schedule = scheduleForm ?? (syncScheduleData?.data?.schedule || { enabled: false, unit: 'hours', value: 6 });
+
+  const saveScheduleMutation = useMutation({
+    mutationFn: () => setSyncSchedule(schedule),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['marketing', 'sync-schedule'] }),
   });
 
   const config = configData?.data?.config;
   const projects = projectsData?.data?.projects ?? [];
+  const brands: any[] = brandsData?.data?.brands ?? [];
+
+  // Use meta-available-accounts if we have any connected account, otherwise fall back to connected-only list
+  const metaAccounts: any[] = metaAvailableData?.data?.accounts ?? [];
+  const hasMetaAvailable = metaAccounts.length > 0;
+  const connectedOnlyAccounts: any[] = adAccountsData?.data?.accounts ?? [];
+
+  // Build display list
+  const allDisplayAccounts = hasMetaAvailable
+    ? metaAccounts.map((a: any) => ({ ...a, platform: 'meta' }))
+    : connectedOnlyAccounts;
+
+  const isLoading = hasMetaAvailable ? metaLoading : adAccountsLoading;
+
+  const filteredAccounts = activePlatform === 'all'
+    ? allDisplayAccounts
+    : allDisplayAccounts.filter((a: any) => a.platform === activePlatform);
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-800">إعدادات التسويق</h1>
+
+      {/* Ad Accounts */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">حسابات الإعلانات</h2>
+
+        {/* Platform Tabs */}
+        <div className="flex gap-1 border-b border-slate-200 mb-4">
+          {PLATFORMS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setActivePlatform(p.key)}
+              className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors ${
+                activePlatform === p.key
+                  ? 'bg-blue-600 text-white'
+                  : 'text-slate-600 hover:text-slate-800 hover:bg-slate-50'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Accounts List */}
+        <div className="space-y-2 mb-4">
+          {isLoading ? (
+            <p className="text-sm text-slate-400 py-4 text-center">جاري التحميل...</p>
+          ) : filteredAccounts.length === 0 ? (
+            <p className="text-sm text-slate-400 py-4 text-center">لا توجد حسابات</p>
+          ) : (
+            filteredAccounts.map((account: any) => {
+              const isConnected = account.isConnected !== undefined ? account.isConnected : true;
+              const accountKey = account.accountId ?? account.id;
+              return (
+                <div key={accountKey} className="flex items-center justify-between bg-slate-50 rounded-lg p-3">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${PLATFORM_COLORS[account.platform] ?? 'bg-slate-100 text-slate-600'}`}>
+                      {PLATFORM_LABELS[account.platform] ?? account.platform}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{account.accountName ?? account.name}</p>
+                      <p className="text-xs text-slate-400">{account.accountId}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {isConnected ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                        <span className="text-xs text-slate-500">مربوط{account.brandName ? ` · ${account.brandName}` : ''}</span>
+                        <button
+                          onClick={() => disconnectMutation.mutate(account.connectedId ?? account.id)}
+                          disabled={disconnectMutation.isPending}
+                          className="px-3 py-1 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                        >
+                          فك الربط
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-slate-300" />
+                        <select
+                          value={brandSelect[accountKey] ?? ''}
+                          onChange={(e) => setBrandSelect((prev) => ({ ...prev, [accountKey]: e.target.value }))}
+                          className="border rounded-lg px-2 py-1 text-xs text-slate-700"
+                        >
+                          <option value="">اختر البراند</option>
+                          {brands.map((b: any) => (
+                            <option key={b.id} value={b.id}>{b.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => {
+                            const brandId = brandSelect[accountKey];
+                            if (!brandId) return;
+                            setConnectingId(accountKey);
+                            connectExistingMutation.mutate({
+                              accountId: account.accountId,
+                              accountName: account.name,
+                              brandId,
+                            });
+                          }}
+                          disabled={!brandSelect[accountKey] || connectingId === accountKey}
+                          className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 disabled:opacity-50"
+                        >
+                          {connectingId === accountKey ? 'جاري...' : 'ربط'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Connect Buttons */}
+        <div className="border-t border-slate-100 pt-4">
+          <p className="text-xs text-slate-500 mb-3">ربط حساب جديد:</p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={handleMetaConnect}
+              className="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+            >
+              <span>+ ربط ميتا</span>
+            </button>
+            {['google', 'tiktok', 'snapchat'].map((p) => (
+              <button
+                key={p}
+                disabled
+                className="px-4 py-2 text-sm border border-slate-200 text-slate-400 rounded-lg flex items-center gap-2 cursor-not-allowed"
+              >
+                <span>+ ربط {PLATFORM_LABELS[p]}</span>
+                <span className="text-xs bg-slate-100 px-1.5 py-0.5 rounded">قريباً</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* Projects */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
@@ -61,11 +278,70 @@ export default function MarketingSettings() {
             <option value="en">English</option>
           </select>
           <button
-            onClick={() => newProject.name && createProjectMutation.mutate()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
+            onClick={() => {
+              if (!newProject.name.trim()) return;
+              setProjectError('');
+              createProjectMutation.mutate();
+            }}
+            disabled={createProjectMutation.isPending || !newProject.name.trim()}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
           >
-            إضافة
+            {createProjectMutation.isPending ? 'جاري...' : 'إضافة'}
           </button>
+        </div>
+        {projectError && (
+          <p className="text-sm text-red-600 bg-red-50 p-2 rounded mt-2">{projectError}</p>
+        )}
+      </div>
+
+      {/* Auto Sync Schedule */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">جدول المزامنة التلقائية</h2>
+        <div className="space-y-4">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div
+              onClick={() => setScheduleForm({ ...schedule, enabled: !schedule.enabled })}
+              className={`relative w-11 h-6 rounded-full transition-colors ${schedule.enabled ? 'bg-blue-600' : 'bg-slate-300'}`}
+            >
+              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${schedule.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </div>
+            <span className="text-sm text-slate-700">تفعيل المزامنة التلقائية</span>
+          </label>
+
+          {schedule.enabled && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-slate-600">كل</span>
+              <input
+                type="number"
+                min={1}
+                value={schedule.value}
+                onChange={(e) => setScheduleForm({ ...schedule, value: Number(e.target.value) })}
+                className="border rounded-lg px-3 py-2 text-sm w-20"
+              />
+              <select
+                value={schedule.unit}
+                onChange={(e) => setScheduleForm({ ...schedule, unit: e.target.value })}
+                className="border rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="minutes">دقائق</option>
+                <option value="hours">ساعات</option>
+                <option value="days">أيام</option>
+                <option value="months">أشهر</option>
+                <option value="years">سنوات</option>
+              </select>
+            </div>
+          )}
+
+          <button
+            onClick={() => saveScheduleMutation.mutate()}
+            disabled={saveScheduleMutation.isPending}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saveScheduleMutation.isPending ? 'جاري الحفظ...' : 'حفظ الإعدادات'}
+          </button>
+          {saveScheduleMutation.isSuccess && (
+            <p className="text-xs text-green-600">تم الحفظ ✓</p>
+          )}
         </div>
       </div>
 

@@ -83,7 +83,7 @@ app.use(express.urlencoded({ extended: true }));
 // ===== Rate Limiting =====
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 300,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'طلبات كثيرة جداً، حاول بعد قليل' },
@@ -135,6 +135,9 @@ app.use('/api/v1/leads', authMiddleware, leadsRoutes);
 // Marketing module
 app.use('/api/v1/marketing', authMiddleware, marketingRoutes);
 app.use('/api/marketing', authMiddleware, marketingRoutes);
+
+// Landing Pages (public routes — no auth)
+app.use('/lp', require('./modules/marketing/routes/lp-public').default);
 
 // Webhooks (public, rate-limited)
 // Keeping old path for backwards compatibility with WordPress plugins

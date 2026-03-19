@@ -14,6 +14,23 @@ interface CreateCreativeInput {
   requestId?: string;
   tagIds?: string[];
   codeSegments: Record<string, string>;
+  photographerName?: string;
+}
+
+function extractDriveFileId(url: string): string | null {
+  if (!url) return null;
+  // Format: /file/d/FILE_ID or /file/u/0/d/FILE_ID
+  const m1 = url.match(/\/file(?:\/u\/\d+)?\/d\/([a-zA-Z0-9_-]+)/);
+  if (m1) return m1[1];
+  const m2 = url.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (m2) return m2[1];
+  return null;
+}
+
+function generateDriveThumbnailUrl(driveUrl: string): string | null {
+  const fileId = extractDriveFileId(driveUrl);
+  if (!fileId) return null;
+  return `https://lh3.googleusercontent.com/d/${fileId}=w400`;
 }
 
 interface ListCreativesInput {
@@ -31,6 +48,8 @@ interface ListCreativesInput {
 export async function createCreative(input: CreateCreativeInput) {
   const code = await generateCreativeCode(input.codeSegments);
 
+  const thumbnailUrl = input.driveUrl ? generateDriveThumbnailUrl(input.driveUrl) : undefined;
+
   const creative = await prisma.creative.create({
     data: {
       code,
@@ -38,9 +57,11 @@ export async function createCreative(input: CreateCreativeInput) {
       description: input.description,
       type: input.type,
       driveUrl: input.driveUrl,
+      thumbnailUrl: thumbnailUrl ?? undefined,
       projectId: input.projectId,
       productId: input.productId,
       language: input.language,
+      photographerName: input.photographerName,
       creatorId: input.creatorId,
       requestId: input.requestId,
       tags: input.tagIds?.length

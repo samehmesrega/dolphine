@@ -43,7 +43,9 @@ export async function generateCreativeCode(
   for (const seg of sortedSegments) {
     const selectedCode = segmentSelections[seg.name];
     if (!selectedCode) {
-      throw new Error(`Missing segment selection for "${seg.name}"`);
+      // Skip optional segments (e.g. Product when none selected)
+      prefixParts.push('0');
+      continue;
     }
     const valid = seg.values.find((v) => v.code === selectedCode);
     if (!valid) {
@@ -52,22 +54,23 @@ export async function generateCreativeCode(
     prefixParts.push(selectedCode);
   }
 
-  const prefix = prefixParts.join(config.separator);
+  // Always join without separator — code is a plain number like 111001
+  const prefix = prefixParts.join('');
 
   // Find the next sequence number for this prefix
   const lastCreative = await prisma.creative.findFirst({
-    where: { code: { startsWith: prefix + config.separator } },
+    where: { code: { startsWith: prefix } },
     orderBy: { code: 'desc' },
   });
 
   let seq = 1;
   if (lastCreative) {
-    const lastSeq = lastCreative.code.split(config.separator).pop();
+    const lastSeq = lastCreative.code.slice(prefix.length);
     if (lastSeq) {
       seq = parseInt(lastSeq, 10) + 1;
     }
   }
 
   const seqStr = String(seq).padStart(config.seqDigits, '0');
-  return `${prefix}${config.separator}${seqStr}`;
+  return `${prefix}${seqStr}`;
 }

@@ -43,7 +43,17 @@ function AppRoutes() {
         }
       />
 
-      {/* Protected routes */}
+      {/* Module switcher (homepage — no sidebar) */}
+      <Route
+        path="/"
+        element={
+          <PrivateRoute>
+            <ModuleSwitcher />
+          </PrivateRoute>
+        }
+      />
+
+      {/* Leads module (with AppShell sidebar) */}
       <Route
         element={
           <PrivateRoute>
@@ -51,9 +61,6 @@ function AppRoutes() {
           </PrivateRoute>
         }
       >
-        {/* Module switcher (homepage) */}
-        <Route path="/" element={<ModuleSwitcher />} />
-
         {/* Leads module */}
         <Route
           path="/leads/*"

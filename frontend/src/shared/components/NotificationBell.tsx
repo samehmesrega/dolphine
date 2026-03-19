@@ -68,6 +68,12 @@ export default function NotificationBell() {
     if (n.entity === 'lead' && n.entityId) return `/leads/${n.entityId}`;
     if (n.entity === 'order' && n.entityId) return `/orders/${n.entityId}`;
     if (n.type === 'order_pending_accounts') return '/orders-pending';
+    // Marketing module links
+    if (n.entity === 'creative' && n.entityId) return `/marketing/creatives/${n.entityId}`;
+    if (n.entity === 'creative_request') return `/marketing/requests`;
+    if (n.entity === 'landing_page' && n.entityId) return `/marketing/landing-pages/${n.entityId}`;
+    if (n.entity === 'campaign') return `/marketing/media-buying`;
+    if (n.entity === 'script') return `/marketing/scripts`;
     return null;
   };
 

@@ -18,11 +18,11 @@ export default function Login() {
     try {
       const { data } = await api.post('/auth/login', { email, password });
       login(data.token, data.user);
-      navigate('/dashboard');
+      navigate('/');
     } catch (err: any) {
       const msg = err.response?.data?.error
         || (err.response?.status === 500 && 'خطأ في الخادم. تحقق من تشغيل الـ Backend وقاعدة البيانات.')
-        || (err.code === 'ERR_NETWORK' && 'لا يمكن الاتصال بالسيرفر. تأكد أن الـ Backend يعمل على المنفذ 3001.')
+        || (err.code === 'ERR_NETWORK' && 'لا يمكن الاتصال بالسيرفر. تأكد أن الـ Backend يعمل على المنفذ 4000.')
         || err.message
         || 'حدث خطأ في تسجيل الدخول';
       setError(msg);
