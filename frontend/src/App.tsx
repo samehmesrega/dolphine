@@ -43,15 +43,8 @@ function AppRoutes() {
         }
       />
 
-      {/* Module switcher (homepage — no sidebar) */}
-      <Route
-        path="/"
-        element={
-          <PrivateRoute>
-            <ModuleSwitcher />
-          </PrivateRoute>
-        }
-      />
+      {/* Module switcher / landing page (public) */}
+      <Route path="/" element={<ModuleSwitcher />} />
 
       {/* Leads module (with AppShell sidebar) */}
       <Route
