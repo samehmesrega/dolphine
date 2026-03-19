@@ -28,11 +28,6 @@ function getDriveThumbnail(url: string): string | null {
   return fileId ? `https://lh3.googleusercontent.com/d/${fileId}=w600` : null;
 }
 
-function getDriveVideoUrl(url: string): string | null {
-  const fileId = extractDriveFileId(url);
-  return fileId ? `https://drive.google.com/uc?export=view&id=${fileId}` : null;
-}
-
 function getDrivePreviewUrl(url: string): string | null {
   const fileId = extractDriveFileId(url);
   return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : null;

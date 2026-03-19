@@ -48,12 +48,6 @@ function getDriveThumbnail(url: string): string | null {
   return `https://lh3.googleusercontent.com/d/${fileId}=w400`;
 }
 
-function getDriveVideoUrl(url: string): string | null {
-  const fileId = extractDriveFileId(url);
-  if (!fileId) return null;
-  return `https://drive.google.com/uc?export=view&id=${fileId}`;
-}
-
 function getDrivePreviewUrl(url: string): string | null {
   const fileId = extractDriveFileId(url);
   if (!fileId) return null;

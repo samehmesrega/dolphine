@@ -367,7 +367,7 @@ export default function ReportsPage() {
                 <XAxis dataKey="date" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} allowDecimals={false} />
                 <Tooltip
-                  formatter={(v: number | undefined) => [v ?? 0, 'عدد الليدز']}
+                  formatter={(v: any) => [Number(v) || 0, 'عدد الليدز']}
                   labelFormatter={(l) => `التاريخ: ${l}`}
                 />
                 <Bar dataKey="count" name="ليدز" fill="#0d9488" radius={[4, 4, 0, 0]} />
@@ -401,7 +401,7 @@ export default function ReportsPage() {
                     <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number | undefined) => [v ?? 0, 'العدد']} />
+                <Tooltip formatter={(v: any) => [Number(v) || 0, 'العدد']} />
                 <Legend />
               </PieChart>
             </ResponsiveContainer>

@@ -96,7 +96,7 @@ export default function GeneralReports() {
                 <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
                 <Tooltip
-                  formatter={(v: number | undefined) => [v ?? 0, 'عدد الليدز']}
+                  formatter={(v: any) => [Number(v) || 0, 'عدد الليدز']}
                   labelFormatter={(l) => `التاريخ: ${l}`}
                 />
                 <Line
