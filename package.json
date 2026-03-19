@@ -14,7 +14,8 @@
     "db:seed": "pnpm --filter backend db:seed",
     "db:studio": "pnpm --filter backend db:studio",
     "lint": "pnpm -r lint",
-    "test": "pnpm -r test"
+    "test": "pnpm -r test",
+    "start": "node backend/dist/index.js"
   },
   "engines": {
     "node": ">=18",

@@ -1,0 +1,40 @@
+services:
+  - type: web
+    name: dolphin-platform
+    runtime: node
+    buildCommand: |
+      npm install -g pnpm &&
+      pnpm install --frozen-lockfile &&
+      pnpm build
+    startCommand: node backend/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "4000"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: "15m"
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: "7d"
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: WOOCOMMERCE_BASE_URL
+        sync: false
+      - key: WOOCOMMERCE_CONSUMER_KEY
+        sync: false
+      - key: WOOCOMMERCE_CONSUMER_SECRET
+        sync: false
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+
+databases:
+  - name: dolphin-db
+    plan: free
+    databaseName: dolphin_platform
+    user: dolphin
