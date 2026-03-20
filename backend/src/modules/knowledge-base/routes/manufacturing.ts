@@ -7,7 +7,7 @@ import * as manufacturingService from '../services/kb-manufacturing.service';
 const router = Router({ mergeParams: true });
 
 // GET /api/v1/knowledge-base/products/:productId/manufacturing
-router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const manufacturing = await manufacturingService.getManufacturing(String(req.params.productId));
     res.json({ manufacturing });
@@ -17,7 +17,7 @@ router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Resp
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/manufacturing
-router.put('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/', async (req: AuthRequest, res: Response) => {
   try {
     const manufacturing = await manufacturingService.upsertManufacturing(
       String(req.params.productId),
@@ -30,7 +30,7 @@ router.put('/', requirePermission('kb.product.edit'), async (req: AuthRequest, r
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/manufacturing
-router.delete('/', requirePermission('kb.admin'), async (req: AuthRequest, res: Response) => {
+router.delete('/', async (req: AuthRequest, res: Response) => {
   try {
     await manufacturingService.deleteManufacturing(String(req.params.productId));
     res.json({ success: true });

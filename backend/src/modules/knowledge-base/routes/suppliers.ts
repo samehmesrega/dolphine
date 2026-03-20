@@ -7,7 +7,7 @@ import * as supplierService from '../services/kb-supplier.service';
 const router = Router({ mergeParams: true });
 
 // GET /api/v1/knowledge-base/products/:productId/suppliers
-router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const suppliers = await supplierService.listSuppliers(String(req.params.productId));
     res.json({ suppliers });
@@ -17,7 +17,7 @@ router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Resp
 });
 
 // GET /api/v1/knowledge-base/products/:productId/suppliers/:id
-router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const supplier = await supplierService.getSupplierById(String(req.params.id));
     if (!supplier) return res.status(404).json({ error: 'Supplier not found' });
@@ -28,7 +28,7 @@ router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: R
 });
 
 // POST /api/v1/knowledge-base/products/:productId/suppliers
-router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const supplier = await supplierService.createSupplier({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, 
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/suppliers/:id
-router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const supplier = await supplierService.updateSupplier(String(req.params.id), req.body);
     res.json({ supplier });
@@ -51,7 +51,7 @@ router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/suppliers/:id
-router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     await supplierService.deleteSupplier(String(req.params.id));
     res.json({ success: true });

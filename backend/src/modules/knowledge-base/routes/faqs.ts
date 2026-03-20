@@ -7,7 +7,7 @@ import * as faqService from '../services/kb-faq.service';
 const router = Router({ mergeParams: true });
 
 // GET /api/v1/knowledge-base/products/:productId/faqs
-router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const faqs = await faqService.listFaqs(String(req.params.productId));
     res.json({ faqs });
@@ -17,7 +17,7 @@ router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Resp
 });
 
 // GET /api/v1/knowledge-base/products/:productId/faqs/:id
-router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const faq = await faqService.getFaqById(String(req.params.id));
     if (!faq) return res.status(404).json({ error: 'FAQ not found' });
@@ -28,7 +28,7 @@ router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: R
 });
 
 // POST /api/v1/knowledge-base/products/:productId/faqs
-router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const faq = await faqService.createFaq({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, 
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/faqs/:id
-router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const faq = await faqService.updateFaq(String(req.params.id), req.body);
     res.json({ faq });
@@ -51,7 +51,7 @@ router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/faqs/:id
-router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     await faqService.deleteFaq(String(req.params.id));
     res.json({ success: true });
@@ -61,7 +61,7 @@ router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequ
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/faqs/reorder
-router.put('/reorder', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/reorder', async (req: AuthRequest, res: Response) => {
   try {
     const faqs = await faqService.reorderFaqs(
       String(req.params.productId),

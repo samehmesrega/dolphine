@@ -7,7 +7,7 @@ import * as upsellService from '../services/kb-upsell.service';
 const router = Router({ mergeParams: true });
 
 // GET /api/v1/knowledge-base/products/:productId/upsells
-router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const upsells = await upsellService.listUpsells(String(req.params.productId));
     res.json({ upsells });
@@ -17,7 +17,7 @@ router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Resp
 });
 
 // GET /api/v1/knowledge-base/products/:productId/upsells/:id
-router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const upsell = await upsellService.getUpsellById(String(req.params.id));
     if (!upsell) return res.status(404).json({ error: 'Upsell not found' });
@@ -28,7 +28,7 @@ router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: R
 });
 
 // POST /api/v1/knowledge-base/products/:productId/upsells
-router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const upsell = await upsellService.createUpsell({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, 
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/upsells/:id
-router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const upsell = await upsellService.updateUpsell(String(req.params.id), req.body);
     res.json({ upsell });
@@ -51,7 +51,7 @@ router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/upsells/:id
-router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     await upsellService.deleteUpsell(String(req.params.id));
     res.json({ success: true });

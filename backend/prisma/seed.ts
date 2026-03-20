@@ -123,6 +123,61 @@ async function main() {
     });
   }
 
+  // === Seed Knowledge Base Permissions ===
+  const kbPermissions = [
+    { name: 'KB - View', slug: 'kb.view', module: 'knowledge-base', description: 'عرض بنك المعلومات' },
+    { name: 'KB - Edit Products', slug: 'kb.product.edit', module: 'knowledge-base', description: 'إضافة وتعديل المنتجات' },
+    { name: 'KB - Edit Media', slug: 'kb.media.edit', module: 'knowledge-base', description: 'إدارة الصور والفيديوهات' },
+    { name: 'KB - Edit Manufacturing', slug: 'kb.manufacturing.edit', module: 'knowledge-base', description: 'تعديل بيانات التصنيع والتوريد' },
+    { name: 'KB - Edit Pricing', slug: 'kb.pricing.edit', module: 'knowledge-base', description: 'تعديل الأسعار والفاريشنز' },
+    { name: 'KB - Edit Marketing', slug: 'kb.marketing.edit', module: 'knowledge-base', description: 'تعديل بيانات التسويق' },
+    { name: 'KB - Edit Sales', slug: 'kb.sales.edit', module: 'knowledge-base', description: 'تعديل FAQ والاعتراضات والسكربتات' },
+    { name: 'KB - Edit After Sales', slug: 'kb.aftersales.edit', module: 'knowledge-base', description: 'تعديل بيانات ما بعد البيع' },
+    { name: 'KB - Admin', slug: 'kb.admin', module: 'knowledge-base', description: 'صلاحيات كاملة على بنك المعلومات' },
+  ];
+
+  for (const perm of kbPermissions) {
+    await prisma.permission.upsert({
+      where: { slug: perm.slug },
+      update: {},
+      create: perm,
+    });
+  }
+
+  // Assign all KB permissions to super_admin role (if exists)
+  const superAdminRole = await prisma.role.findUnique({ where: { slug: 'super_admin' } });
+  if (superAdminRole) {
+    for (const perm of kbPermissions) {
+      const permission = await prisma.permission.findUnique({ where: { slug: perm.slug } });
+      if (permission) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: superAdminRole.id, permissionId: permission.id } },
+          update: {},
+          create: { roleId: superAdminRole.id, permissionId: permission.id },
+        });
+      }
+    }
+  }
+
+  // Also assign all KB permissions to any role with slug 'admin' or 'sales_manager'
+  const adminRoles = await prisma.role.findMany({
+    where: { slug: { in: ['admin', 'sales_manager'] } },
+  });
+  for (const role of adminRoles) {
+    for (const perm of kbPermissions) {
+      const permission = await prisma.permission.findUnique({ where: { slug: perm.slug } });
+      if (permission) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+          update: {},
+          create: { roleId: role.id, permissionId: permission.id },
+        });
+      }
+    }
+  }
+
+  console.log(`  - KB permissions: ${kbPermissions.length}`);
+
   // === Seed Marketing Projects ===
   const projects = [
     { name: 'Print In', slug: 'print-in', language: 'ar' },

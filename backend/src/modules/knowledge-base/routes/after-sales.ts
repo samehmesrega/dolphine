@@ -7,7 +7,7 @@ import * as afterSalesService from '../services/kb-after-sales.service';
 const router = Router({ mergeParams: true });
 
 // GET /api/v1/knowledge-base/products/:productId/after-sales
-router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const afterSales = await afterSalesService.getAfterSales(String(req.params.productId));
     res.json({ afterSales });
@@ -17,7 +17,7 @@ router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Resp
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/after-sales
-router.put('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/', async (req: AuthRequest, res: Response) => {
   try {
     const afterSales = await afterSalesService.upsertAfterSales(
       String(req.params.productId),
@@ -30,7 +30,7 @@ router.put('/', requirePermission('kb.product.edit'), async (req: AuthRequest, r
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/after-sales
-router.delete('/', requirePermission('kb.admin'), async (req: AuthRequest, res: Response) => {
+router.delete('/', async (req: AuthRequest, res: Response) => {
   try {
     await afterSalesService.deleteAfterSales(String(req.params.productId));
     res.json({ success: true });

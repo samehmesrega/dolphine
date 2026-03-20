@@ -7,7 +7,7 @@ import * as mediaService from '../services/kb-media.service';
 const router = Router({ mergeParams: true });
 
 // GET /api/v1/knowledge-base/products/:productId/media
-router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const media = await mediaService.listMedia(String(req.params.productId));
     res.json({ media });
@@ -17,7 +17,7 @@ router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Resp
 });
 
 // GET /api/v1/knowledge-base/products/:productId/media/:id
-router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const item = await mediaService.getMediaById(String(req.params.id));
     if (!item) return res.status(404).json({ error: 'Media not found' });
@@ -28,7 +28,7 @@ router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: R
 });
 
 // POST /api/v1/knowledge-base/products/:productId/media
-router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const item = await mediaService.createMedia({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, 
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/media/:id
-router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const item = await mediaService.updateMedia(String(req.params.id), req.body);
     res.json({ media: item });
@@ -51,7 +51,7 @@ router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/media/:id
-router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     await mediaService.deleteMedia(String(req.params.id));
     res.json({ success: true });
@@ -61,7 +61,7 @@ router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequ
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/media/reorder
-router.put('/reorder', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/reorder', async (req: AuthRequest, res: Response) => {
   try {
     const media = await mediaService.reorderMedia(
       String(req.params.productId),

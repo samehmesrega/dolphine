@@ -7,7 +7,7 @@ import * as salesScriptService from '../services/kb-sales-script.service';
 const router = Router({ mergeParams: true });
 
 // GET /api/v1/knowledge-base/products/:productId/sales-scripts
-router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const salesScripts = await salesScriptService.listSalesScripts(String(req.params.productId));
     res.json({ salesScripts });
@@ -17,7 +17,7 @@ router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Resp
 });
 
 // GET /api/v1/knowledge-base/products/:productId/sales-scripts/:id
-router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const salesScript = await salesScriptService.getSalesScriptById(String(req.params.id));
     if (!salesScript) return res.status(404).json({ error: 'Sales script not found' });
@@ -28,7 +28,7 @@ router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: R
 });
 
 // POST /api/v1/knowledge-base/products/:productId/sales-scripts
-router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const salesScript = await salesScriptService.createSalesScript({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, 
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/sales-scripts/:id
-router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const salesScript = await salesScriptService.updateSalesScript(String(req.params.id), req.body);
     res.json({ salesScript });
@@ -51,7 +51,7 @@ router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/sales-scripts/:id
-router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     await salesScriptService.deleteSalesScript(String(req.params.id));
     res.json({ success: true });
@@ -61,7 +61,7 @@ router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequ
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/sales-scripts/reorder
-router.put('/reorder', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/reorder', async (req: AuthRequest, res: Response) => {
   try {
     const salesScripts = await salesScriptService.reorderSalesScripts(
       String(req.params.productId),

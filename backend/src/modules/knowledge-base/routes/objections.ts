@@ -7,7 +7,7 @@ import * as objectionService from '../services/kb-objection.service';
 const router = Router({ mergeParams: true });
 
 // GET /api/v1/knowledge-base/products/:productId/objections
-router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/', async (req: AuthRequest, res: Response) => {
   try {
     const objections = await objectionService.listObjections(String(req.params.productId));
     res.json({ objections });
@@ -17,7 +17,7 @@ router.get('/', requirePermission('kb.view'), async (req: AuthRequest, res: Resp
 });
 
 // GET /api/v1/knowledge-base/products/:productId/objections/:id
-router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: Response) => {
+router.get('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const objection = await objectionService.getObjectionById(String(req.params.id));
     if (!objection) return res.status(404).json({ error: 'Objection not found' });
@@ -28,7 +28,7 @@ router.get('/:id', requirePermission('kb.view'), async (req: AuthRequest, res: R
 });
 
 // POST /api/v1/knowledge-base/products/:productId/objections
-router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const objection = await objectionService.createObjection({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, 
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/objections/:id
-router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
     const objection = await objectionService.updateObjection(String(req.params.id), req.body);
     res.json({ objection });
@@ -51,7 +51,7 @@ router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/objections/:id
-router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
     await objectionService.deleteObjection(String(req.params.id));
     res.json({ success: true });
@@ -61,7 +61,7 @@ router.delete('/:id', requirePermission('kb.product.edit'), async (req: AuthRequ
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/objections/reorder
-router.put('/reorder', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
+router.put('/reorder', async (req: AuthRequest, res: Response) => {
   try {
     const objections = await objectionService.reorderObjections(
       String(req.params.productId),
