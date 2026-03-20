@@ -333,6 +333,7 @@ model Product {
   orderItems       OrderItem[]
   formConnections  FormConnection[]
   sheetConnections SheetConnection[]
+  kbProducts       KbProduct[]
 
   @@map("products")
 }
@@ -537,6 +538,7 @@ model MktProject {
   creativeRequests CreativeRequest[]
   ideas            Idea[]
   scripts          Script[]
+  kbProducts       KbProduct[]
 
   @@map("mkt_projects")
 }
@@ -1122,4 +1124,241 @@ model ABTest {
   completedAt    DateTime?    @map("completed_at")
 
   @@map("mkt_ab_tests")
+}
+
+// =============================================================
+// KNOWLEDGE BASE: بنك المعلومات — بيانات المنتجات الشاملة
+// =============================================================
+
+enum KbMediaSource {
+  DRIVE
+  UPLOAD
+}
+
+enum KbPriceType {
+  RETAIL
+  WHOLESALE
+  OFFER
+}
+
+enum KbCurrency {
+  EGP
+  USD
+  SAR
+  AED
+  KWD
+}
+
+enum KbUpsellType {
+  UPSELL
+  CROSSSELL
+}
+
+enum KbVariationSource {
+  WOOCOMMERCE
+  MANUAL
+}
+
+model KbProduct {
+  id             String    @id @default(uuid())
+  name           String
+  slug           String    @unique
+  sku            String?
+  description    String?
+  category       String?
+  projectId      String?   @map("project_id")
+  project        MktProject? @relation(fields: [projectId], references: [id])
+  wooProductId   String?   @map("woo_product_id")
+  wooProduct     Product?  @relation(fields: [wooProductId], references: [id])
+  dimensions     String?
+  weight         String?
+  driveFolderUrl String?   @map("drive_folder_url")
+  isActive       Boolean   @default(true) @map("is_active")
+  createdBy      String    @map("created_by")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  media          KbMedia[]
+  suppliers      KbSupplier[]
+  manufacturing  KbManufacturing?
+  pricing        KbPricing[]
+  variations     KbVariation[]
+  marketing      KbMarketing?
+  faqs           KbFaq[]
+  objections     KbObjection[]
+  upsellsFrom    KbUpsell[]  @relation("KbUpsellFrom")
+  upsellsTo      KbUpsell[]  @relation("KbUpsellTo")
+  afterSales     KbAfterSales?
+  salesScripts   KbSalesScript[]
+
+  @@index([category])
+  @@index([projectId])
+  @@map("kb_products")
+}
+
+model KbMedia {
+  id         String        @id @default(uuid())
+  productId  String        @map("product_id")
+  product    KbProduct     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  type       String        // "image" | "video"
+  url        String
+  thumbnail  String?
+  caption    String?
+  tags       String?
+  source     KbMediaSource @default(UPLOAD)
+  orderNum   Int           @default(0) @map("order_num")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("kb_media")
+}
+
+model KbSupplier {
+  id          String   @id @default(uuid())
+  productId   String   @map("product_id")
+  product     KbProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name        String
+  contactInfo String?  @map("contact_info")
+  rating      Int?     // 1-5
+  notes       String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("kb_suppliers")
+}
+
+model KbManufacturing {
+  id                  String   @id @default(uuid())
+  productId           String   @unique @map("product_id")
+  product             KbProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  materials           String?
+  productionSteps     String?  @map("production_steps")
+  wastePercentage     Float?   @map("waste_percentage")
+  unitCost            Float?   @map("unit_cost")
+  unitCostCurrency    String?  @map("unit_cost_currency")
+  packagingType       String?  @map("packaging_type")
+  packagingDimensions String?  @map("packaging_dimensions")
+  packagingCost       Float?   @map("packaging_cost")
+  shippingTerms       String?  @map("shipping_terms")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("kb_manufacturing")
+}
+
+model KbPricing {
+  id          String      @id @default(uuid())
+  productId   String      @map("product_id")
+  product     KbProduct   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variationId String?     @map("variation_id")
+  variation   KbVariation? @relation(fields: [variationId], references: [id], onDelete: Cascade)
+  currency    KbCurrency
+  priceType   KbPriceType @map("price_type")
+  price       Float
+  notes       String?
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@map("kb_pricing")
+}
+
+model KbVariation {
+  id              String            @id @default(uuid())
+  productId       String            @map("product_id")
+  product         KbProduct         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name            String
+  color           String?
+  size            String?
+  sku             String?
+  wooVariationId  Int?              @map("woo_variation_id")
+  source          KbVariationSource @default(MANUAL)
+  isActive        Boolean           @default(true) @map("is_active")
+  createdAt       DateTime          @default(now()) @map("created_at")
+
+  pricing KbPricing[]
+
+  @@index([productId])
+  @@map("kb_variations")
+}
+
+model KbMarketing {
+  id                    String   @id @default(uuid())
+  productId             String   @unique @map("product_id")
+  product               KbProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  usps                  String?
+  targetAudience        String?  @map("target_audience")
+  competitorComparison  String?  @map("competitor_comparison")
+  brandVoice            String?  @map("brand_voice")
+  keywords              String?
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  @@map("kb_marketing")
+}
+
+model KbFaq {
+  id         String   @id @default(uuid())
+  productId  String   @map("product_id")
+  product    KbProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  question   String
+  answer     String
+  orderNum   Int      @default(0) @map("order_num")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@map("kb_faqs")
+}
+
+model KbObjection {
+  id         String   @id @default(uuid())
+  productId  String   @map("product_id")
+  product    KbProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  objection  String
+  response   String
+  orderNum   Int      @default(0) @map("order_num")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([productId])
+  @@map("kb_objections")
+}
+
+model KbUpsell {
+  id               String      @id @default(uuid())
+  productId        String      @map("product_id")
+  product          KbProduct   @relation("KbUpsellFrom", fields: [productId], references: [id], onDelete: Cascade)
+  relatedProductId String      @map("related_product_id")
+  relatedProduct   KbProduct   @relation("KbUpsellTo", fields: [relatedProductId], references: [id], onDelete: Cascade)
+  type             KbUpsellType
+  notes            String?
+  orderNum         Int          @default(0) @map("order_num")
+
+  @@index([productId])
+  @@map("kb_upsells")
+}
+
+model KbAfterSales {
+  id                  String   @id @default(uuid())
+  productId           String   @unique @map("product_id")
+  product             KbProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  returnPolicy        String?  @map("return_policy")
+  usageInstructions   String?  @map("usage_instructions")
+  troubleshooting     String?
+  spareParts          String?  @map("spare_parts")
+  warrantyTerms       String?  @map("warranty_terms")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("kb_after_sales")
+}
+
+model KbSalesScript {
+  id         String   @id @default(uuid())
+  productId  String   @map("product_id")
+  product    KbProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title      String
+  content    String
+  orderNum   Int      @default(0) @map("order_num")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@index([productId])
+  @@map("kb_sales_scripts")
 }

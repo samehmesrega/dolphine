@@ -22,6 +22,7 @@ import type { Response as ExpressResponse, NextFunction } from 'express';
 import authRoutes from './modules/auth/routes';
 import leadsRoutes from './modules/leads/routes';
 import marketingRoutes from './modules/marketing/routes';
+import knowledgeBaseRoutes from './modules/knowledge-base/routes';
 
 // يسمح بـ users.manage أو مدير السيلز
 function requireUsersAccess(
@@ -135,6 +136,10 @@ app.use('/api/v1/leads', authMiddleware, leadsRoutes);
 // Marketing module
 app.use('/api/v1/marketing', authMiddleware, marketingRoutes);
 app.use('/api/marketing', authMiddleware, marketingRoutes);
+
+// Knowledge Base module
+app.use('/api/v1/knowledge-base', authMiddleware, knowledgeBaseRoutes);
+app.use('/api/knowledge-base', authMiddleware, knowledgeBaseRoutes);
 
 // Landing Pages (public routes — no auth)
 app.use('/lp', require('./modules/marketing/routes/lp-public').default);

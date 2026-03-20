@@ -9,6 +9,7 @@ import Login from './modules/auth/pages/Login';
 
 const LeadsModule = lazy(() => import('./modules/leads'));
 const MarketingModule = lazy(() => import('./modules/marketing'));
+const KnowledgeBaseModule = lazy(() => import('./modules/knowledge-base'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -38,6 +39,18 @@ function AppRoutes() {
           <PrivateRoute>
             <Suspense fallback={<div className="p-8 text-center text-slate-400">جاري التحميل...</div>}>
               <MarketingModule />
+            </Suspense>
+          </PrivateRoute>
+        }
+      />
+
+      {/* Knowledge Base module (has its own shell) */}
+      <Route
+        path="/knowledge-base/*"
+        element={
+          <PrivateRoute>
+            <Suspense fallback={<div className="p-8 text-center text-slate-400">جاري التحميل...</div>}>
+              <KnowledgeBaseModule />
             </Suspense>
           </PrivateRoute>
         }
