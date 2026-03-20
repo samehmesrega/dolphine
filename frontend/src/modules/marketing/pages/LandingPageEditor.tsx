@@ -149,7 +149,7 @@ export default function LandingPageEditor() {
 
   const createABTestMutation = useMutation({
     mutationFn: () =>
-      mktApi.createABTest({ landingPageAId: id!, landingPageBId: abTestPageBId, trafficSplit: abTestSplit }),
+      mktApi.createABTest(id!, { landingPageBId: abTestPageBId, trafficSplit: abTestSplit }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ab-tests'] });
       setAbTestPageBId('');
