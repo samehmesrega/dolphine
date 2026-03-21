@@ -257,9 +257,9 @@ function OverviewTab({
   product,
   productId,
   canEdit,
-  isEditing,
-  onEdit,
-  onCancel,
+  isEditing: _isEditing,
+  onEdit: _onEdit,
+  onCancel: _onCancel,
 }: {
   product: any;
   productId: string;
@@ -503,11 +503,11 @@ function SupplyTab({
 function SuppliersSection({
   productId,
   suppliers,
-  canEdit,
+  canEdit: _canEdit,
   qc,
   isEditing,
-  onEdit,
-  onCancel,
+  onEdit: _onEdit,
+  onCancel: _onCancel,
 }: {
   productId: string;
   suppliers: any[];
@@ -1669,7 +1669,7 @@ function ObjectionsSection({
 function UpsellsSection({
   productId,
   upsells,
-  canEdit,
+  canEdit: _canEdit,
   qc,
   isEditing,
 }: {
