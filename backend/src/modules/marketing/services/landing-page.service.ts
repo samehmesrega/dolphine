@@ -39,11 +39,18 @@ export async function createLandingPage(data: {
   css?: string;
   createdBy: string;
 }) {
+  // Ensure unique slug
+  let slug = data.slug;
+  const existing = await prisma.landingPage.findUnique({ where: { slug } });
+  if (existing) {
+    slug = `${slug}-${Date.now().toString(36)}`;
+  }
+
   // Save initial version as v1
   return prisma.landingPage.create({
     data: {
       title: data.title,
-      slug: data.slug,
+      slug,
       brandId: data.brandId,
       productId: data.productId || undefined,
       html: data.html,
