@@ -1,13 +1,21 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import * as kbApi from '../services/kb-api';
 
 export default function ProductList() {
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
+
+  // Import modal state
+  const [importModal, setImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importDetails, setImportDetails] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const params: Record<string, string> = {};
   if (submittedSearch) params.q = submittedSearch;
@@ -20,10 +28,59 @@ export default function ProductList() {
 
   const products = data?.data?.products ?? [];
 
+  const importMutation = useMutation({
+    mutationFn: (formData: FormData) => kbApi.importProductFromJson(formData),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['kb-products'] });
+      setImportModal(false);
+      setImportFile(null);
+      setImportError(null);
+      setImportDetails([]);
+      const newId = res.data?.product?.id;
+      if (newId) navigate(`/knowledge-base/products/${newId}`);
+    },
+    onError: (err: any) => {
+      const data = err?.response?.data;
+      setImportError(data?.error || 'حدث خطأ أثناء الاستيراد');
+      setImportDetails(data?.details || []);
+    },
+  });
+
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       setSubmittedSearch(search);
     }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const res = await kbApi.downloadImportTemplate();
+      const blob = new Blob([res.data], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'product-template.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      setImportError('حدث خطأ أثناء تحميل التمبليت');
+    }
+  };
+
+  const handleImport = () => {
+    if (!importFile) return;
+    setImportError(null);
+    setImportDetails([]);
+    const formData = new FormData();
+    formData.append('file', importFile);
+    importMutation.mutate(formData);
+  };
+
+  const openImportModal = () => {
+    setImportModal(true);
+    setImportFile(null);
+    setImportError(null);
+    setImportDetails([]);
   };
 
   return (
@@ -31,12 +88,23 @@ export default function ProductList() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">المنتجات</h1>
-        <Link
-          to="/knowledge-base/products/new"
-          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
-        >
-          + إضافة منتج
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={openImportModal}
+            className="px-4 py-2 border border-emerald-600 text-emerald-600 rounded-lg hover:bg-emerald-50 text-sm flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            استيراد منتج
+          </button>
+          <Link
+            to="/knowledge-base/products/new"
+            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
+          >
+            + إضافة منتج
+          </Link>
+        </div>
       </div>
 
       {/* Search & Filters */}
@@ -136,6 +204,113 @@ export default function ProductList() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Import Modal */}
+      {importModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setImportModal(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6"
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-slate-800">استيراد منتج من ملف JSON</h2>
+              <button onClick={() => setImportModal(false)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Steps */}
+            <div className="space-y-4 mb-6">
+              <div className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">1</span>
+                <div className="flex-1">
+                  <p className="text-sm text-slate-700 mb-2">نزّل التمبليت وابعته لـ ChatGPT عشان يملاه ببيانات المنتج</p>
+                  <button
+                    onClick={handleDownloadTemplate}
+                    className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 text-sm flex items-center gap-1.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    تحميل التمبليت
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold">2</span>
+                <div className="flex-1">
+                  <p className="text-sm text-slate-700 mb-2">ارفع الملف بعد ما ChatGPT يملاه</p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={(e) => {
+                      setImportFile(e.target.files?.[0] || null);
+                      setImportError(null);
+                      setImportDetails([]);
+                    }}
+                  />
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-3 py-1.5 border border-dashed border-slate-300 text-slate-600 rounded-lg hover:border-emerald-400 hover:text-emerald-600 text-sm flex items-center gap-1.5 w-full justify-center"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    {importFile ? importFile.name : 'اختر ملف JSON'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Error display */}
+            {importError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700 font-medium">{importError}</p>
+                {importDetails.length > 0 && (
+                  <ul className="mt-2 space-y-1 text-xs text-red-600 list-disc list-inside">
+                    {importDetails.map((d, i) => (
+                      <li key={i}>{d}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-3 justify-end">
+              <button
+                onClick={() => setImportModal(false)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 text-sm"
+              >
+                إلغاء
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={!importFile || importMutation.isPending}
+                className="px-5 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {importMutation.isPending ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    جاري الاستيراد...
+                  </>
+                ) : (
+                  'استيراد'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

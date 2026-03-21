@@ -1,8 +1,27 @@
 import { Router } from 'express';
 import type { Response } from 'express';
+import multer from 'multer';
 import type { AuthRequest } from '../../../shared/middleware/auth';
 import { requirePermission } from '../../../shared/middleware/auth';
 import * as productService from '../services/kb-product.service';
+import {
+  PRODUCT_IMPORT_TEMPLATE,
+  importSchema,
+  importProduct,
+  formatZodErrors,
+} from '../services/kb-import.service';
+
+const jsonUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 1 * 1024 * 1024 }, // 1 MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype === 'application/json' || file.originalname.endsWith('.json')) {
+      cb(null, true);
+    } else {
+      cb(new Error('يُسمح فقط بملفات JSON'));
+    }
+  },
+}).single('file');
 
 const router = Router();
 
@@ -34,6 +53,65 @@ router.get('/search', async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: err.message });
   }
 });
+
+// GET /api/v1/knowledge-base/products/import/template
+router.get(
+  '/import/template',
+  requirePermission('kb.product.edit'),
+  async (_req: AuthRequest, res: Response) => {
+    res.setHeader('Content-Disposition', 'attachment; filename="product-template.json"');
+    res.json(PRODUCT_IMPORT_TEMPLATE);
+  }
+);
+
+// POST /api/v1/knowledge-base/products/import
+router.post(
+  '/import',
+  requirePermission('kb.product.edit'),
+  (req: AuthRequest, res: Response, next) => {
+    jsonUpload(req as any, res as any, (err: any) => {
+      if (err) {
+        return res.status(400).json({ error: err.message || 'خطأ في رفع الملف' });
+      }
+      next();
+    });
+  },
+  async (req: AuthRequest, res: Response) => {
+    try {
+      const file = (req as any).file;
+      if (!file) {
+        return res.status(400).json({ error: 'لم يتم رفع ملف' });
+      }
+
+      let rawData: any;
+      try {
+        rawData = JSON.parse(file.buffer.toString('utf-8'));
+      } catch {
+        return res.status(400).json({ error: 'الملف لا يحتوي على JSON صحيح' });
+      }
+
+      // Strip template hint fields
+      const { _instructions, _hint, ...cleanData } = rawData;
+      if (cleanData.pricing) {
+        cleanData.pricing = cleanData.pricing.map(({ _hint, ...rest }: any) => rest);
+      }
+
+      const parsed = importSchema.safeParse(cleanData);
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: 'بيانات الملف غير صحيحة',
+          details: formatZodErrors(parsed.error),
+        });
+      }
+
+      const userId = (req as any).user.userId;
+      const product = await importProduct(parsed.data, userId);
+      res.status(201).json({ product });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'حدث خطأ أثناء الاستيراد' });
+    }
+  }
+);
 
 // GET /api/v1/knowledge-base/products/:id
 router.get('/:id', async (req: AuthRequest, res: Response) => {

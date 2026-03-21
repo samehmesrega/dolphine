@@ -14,6 +14,14 @@ export const deleteProduct = (id: string) =>
 export const searchProducts = (q: string) =>
   api.get('/knowledge-base/products/search', { params: { q } });
 
+// === Import ===
+export const downloadImportTemplate = () =>
+  api.get('/knowledge-base/products/import/template', { responseType: 'blob' });
+export const importProductFromJson = (formData: FormData) =>
+  api.post('/knowledge-base/products/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
+
 // === Media ===
 export const getMedia = (productId: string) =>
   api.get(`/knowledge-base/products/${productId}/media`);
