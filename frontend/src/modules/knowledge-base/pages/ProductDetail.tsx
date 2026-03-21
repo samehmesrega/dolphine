@@ -282,7 +282,7 @@ function OverviewTab({
         canEdit={canEdit}
         isEditing={false}
         onEdit={handleEdit}
-        onCancel={onCancel}
+        onCancel={_onCancel}
       />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
