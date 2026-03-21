@@ -20,6 +20,11 @@ export default function LandingPages() {
     queryFn: () => mktApi.getBrands(),
   });
 
+  const { data: projectsData } = useQuery({
+    queryKey: ['projects'],
+    queryFn: () => mktApi.getProjects(),
+  });
+
   // Fetch KB products for AI generation form
   const { data: kbProductsData } = useQuery({
     queryKey: ['kb-products-for-lp'],
@@ -43,9 +48,20 @@ export default function LandingPages() {
 
   const pages: any[] = pagesData?.data?.landingPages || [];
   const brands: any[] = brandsData?.data?.brands || [];
+  const projects: any[] = projectsData?.data?.projects || []
+  // Use brands if available, fallback to projects
+  const brandOptions: any[] = brands.length > 0 ? brands : projects;
   const kbProducts: any[] = kbProductsData?.data?.products || [];
   const orderForms: any[] = orderFormsData?.data?.templates || orderFormsData?.data?.orderForms || [];
-  const aiModelsGroups: any[] = aiModelsData?.data?.models || [];
+  // Group flat models array by provider
+  const aiModelsFlat: any[] = aiModelsData?.data?.models || [];
+  const aiModelsGroups = Object.entries(
+    aiModelsFlat.reduce((acc: Record<string, any[]>, m: any) => {
+      if (!acc[m.provider]) acc[m.provider] = [];
+      acc[m.provider].push(m);
+      return acc;
+    }, {} as Record<string, any[]>)
+  ).map(([provider, models]) => ({ provider, models }));
 
   // AI Generate form state
   const [form, setForm] = useState({
@@ -291,8 +307,8 @@ export default function LandingPages() {
                   onChange={(e) => setForm({ ...form, brandId: e.target.value })}
                   className="w-full border rounded px-3 py-2 text-sm"
                 >
-                  <option value="">اختر براند</option>
-                  {brands.map((b: any) => (
+                  <option value="">اختر براند / مشروع</option>
+                  {brandOptions.map((b: any) => (
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
