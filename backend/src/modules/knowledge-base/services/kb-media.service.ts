@@ -117,18 +117,18 @@ export async function syncFromDrive(productId: string) {
   const data = (await res.json()) as { files?: Array<{ id: string; name: string; mimeType: string; thumbnailLink?: string }> };
   const files = data.files || [];
 
-  // Fix old Drive URLs (drive.google.com/uc → lh3.googleusercontent.com)
+  // Fix old Drive URLs → use proxy
   const oldMedia = await prisma.kbMedia.findMany({
-    where: { productId, source: 'DRIVE', url: { contains: 'drive.google.com/uc' } },
+    where: { productId, source: 'DRIVE', url: { startsWith: 'http' } },
   });
   for (const m of oldMedia) {
-    const match = m.url.match(/id=([a-zA-Z0-9_-]+)/);
+    const match = m.url.match(/(?:id=|\/d\/)([a-zA-Z0-9_-]+)/);
     if (match) {
       await prisma.kbMedia.update({
         where: { id: m.id },
         data: {
-          url: `https://lh3.googleusercontent.com/d/${match[1]}=s1600`,
-          thumbnail: `https://lh3.googleusercontent.com/d/${match[1]}=w400`,
+          url: `/drive-proxy/${match[1]}`,
+          thumbnail: `/drive-proxy/${match[1]}?s=400`,
         },
       });
     }
@@ -155,10 +155,10 @@ export async function syncFromDrive(productId: string) {
     const isVideo = file.mimeType.startsWith('video/');
     if (!isImage && !isVideo) continue;
 
-    const fileUrl = `https://lh3.googleusercontent.com/d/${file.id}=s1600`;
+    const fileUrl = `/drive-proxy/${file.id}`;
     if (existingUrls.has(fileUrl)) continue;
 
-    const thumbnail = `https://lh3.googleusercontent.com/d/${file.id}=w400`;
+    const thumbnail = `/drive-proxy/${file.id}?s=400`;
 
     await prisma.kbMedia.create({
       data: {

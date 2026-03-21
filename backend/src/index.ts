@@ -141,6 +141,24 @@ app.use('/api/marketing', authMiddleware, marketingRoutes);
 app.use('/api/v1/knowledge-base', authMiddleware, knowledgeBaseRoutes);
 app.use('/api/knowledge-base', authMiddleware, knowledgeBaseRoutes);
 
+// Drive image proxy (no auth — images need to load in <img> tags)
+app.get('/drive-proxy/:fileId', async (req: Request, res: Response) => {
+  try {
+    const { fileId } = req.params;
+    const size = req.query.s || '1600';
+    const url = `https://lh3.googleusercontent.com/d/${fileId}=s${size}`;
+    const response = await fetch(url);
+    if (!response.ok) return res.status(404).send('Not found');
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const buffer = Buffer.from(await response.arrayBuffer());
+    res.send(buffer);
+  } catch {
+    res.status(500).send('Proxy error');
+  }
+});
+
 // Landing Pages (public routes — no auth)
 app.use('/lp', require('./modules/marketing/routes/lp-public').default);
 
