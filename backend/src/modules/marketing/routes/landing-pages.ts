@@ -136,6 +136,25 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
       kbProductId, formTemplateId, aiProvider, aiModel,
     } = req.body;
 
+    // Resolve brandId — if it's a project ID, find or create matching brand
+    let resolvedBrandId = brandId;
+    if (brandId) {
+      const brandExists = await prisma.brand.findUnique({ where: { id: brandId } });
+      if (!brandExists) {
+        // brandId might be a project ID, try to find the project
+        const project = await prisma.mktProject.findUnique({ where: { id: brandId } });
+        if (project) {
+          // Find or create a brand with the same slug
+          const brand = await prisma.brand.upsert({
+            where: { slug: project.slug },
+            update: {},
+            create: { name: project.name, slug: project.slug, language: project.language },
+          });
+          resolvedBrandId = brand.id;
+        }
+      }
+    }
+
     // Resolve KB product context if provided
     let productContext: string | undefined;
     let resolvedProductImages = productImages || [];
@@ -208,7 +227,7 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
     const page = await lpService.createLandingPage({
       title,
       slug,
-      brandId,
+      brandId: resolvedBrandId,
       productId,
       html,
       createdBy: req.user!.userId,
