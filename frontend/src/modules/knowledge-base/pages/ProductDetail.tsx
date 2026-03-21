@@ -171,9 +171,17 @@ function MediaTab({ productId, product, canEdit, qc }: { productId: string; prod
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaItems: any[] = product.media ?? [];
 
+  const [syncMsg, setSyncMsg] = useState('');
   const syncMutation = useMutation({
     mutationFn: () => kbApi.syncDrive(productId, product.driveFolderUrl),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['kb-product', productId] }),
+    onSuccess: (res: any) => {
+      const data = res.data || res;
+      setSyncMsg(`تم مزامنة ${data.synced ?? 0} ملف جديد من أصل ${data.total ?? 0}`);
+      qc.invalidateQueries({ queryKey: ['kb-product', productId] });
+    },
+    onError: (err: any) => {
+      setSyncMsg(`خطأ: ${err.response?.data?.error || err.message}`);
+    },
   });
 
   const uploadMutation = useMutation({
@@ -203,15 +211,14 @@ function MediaTab({ productId, product, canEdit, qc }: { productId: string; prod
         <h2 className="text-lg font-semibold text-slate-800">الصور والفيديوهات</h2>
         {canEdit && (
           <div className="flex gap-2">
-            {product.driveFolderUrl && (
-              <button
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-                className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm disabled:opacity-50"
-              >
-                {syncMutation.isPending ? 'جاري المزامنة...' : 'مزامنة من Drive'}
-              </button>
-            )}
+            <button
+              onClick={() => { setSyncMsg(''); syncMutation.mutate(); }}
+              disabled={syncMutation.isPending || !product.driveFolderUrl}
+              title={!product.driveFolderUrl ? 'أضف رابط فولدر Drive في بيانات المنتج أولاً' : ''}
+              className="px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 text-sm disabled:opacity-50"
+            >
+              {syncMutation.isPending ? 'جاري المزامنة...' : 'مزامنة من Drive'}
+            </button>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadMutation.isPending}
@@ -230,6 +237,12 @@ function MediaTab({ productId, product, canEdit, qc }: { productId: string; prod
           </div>
         )}
       </div>
+
+      {syncMsg && (
+        <div className={`p-3 rounded-lg text-sm ${syncMsg.startsWith('خطأ') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
+          {syncMsg}
+        </div>
+      )}
 
       {mediaItems.length === 0 ? (
         <div className="p-8 text-center text-slate-400">لا توجد ملفات وسائط</div>
