@@ -114,9 +114,8 @@ export async function syncFromDrive(productId: string) {
     throw new Error(`خطأ من Google Drive API: ${text}`);
   }
 
-  const data = await res.json();
-  const files: Array<{ id: string; name: string; mimeType: string; thumbnailLink?: string }> =
-    data.files || [];
+  const data = (await res.json()) as { files?: Array<{ id: string; name: string; mimeType: string; thumbnailLink?: string }> };
+  const files = data.files || [];
 
   // Get existing Drive media to avoid duplicates
   const existing = await prisma.kbMedia.findMany({
