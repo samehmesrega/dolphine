@@ -27,28 +27,28 @@ export async function createTemplate(data: {
   fields: Array<{
     fieldName: string;
     label: string;
-    type: string;
-    required: boolean;
+    type?: string;
+    required?: boolean;
     options?: string;
     leadField: string;
-    orderNum: number;
+    orderNum?: number;
   }>;
 }) {
   return prisma.$transaction(async (tx) => {
     const template = await tx.orderFormTemplate.create({
       data: {
         name: data.name,
-        slug: data.slug,
+        slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'),
         paymentMethods: data.paymentMethods || ['cod'],
         fields: {
-          create: data.fields.map((f) => ({
+          create: data.fields.map((f, i) => ({
             fieldName: f.fieldName,
             label: f.label,
-            type: f.type,
-            required: f.required,
+            type: f.type || 'text',
+            required: f.required ?? false,
             options: f.options || undefined,
             leadField: f.leadField,
-            orderNum: f.orderNum,
+            orderNum: f.orderNum ?? i,
           })),
         },
       },

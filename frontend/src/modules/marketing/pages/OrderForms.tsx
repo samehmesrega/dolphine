@@ -64,22 +64,28 @@ export default function OrderForms() {
     queryFn: () => getOrderForms(),
   });
 
-  const forms: any[] = data?.data?.orderForms ?? [];
+  const forms: any[] = data?.data?.templates ?? data?.data?.orderForms ?? [];
+
+  const [saveError, setSaveError] = useState('');
 
   const createMutation = useMutation({
     mutationFn: (data: any) => createOrderForm(data),
     onSuccess: () => {
+      setSaveError('');
       qc.invalidateQueries({ queryKey: ['order-forms'] });
       closeModal();
     },
+    onError: (err: any) => setSaveError(err.response?.data?.error || err.message),
   });
 
   const updateMutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) => updateOrderForm(id, data),
     onSuccess: () => {
+      setSaveError('');
       qc.invalidateQueries({ queryKey: ['order-forms'] });
       closeModal();
     },
+    onError: (err: any) => setSaveError(err.response?.data?.error || err.message),
   });
 
   const deleteMutation = useMutation({
@@ -154,9 +160,9 @@ export default function OrderForms() {
     if (!form.name.trim()) return;
     const payload = {
       name: form.name,
-      slug: form.slug,
+      slug: form.slug || form.name.toLowerCase().replace(/\s+/g, '-'),
       paymentMethods: form.paymentMethods,
-      fields: form.fields,
+      fields: form.fields.map((f, i) => ({ ...f, orderNum: i })),
     };
     if (editingId) {
       updateMutation.mutate({ id: editingId, data: payload });
@@ -426,6 +432,10 @@ export default function OrderForms() {
                 </button>
               </div>
             </div>
+
+            {saveError && (
+              <div className="mx-6 mb-2 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{saveError}</div>
+            )}
 
             {/* Footer */}
             <div className="p-6 border-t border-slate-200 flex gap-2 justify-end">
