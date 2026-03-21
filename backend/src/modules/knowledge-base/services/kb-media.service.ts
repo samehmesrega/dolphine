@@ -117,6 +117,23 @@ export async function syncFromDrive(productId: string) {
   const data = (await res.json()) as { files?: Array<{ id: string; name: string; mimeType: string; thumbnailLink?: string }> };
   const files = data.files || [];
 
+  // Fix old Drive URLs (drive.google.com/uc → lh3.googleusercontent.com)
+  const oldMedia = await prisma.kbMedia.findMany({
+    where: { productId, source: 'DRIVE', url: { contains: 'drive.google.com/uc' } },
+  });
+  for (const m of oldMedia) {
+    const match = m.url.match(/id=([a-zA-Z0-9_-]+)/);
+    if (match) {
+      await prisma.kbMedia.update({
+        where: { id: m.id },
+        data: {
+          url: `https://lh3.googleusercontent.com/d/${match[1]}=s1600`,
+          thumbnail: `https://lh3.googleusercontent.com/d/${match[1]}=w400`,
+        },
+      });
+    }
+  }
+
   // Get existing Drive media to avoid duplicates
   const existing = await prisma.kbMedia.findMany({
     where: { productId, source: 'DRIVE' },
@@ -138,7 +155,7 @@ export async function syncFromDrive(productId: string) {
     const isVideo = file.mimeType.startsWith('video/');
     if (!isImage && !isVideo) continue;
 
-    const fileUrl = `https://drive.google.com/uc?export=view&id=${file.id}`;
+    const fileUrl = `https://lh3.googleusercontent.com/d/${file.id}=s1600`;
     if (existingUrls.has(fileUrl)) continue;
 
     const thumbnail = `https://lh3.googleusercontent.com/d/${file.id}=w400`;
