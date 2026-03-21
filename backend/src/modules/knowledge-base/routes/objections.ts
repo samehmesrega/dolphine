@@ -28,7 +28,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/v1/knowledge-base/products/:productId/objections
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', requirePermission('kb.sales.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const objection = await objectionService.createObjection({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/objections/:id
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', requirePermission('kb.sales.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const objection = await objectionService.updateObjection(String(req.params.id), req.body);
     res.json({ objection });
@@ -51,7 +51,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/objections/:id
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requirePermission('kb.sales.edit'), async (req: AuthRequest, res: Response) => {
   try {
     await objectionService.deleteObjection(String(req.params.id));
     res.json({ success: true });
@@ -61,7 +61,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/objections/reorder
-router.put('/reorder', async (req: AuthRequest, res: Response) => {
+router.put('/reorder', requirePermission('kb.sales.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const objections = await objectionService.reorderObjections(
       String(req.params.productId),

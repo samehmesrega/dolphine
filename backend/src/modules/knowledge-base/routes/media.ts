@@ -28,7 +28,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/v1/knowledge-base/products/:productId/media
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', requirePermission('kb.media.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const item = await mediaService.createMedia({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/v1/knowledge-base/products/:productId/media/sync-drive
-router.post('/sync-drive', async (req: AuthRequest, res: Response) => {
+router.post('/sync-drive', requirePermission('kb.media.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const result = await mediaService.syncFromDrive(String(req.params.productId));
     res.json({ success: true, synced: result.synced, total: result.total });
@@ -51,7 +51,7 @@ router.post('/sync-drive', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/media/:id
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', requirePermission('kb.media.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const item = await mediaService.updateMedia(String(req.params.id), req.body);
     res.json({ media: item });
@@ -61,7 +61,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/media/:id
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requirePermission('kb.media.edit'), async (req: AuthRequest, res: Response) => {
   try {
     await mediaService.deleteMedia(String(req.params.id));
     res.json({ success: true });
@@ -71,7 +71,7 @@ router.delete('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/media/reorder
-router.put('/reorder', async (req: AuthRequest, res: Response) => {
+router.put('/reorder', requirePermission('kb.media.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const media = await mediaService.reorderMedia(
       String(req.params.productId),

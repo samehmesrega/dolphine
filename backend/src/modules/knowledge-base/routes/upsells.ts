@@ -28,7 +28,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/v1/knowledge-base/products/:productId/upsells
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', requirePermission('kb.sales.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const upsell = await upsellService.createUpsell({
       ...req.body,
@@ -51,7 +51,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/upsells/:id
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requirePermission('kb.sales.edit'), async (req: AuthRequest, res: Response) => {
   try {
     await upsellService.deleteUpsell(String(req.params.id));
     res.json({ success: true });

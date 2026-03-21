@@ -17,7 +17,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/manufacturing
-router.put('/', async (req: AuthRequest, res: Response) => {
+router.put('/', requirePermission('kb.manufacturing.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const manufacturing = await manufacturingService.upsertManufacturing(
       String(req.params.productId),

@@ -28,7 +28,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/v1/knowledge-base/products/:productId/pricing
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', requirePermission('kb.pricing.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const item = await pricingService.createPricing({
       ...req.body,
@@ -41,7 +41,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/pricing/:id
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', requirePermission('kb.pricing.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const item = await pricingService.updatePricing(String(req.params.id), req.body);
     res.json({ pricing: item });
@@ -51,7 +51,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/v1/knowledge-base/products/:productId/pricing/:id
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requirePermission('kb.pricing.edit'), async (req: AuthRequest, res: Response) => {
   try {
     await pricingService.deletePricing(String(req.params.id));
     res.json({ success: true });

@@ -17,7 +17,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/after-sales
-router.put('/', async (req: AuthRequest, res: Response) => {
+router.put('/', requirePermission('kb.aftersales.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const afterSales = await afterSalesService.upsertAfterSales(
       String(req.params.productId),

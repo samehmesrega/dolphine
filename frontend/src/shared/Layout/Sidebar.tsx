@@ -21,6 +21,7 @@ const ICONS: Record<string, string> = {
   chevronLeft: 'M15 19l-7-7 7-7',
   chevronDown: 'M19 9l-7 7-7-7',
   dualName: 'M21 7.5V18M15 7.5V18M3 16.811V8.69c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811z',
+  book: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
 };
 
 function NavIcon({ name, className = 'w-5 h-5' }: { name: string; className?: string }) {
@@ -287,6 +288,28 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
           }
           return <GroupNav key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} onNavigate={onNavigate} />;
         })}
+
+        <div className="border-t border-slate-800 my-2" />
+
+        {collapsed ? (
+          <NavLink
+            to="/knowledge-base"
+            title="بنك المعلومات"
+            onClick={onNavigate}
+            className="flex items-center justify-center p-2.5 rounded-lg mb-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+          >
+            <NavIcon name="book" />
+          </NavLink>
+        ) : (
+          <NavLink
+            to="/knowledge-base"
+            onClick={onNavigate}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
+          >
+            <NavIcon name="book" />
+            <span>بنك المعلومات</span>
+          </NavLink>
+        )}
       </nav>
 
       {/* Account section - always visible */}

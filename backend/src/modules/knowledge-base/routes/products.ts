@@ -47,7 +47,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // POST /api/v1/knowledge-base/products
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const product = await productService.createProduct({
       ...req.body,
@@ -60,7 +60,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:id
-router.put('/:id', async (req: AuthRequest, res: Response) => {
+router.put('/:id', requirePermission('kb.product.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const product = await productService.updateProduct(String(req.params.id), req.body);
     res.json({ product });
@@ -70,7 +70,7 @@ router.put('/:id', async (req: AuthRequest, res: Response) => {
 });
 
 // DELETE /api/v1/knowledge-base/products/:id (soft delete)
-router.delete('/:id', async (req: AuthRequest, res: Response) => {
+router.delete('/:id', requirePermission('kb.admin'), async (req: AuthRequest, res: Response) => {
   try {
     await productService.deleteProduct(String(req.params.id));
     res.json({ success: true });

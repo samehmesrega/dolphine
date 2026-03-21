@@ -17,7 +17,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 });
 
 // PUT /api/v1/knowledge-base/products/:productId/marketing
-router.put('/', async (req: AuthRequest, res: Response) => {
+router.put('/', requirePermission('kb.marketing.edit'), async (req: AuthRequest, res: Response) => {
   try {
     const marketing = await marketingService.upsertMarketing(
       String(req.params.productId),
