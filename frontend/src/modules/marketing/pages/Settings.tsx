@@ -43,12 +43,16 @@ export default function MarketingSettings() {
     queryFn: () => getAiProviders(),
   });
 
+  const [aiError, setAiError] = useState('');
+
   const saveAiMutation = useMutation({
     mutationFn: (data: { provider: string; name: string; apiKey: string }) => saveAiProvider(data),
     onSuccess: () => {
+      setAiError('');
       qc.invalidateQueries({ queryKey: ['ai-providers'] });
       setAiKeyInputs({});
     },
+    onError: (err: any) => setAiError(err.response?.data?.error || err.message),
   });
 
   const deleteAiMutation = useMutation({
@@ -163,6 +167,7 @@ export default function MarketingSettings() {
       {/* AI Providers */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">
         <h2 className="text-lg font-semibold text-slate-800 mb-4">إعدادات الذكاء الاصطناعي</h2>
+        {aiError && <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{aiError}</div>}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {AI_PROVIDER_CONFIG.map((cfg) => {
             const existing = aiProviders.find((p: any) => p.provider === cfg.provider);
