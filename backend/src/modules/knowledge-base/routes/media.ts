@@ -40,6 +40,16 @@ router.post('/', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// POST /api/v1/knowledge-base/products/:productId/media/sync-drive
+router.post('/sync-drive', async (req: AuthRequest, res: Response) => {
+  try {
+    const result = await mediaService.syncFromDrive(String(req.params.productId));
+    res.json({ success: true, synced: result.synced, total: result.total });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 // PUT /api/v1/knowledge-base/products/:productId/media/:id
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
