@@ -81,24 +81,30 @@ export default function LandingPages() {
     codPayment: true,
   });
 
+  const [genError, setGenError] = useState('');
+
   const generateMutation = useMutation({
     mutationFn: (data: any) => mktApi.generateLandingPage(data),
     onSuccess: (res) => {
+      setGenError('');
       queryClient.invalidateQueries({ queryKey: ['landing-pages'] });
       setShowCreate(false);
       const lp = res.data?.landingPage;
       if (lp) navigate(`/marketing/landing-pages/${lp.id}`);
     },
+    onError: (err: any) => setGenError(err.response?.data?.error || err.message),
   });
 
   const createMutation = useMutation({
     mutationFn: (data: any) => mktApi.createLandingPage(data),
     onSuccess: (res) => {
+      setGenError('');
       queryClient.invalidateQueries({ queryKey: ['landing-pages'] });
       setShowCreate(false);
       const lp = res.data?.landingPage;
       if (lp) navigate(`/marketing/landing-pages/${lp.id}`);
     },
+    onError: (err: any) => setGenError(err.response?.data?.error || err.message),
   });
 
   const deleteMutation = useMutation({
@@ -454,6 +460,10 @@ export default function LandingPages() {
                 </>
               )}
             </div>
+
+            {genError && (
+              <div className="mt-3 p-3 bg-red-50 text-red-700 rounded-lg text-sm">{genError}</div>
+            )}
 
             <div className="flex gap-2 mt-4">
               <button
