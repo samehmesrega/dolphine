@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import * as mktApi from '../services/marketing-api';
+import api from '../../../shared/services/api';
 
 export default function LandingPages() {
   const navigate = useNavigate();
@@ -19,8 +20,32 @@ export default function LandingPages() {
     queryFn: () => mktApi.getBrands(),
   });
 
+  // Fetch KB products for AI generation form
+  const { data: kbProductsData } = useQuery({
+    queryKey: ['kb-products-for-lp'],
+    queryFn: () => api.get('/knowledge-base/products'),
+    enabled: showCreate && createMode === 'ai',
+  });
+
+  // Fetch order form templates for AI generation form
+  const { data: orderFormsData } = useQuery({
+    queryKey: ['order-forms-for-lp'],
+    queryFn: () => mktApi.getOrderForms(),
+    enabled: showCreate && createMode === 'ai',
+  });
+
+  // Fetch AI models grouped by provider
+  const { data: aiModelsData } = useQuery({
+    queryKey: ['ai-models'],
+    queryFn: () => mktApi.getAiModels(),
+    enabled: showCreate && createMode === 'ai',
+  });
+
   const pages: any[] = pagesData?.data?.landingPages || [];
   const brands: any[] = brandsData?.data?.brands || [];
+  const kbProducts: any[] = kbProductsData?.data?.products || [];
+  const orderForms: any[] = orderFormsData?.data?.templates || orderFormsData?.data?.orderForms || [];
+  const aiModelsGroups: any[] = aiModelsData?.data?.models || [];
 
   // AI Generate form state
   const [form, setForm] = useState({
@@ -33,6 +58,11 @@ export default function LandingPages() {
     language: 'ar',
     instructions: '',
     formFields: 'name,phone',
+    kbProductId: '',
+    formTemplateId: '',
+    aiProvider: '',
+    aiModel: '',
+    codPayment: true,
   });
 
   const generateMutation = useMutation({
@@ -60,13 +90,66 @@ export default function LandingPages() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['landing-pages'] }),
   });
 
+  const handleKbProductSelect = (productId: string) => {
+    if (productId) {
+      const product = kbProducts.find((p: any) => p.id === productId);
+      if (product) {
+        const slug = product.name
+          .toLowerCase()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/\s+/g, '-')
+          .replace(/-+/g, '-')
+          .trim();
+        setForm({
+          ...form,
+          kbProductId: productId,
+          title: product.name,
+          slug,
+          productName: '',
+          productDescription: '',
+          productPrice: '',
+        });
+      }
+    } else {
+      setForm({ ...form, kbProductId: '', title: '', slug: '' });
+    }
+  };
+
+  const handleFormTemplateSelect = (templateId: string) => {
+    setForm({
+      ...form,
+      formTemplateId: templateId,
+      formFields: templateId ? '' : 'name,phone',
+      codPayment: true,
+    });
+  };
+
+  const handleAiModelSelect = (value: string) => {
+    // value format: "provider::modelId"
+    if (value) {
+      const [provider, model] = value.split('::');
+      setForm({ ...form, aiProvider: provider, aiModel: model });
+    } else {
+      setForm({ ...form, aiProvider: '', aiModel: '' });
+    }
+  };
+
+  const selectedTemplate = orderForms.find((t: any) => t.id === form.formTemplateId);
+
   const handleSubmit = () => {
     const brandObj = brands.find((b: any) => b.id === form.brandId);
     if (createMode === 'ai') {
       generateMutation.mutate({
         ...form,
         storeName: brandObj?.name || '',
-        formFields: form.formFields.split(',').map((f) => f.trim()),
+        formFields: form.formTemplateId
+          ? undefined
+          : form.formFields.split(',').map((f) => f.trim()),
+        kbProductId: form.kbProductId || undefined,
+        formTemplateId: form.formTemplateId || undefined,
+        aiProvider: form.aiProvider || undefined,
+        aiModel: form.aiModel || undefined,
+        codPayment: form.formTemplateId ? form.codPayment : undefined,
       });
     } else {
       createMutation.mutate({
@@ -160,6 +243,28 @@ export default function LandingPages() {
             </div>
 
             <div className="space-y-3">
+              {/* KB Product Picker — AI mode only, at the top */}
+              {createMode === 'ai' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    اختر منتج من بنك المعلومات (اختياري)
+                  </label>
+                  <select
+                    value={form.kbProductId}
+                    onChange={(e) => handleKbProductSelect(e.target.value)}
+                    className="w-full border rounded px-3 py-2 text-sm"
+                  >
+                    <option value="">— بدون —</option>
+                    {kbProducts.map((p: any) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                  {!form.kbProductId && (
+                    <p className="text-xs text-gray-400 mt-1">أو أدخل البيانات يدوياً</p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-medium mb-1">العنوان</label>
                 <input
@@ -195,32 +300,106 @@ export default function LandingPages() {
 
               {createMode === 'ai' && (
                 <>
+                  {/* Manual product fields — hidden when KB product selected */}
+                  {!form.kbProductId && (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">اسم المنتج</label>
+                        <input
+                          value={form.productName}
+                          onChange={(e) => setForm({ ...form, productName: e.target.value })}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">وصف المنتج</label>
+                        <textarea
+                          value={form.productDescription}
+                          onChange={(e) => setForm({ ...form, productDescription: e.target.value })}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                          rows={2}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">السعر</label>
+                        <input
+                          value={form.productPrice}
+                          onChange={(e) => setForm({ ...form, productPrice: e.target.value })}
+                          className="w-full border rounded px-3 py-2 text-sm"
+                          placeholder="199 SAR"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* Order Form Template Picker */}
                   <div>
-                    <label className="block text-sm font-medium mb-1">اسم المنتج</label>
-                    <input
-                      value={form.productName}
-                      onChange={(e) => setForm({ ...form, productName: e.target.value })}
+                    <label className="block text-sm font-medium mb-1">
+                      اختر نموذج الشراء (اختياري)
+                    </label>
+                    <select
+                      value={form.formTemplateId}
+                      onChange={(e) => handleFormTemplateSelect(e.target.value)}
                       className="w-full border rounded px-3 py-2 text-sm"
-                    />
+                    >
+                      <option value="">— بدون نموذج —</option>
+                      {orderForms.map((t: any) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ))}
+                    </select>
+                    {selectedTemplate?.fields && selectedTemplate.fields.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {selectedTemplate.fields.map((f: any, i: number) => (
+                          <span
+                            key={i}
+                            className="bg-purple-50 text-purple-700 text-xs px-2 py-0.5 rounded-full"
+                          >
+                            {f.fieldName || f.label || f.name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Payment Method — shown only when form template is selected */}
+                  {form.formTemplateId && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="codPayment"
+                        checked={form.codPayment}
+                        onChange={(e) => setForm({ ...form, codPayment: e.target.checked })}
+                        className="rounded"
+                      />
+                      <label htmlFor="codPayment" className="text-sm">
+                        الدفع عند الاستلام
+                      </label>
+                    </div>
+                  )}
+
+                  {/* AI Model Picker */}
                   <div>
-                    <label className="block text-sm font-medium mb-1">وصف المنتج</label>
-                    <textarea
-                      value={form.productDescription}
-                      onChange={(e) => setForm({ ...form, productDescription: e.target.value })}
+                    <label className="block text-sm font-medium mb-1">
+                      اختر موديل الذكاء الاصطناعي
+                    </label>
+                    <select
+                      value={form.aiProvider && form.aiModel ? `${form.aiProvider}::${form.aiModel}` : ''}
+                      onChange={(e) => handleAiModelSelect(e.target.value)}
                       className="w-full border rounded px-3 py-2 text-sm"
-                      rows={2}
-                    />
+                    >
+                      <option value="">اختر موديل</option>
+                      {aiModelsGroups.map((group: any) => (
+                        <optgroup key={group.provider} label={`— ${group.provider} —`}>
+                          {(group.models || []).map((m: any) => (
+                            <option key={m.id} value={`${group.provider}::${m.id}`}>
+                              {m.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">السعر</label>
-                    <input
-                      value={form.productPrice}
-                      onChange={(e) => setForm({ ...form, productPrice: e.target.value })}
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      placeholder="199 SAR"
-                    />
-                  </div>
+
                   <div>
                     <label className="block text-sm font-medium mb-1">اللغة</label>
                     <select
@@ -242,16 +421,20 @@ export default function LandingPages() {
                       placeholder="ألوان محددة، ستايل معين..."
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">حقول الفورم (مفصولة بفاصلة)</label>
-                    <input
-                      value={form.formFields}
-                      onChange={(e) => setForm({ ...form, formFields: e.target.value })}
-                      className="w-full border rounded px-3 py-2 text-sm"
-                      dir="ltr"
-                      placeholder="name, phone, email, city"
-                    />
-                  </div>
+
+                  {/* Manual form fields — hidden when form template selected */}
+                  {!form.formTemplateId && (
+                    <div>
+                      <label className="block text-sm font-medium mb-1">حقول الفورم (مفصولة بفاصلة)</label>
+                      <input
+                        value={form.formFields}
+                        onChange={(e) => setForm({ ...form, formFields: e.target.value })}
+                        className="w-full border rounded px-3 py-2 text-sm"
+                        dir="ltr"
+                        placeholder="name, phone, email, city"
+                      />
+                    </div>
+                  )}
                 </>
               )}
             </div>

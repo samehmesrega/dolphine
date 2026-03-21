@@ -12,6 +12,8 @@ import mediaBuyingRouter from './media-buying';
 import oauthRouter from './oauth';
 import landingPagesRouter from './landing-pages';
 import dashboardRouter from './dashboard';
+import aiProvidersRouter from './ai-providers';
+import orderFormsRouter from './order-forms';
 
 const router = Router();
 
@@ -27,6 +29,8 @@ router.use('/media-buying', mediaBuyingRouter);
 router.use('/oauth', oauthRouter);
 router.use('/landing-pages', landingPagesRouter);
 router.use('/dashboard', dashboardRouter);
+router.use('/ai-providers', aiProvidersRouter);
+router.use('/order-forms', orderFormsRouter);
 router.use('/', publishingRouter); // calendar, posts, social-pages, brands mounted at marketing root
 
 export default router;

@@ -1,6 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCreativeCodeConfig, getProjects, createProject, getAdAccounts, disconnectAdAccount, getMetaOAuthUrl, getMetaAvailableAccounts, connectMetaExisting, getBrands, getSyncSchedule, setSyncSchedule } from '../services/marketing-api';
+import { getCreativeCodeConfig, getProjects, createProject, getAdAccounts, disconnectAdAccount, getMetaOAuthUrl, getMetaAvailableAccounts, connectMetaExisting, getBrands, getSyncSchedule, setSyncSchedule, getAiProviders, saveAiProvider, deleteAiProvider } from '../services/marketing-api';
 import { useState } from 'react';
+
+const AI_PROVIDER_CONFIG = [
+  { provider: 'anthropic', name: 'Anthropic', description: 'Claude Sonnet, Claude Opus', color: 'bg-orange-500' },
+  { provider: 'openai', name: 'OpenAI', description: 'GPT-4o, GPT-4o Mini', color: 'bg-green-500' },
+  { provider: 'google', name: 'Google AI', description: 'Gemini Pro, Gemini Flash', color: 'bg-blue-500' },
+];
 
 const PLATFORMS = [
   { key: 'all', label: 'الكل' },
@@ -30,6 +36,29 @@ export default function MarketingSettings() {
   const [activePlatform, setActivePlatform] = useState('all');
   const [brandSelect, setBrandSelect] = useState<Record<string, string>>({});
   const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [aiKeyInputs, setAiKeyInputs] = useState<Record<string, string>>({});
+
+  const { data: aiProvidersData } = useQuery({
+    queryKey: ['ai-providers'],
+    queryFn: () => getAiProviders(),
+  });
+
+  const saveAiMutation = useMutation({
+    mutationFn: (data: { provider: string; name: string; apiKey: string }) => saveAiProvider(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ai-providers'] });
+      setAiKeyInputs({});
+    },
+  });
+
+  const deleteAiMutation = useMutation({
+    mutationFn: (id: string) => deleteAiProvider(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['ai-providers'] });
+    },
+  });
+
+  const aiProviders: any[] = aiProvidersData?.data?.providers ?? [];
 
   const { data: configData } = useQuery({
     queryKey: ['marketing', 'creative-code-config'],
@@ -130,6 +159,110 @@ export default function MarketingSettings() {
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-slate-800">إعدادات التسويق</h1>
+
+      {/* AI Providers */}
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-4">إعدادات الذكاء الاصطناعي</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {AI_PROVIDER_CONFIG.map((cfg) => {
+            const existing = aiProviders.find((p: any) => p.provider === cfg.provider);
+            const hasKey = !!existing;
+            return (
+              <div key={cfg.provider} className="border border-slate-200 rounded-xl p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full ${cfg.color}`} />
+                    <div>
+                      <p className="font-medium text-slate-800">{cfg.name}</p>
+                      <p className="text-xs text-slate-400">{cfg.description}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${hasKey ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {hasKey ? 'متصل' : 'غير متصل'}
+                  </span>
+                </div>
+
+                {hasKey ? (
+                  <div className="space-y-2">
+                    <div className="bg-slate-50 rounded-lg px-3 py-2 text-sm text-slate-600 font-mono" dir="ltr">
+                      {existing.maskedKey}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          const val = aiKeyInputs[cfg.provider];
+                          if (val) {
+                            saveAiMutation.mutate({ provider: cfg.provider, name: cfg.name, apiKey: val });
+                          } else {
+                            setAiKeyInputs((prev) => ({ ...prev, [cfg.provider]: '' }));
+                          }
+                        }}
+                        className="flex-1 px-3 py-1.5 text-xs text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50"
+                      >
+                        تحديث
+                      </button>
+                      <button
+                        onClick={() => deleteAiMutation.mutate(existing.id)}
+                        disabled={deleteAiMutation.isPending}
+                        className="flex-1 px-3 py-1.5 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50"
+                      >
+                        حذف
+                      </button>
+                    </div>
+                    {aiKeyInputs[cfg.provider] !== undefined && (
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={aiKeyInputs[cfg.provider] || ''}
+                          onChange={(e) => setAiKeyInputs((prev) => ({ ...prev, [cfg.provider]: e.target.value }))}
+                          placeholder="أدخل المفتاح الجديد"
+                          className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+                          dir="ltr"
+                        />
+                        <button
+                          onClick={() => {
+                            const val = aiKeyInputs[cfg.provider];
+                            if (val) {
+                              saveAiMutation.mutate({ provider: cfg.provider, name: cfg.name, apiKey: val });
+                            }
+                          }}
+                          disabled={!aiKeyInputs[cfg.provider] || saveAiMutation.isPending}
+                          className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          حفظ
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="password"
+                      value={aiKeyInputs[cfg.provider] || ''}
+                      onChange={(e) => setAiKeyInputs((prev) => ({ ...prev, [cfg.provider]: e.target.value }))}
+                      placeholder="أدخل API Key"
+                      className="flex-1 border rounded-lg px-3 py-1.5 text-sm"
+                      dir="ltr"
+                    />
+                    <button
+                      onClick={() => {
+                        const val = aiKeyInputs[cfg.provider];
+                        if (val) {
+                          saveAiMutation.mutate({ provider: cfg.provider, name: cfg.name, apiKey: val });
+                        }
+                      }}
+                      disabled={!aiKeyInputs[cfg.provider] || saveAiMutation.isPending}
+                      className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {saveAiMutation.isPending ? 'جاري...' : 'حفظ'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
 
       {/* Ad Accounts */}
       <div className="bg-white rounded-xl border border-slate-200 p-6">

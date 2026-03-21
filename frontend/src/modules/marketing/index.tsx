@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { lazy } from 'react';
 import MarketingShell from './components/MarketingShell';
 import Dashboard from './pages/Dashboard';
 import CreativeLibrary from './pages/CreativeLibrary';
@@ -14,6 +15,8 @@ import CreativeForm from './pages/CreativeForm';
 import LandingPages from './pages/LandingPages';
 import LandingPageEditor from './pages/LandingPageEditor';
 import Settings from './pages/Settings';
+
+const OrderForms = lazy(() => import('./pages/OrderForms'));
 
 export default function MarketingModule() {
   return (
@@ -31,6 +34,7 @@ export default function MarketingModule() {
         <Route path="calendar" element={<ContentCalendar />} />
         <Route path="media-buying" element={<MediaBuying />} />
         <Route path="media-buying/oauth/meta/callback" element={<MetaOAuthCallback />} />
+        <Route path="order-forms" element={<OrderForms />} />
         <Route path="landing-pages" element={<LandingPages />} />
         <Route path="landing-pages/:id" element={<LandingPageEditor />} />
         <Route path="settings" element={<Settings />} />

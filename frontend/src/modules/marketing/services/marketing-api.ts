@@ -200,3 +200,17 @@ export const createSavedFilter = (data: { name: string; filters: any }) =>
   api.post('/marketing/settings/saved-filters', data);
 export const deleteSavedFilter = (id: string) =>
   api.delete(`/marketing/settings/saved-filters/${id}`);
+
+// === AI Providers ===
+export const getAiProviders = () => api.get('/marketing/ai-providers');
+export const getAiModels = () => api.get('/marketing/ai-providers/models');
+export const saveAiProvider = (data: { provider: string; name: string; apiKey: string }) =>
+  api.post('/marketing/ai-providers', data);
+export const deleteAiProvider = (id: string) => api.delete(`/marketing/ai-providers/${id}`);
+
+// === Order Form Templates ===
+export const getOrderForms = () => api.get('/marketing/order-forms');
+export const getOrderForm = (id: string) => api.get(`/marketing/order-forms/${id}`);
+export const createOrderForm = (data: any) => api.post('/marketing/order-forms', data);
+export const updateOrderForm = (id: string, data: any) => api.put(`/marketing/order-forms/${id}`, data);
+export const deleteOrderForm = (id: string) => api.delete(`/marketing/order-forms/${id}`);

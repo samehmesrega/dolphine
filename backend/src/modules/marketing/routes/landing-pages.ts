@@ -1,10 +1,103 @@
 import { Router } from 'express';
 import type { Response } from 'express';
 import type { AuthRequest } from '../../../shared/middleware/auth';
+import { prisma } from '../../../db';
 import * as lpService from '../services/landing-page.service';
 import * as aiLpService from '../services/ai-landing-page.service';
+import { getProductById } from '../../knowledge-base/services/kb-product.service';
 
 const router = Router();
+
+// ===== Helpers =====
+
+function buildProductContext(product: any): string {
+  let ctx = `## Product: ${product.name}\n`;
+  if (product.description) ctx += `Description: ${product.description}\n`;
+  if (product.sku) ctx += `SKU: ${product.sku}\n`;
+  if (product.category) ctx += `Category: ${product.category}\n`;
+  if (product.dimensions) ctx += `Dimensions: ${product.dimensions}\n`;
+  if (product.weight) ctx += `Weight: ${product.weight}\n`;
+
+  // Pricing
+  if (product.pricing?.length) {
+    ctx += `\n## Pricing\n`;
+    for (const p of product.pricing) {
+      ctx += `- ${p.priceType}: ${p.price} ${p.currency}`;
+      if (p.variation) ctx += ` (${p.variation.name})`;
+      ctx += '\n';
+    }
+  }
+
+  // Variations
+  if (product.variations?.length) {
+    ctx += `\n## Variations\n`;
+    for (const v of product.variations) {
+      ctx += `- ${v.name}`;
+      if (v.color) ctx += `, Color: ${v.color}`;
+      if (v.size) ctx += `, Size: ${v.size}`;
+      ctx += '\n';
+    }
+  }
+
+  // Marketing
+  if (product.marketing) {
+    const m = product.marketing;
+    if (m.usps) ctx += `\n## USPs (Unique Selling Points)\n${m.usps}\n`;
+    if (m.targetAudience) ctx += `\n## Target Audience\n${m.targetAudience}\n`;
+    if (m.competitorComparison) ctx += `\n## vs Competitors\n${m.competitorComparison}\n`;
+    if (m.brandVoice) ctx += `\n## Brand Voice\n${m.brandVoice}\n`;
+    if (m.keywords) ctx += `\n## Keywords\n${m.keywords}\n`;
+  }
+
+  // FAQs
+  if (product.faqs?.length) {
+    ctx += `\n## FAQs\n`;
+    for (const f of product.faqs) {
+      ctx += `Q: ${f.question}\nA: ${f.answer}\n\n`;
+    }
+  }
+
+  // Objections
+  if (product.objections?.length) {
+    ctx += `\n## Common Objections & Responses\n`;
+    for (const o of product.objections) {
+      ctx += `Objection: ${o.objection}\nResponse: ${o.response}\n\n`;
+    }
+  }
+
+  // Sales Scripts
+  if (product.salesScripts?.length) {
+    ctx += `\n## Sales Scripts\n`;
+    for (const s of product.salesScripts) {
+      ctx += `### ${s.title}\n${s.content}\n\n`;
+    }
+  }
+
+  // After Sales
+  if (product.afterSales) {
+    const a = product.afterSales;
+    if (a.warrantyTerms) ctx += `\n## Warranty\n${a.warrantyTerms}\n`;
+    if (a.returnPolicy) ctx += `\n## Return Policy\n${a.returnPolicy}\n`;
+    if (a.usageInstructions) ctx += `\n## Usage Instructions\n${a.usageInstructions}\n`;
+  }
+
+  // Manufacturing (for quality messaging)
+  if (product.manufacturing) {
+    const mfg = product.manufacturing;
+    if (mfg.materials) ctx += `\n## Materials\n${mfg.materials}\n`;
+    if (mfg.productionSteps) ctx += `\n## Production Process\n${mfg.productionSteps}\n`;
+  }
+
+  // Media URLs
+  if (product.media?.length) {
+    ctx += `\n## Product Images\n`;
+    for (const m of product.media) {
+      if (m.type === 'image') ctx += `- ${m.url}\n`;
+    }
+  }
+
+  return ctx;
+}
 
 // ===== Landing Pages CRUD =====
 
@@ -40,18 +133,75 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
       title, slug, brandId, productId,
       productName, productDescription, productPrice, productImages,
       storeName, language, instructions, formFields,
+      kbProductId, formTemplateId, aiProvider, aiModel,
     } = req.body;
+
+    // Resolve KB product context if provided
+    let productContext: string | undefined;
+    let resolvedProductImages = productImages || [];
+    let resolvedProductName = productName || title;
+    let resolvedProductDescription = productDescription;
+    let resolvedProductPrice = productPrice;
+
+    if (kbProductId) {
+      const kbProduct = await getProductById(kbProductId);
+      if (kbProduct) {
+        productContext = buildProductContext(kbProduct);
+        // Use KB product data as fallback if not explicitly provided
+        if (!productName) resolvedProductName = kbProduct.name;
+        if (!productDescription) resolvedProductDescription = kbProduct.description || undefined;
+        // Extract price from pricing data
+        if (!productPrice && kbProduct.pricing?.length) {
+          const mainPrice = kbProduct.pricing[0];
+          resolvedProductPrice = `${mainPrice.price} ${mainPrice.currency}`;
+        }
+        // Append KB product images
+        if (!productImages?.length && kbProduct.media?.length) {
+          resolvedProductImages = kbProduct.media
+            .filter((m: any) => m.type === 'image')
+            .map((m: any) => m.url);
+        }
+      }
+    }
+
+    // Resolve form template if provided
+    let formFieldSpecs: Array<{ fieldName: string; label: string; type: string; required: boolean }> | undefined;
+    let paymentMethods: string[] | undefined;
+    let resolvedFormFields = formFields || ['name', 'phone'];
+
+    if (formTemplateId) {
+      const template = await prisma.orderFormTemplate.findUnique({
+        where: { id: formTemplateId },
+        include: { fields: { orderBy: { orderNum: 'asc' } } },
+      });
+      if (template) {
+        formFieldSpecs = template.fields.map((f) => ({
+          fieldName: f.fieldName,
+          label: f.label,
+          type: f.type,
+          required: f.required,
+        }));
+        paymentMethods = template.paymentMethods as string[];
+        // Override formFields with template field names
+        resolvedFormFields = template.fields.map((f) => f.fieldName);
+      }
+    }
 
     // Generate HTML with AI
     const html = await aiLpService.generateLandingPage({
-      productName: productName || title,
-      productDescription,
-      productPrice,
-      productImages,
+      provider: aiProvider || 'anthropic',
+      model: aiModel || 'claude-sonnet-4-20250514',
+      productName: resolvedProductName,
+      productDescription: resolvedProductDescription,
+      productPrice: resolvedProductPrice,
+      productImages: resolvedProductImages,
       storeName: storeName || '',
       language: language || 'ar',
       instructions,
-      formFields: formFields || ['name', 'phone'],
+      formFields: resolvedFormFields,
+      productContext,
+      formFieldSpecs,
+      paymentMethods,
     });
 
     // Create landing page record
@@ -64,12 +214,36 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
       createdBy: req.user!.userId,
     });
 
-    // Auto-create field mappings for common fields
-    const commonMappings = (formFields || ['name', 'phone']).map((f: string) => ({
-      formFieldName: f,
-      leadField: f === 'phone' ? 'phone' : f,
-    }));
-    await lpService.updateFieldMappings(page.id, commonMappings);
+    // Save formTemplateId on the landing page if provided
+    if (formTemplateId) {
+      await prisma.landingPage.update({
+        where: { id: page.id },
+        data: { formTemplateId },
+      });
+    }
+
+    // Auto-create field mappings
+    if (formTemplateId) {
+      // Use template fields for precise mappings
+      const template = await prisma.orderFormTemplate.findUnique({
+        where: { id: formTemplateId },
+        include: { fields: { orderBy: { orderNum: 'asc' } } },
+      });
+      if (template) {
+        const mappings = template.fields.map((f) => ({
+          formFieldName: f.fieldName,
+          leadField: f.leadField,
+        }));
+        await lpService.updateFieldMappings(page.id, mappings);
+      }
+    } else {
+      // Fallback: auto-create field mappings for common fields
+      const commonMappings = resolvedFormFields.map((f: string) => ({
+        formFieldName: f,
+        leadField: f === 'phone' ? 'phone' : f,
+      }));
+      await lpService.updateFieldMappings(page.id, commonMappings);
+    }
 
     res.status(201).json({ landingPage: page });
   } catch (err: any) {
@@ -125,7 +299,7 @@ router.post('/:id/edit', async (req: AuthRequest, res: Response) => {
     const existing = await lpService.getLandingPageById(String(req.params.id));
     if (!existing) return res.status(404).json({ error: 'Landing page not found' });
 
-    // Generate edited HTML
+    // Generate edited HTML (uses decrypted key from DB via anthropic provider)
     const newHtml = await aiLpService.editLandingPage({
       currentHtml: existing.html,
       editRequest,

@@ -1072,6 +1072,9 @@ model LandingPage {
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
 
+  formTemplateId String?            @map("form_template_id")
+  formTemplate   OrderFormTemplate? @relation(fields: [formTemplateId], references: [id])
+
   versions      LandingPageVersion[]
   fieldMappings FormFieldMapping[]
   abTestsA      ABTest[]             @relation("ABTestPageA")
@@ -1124,6 +1127,52 @@ model ABTest {
   completedAt    DateTime?    @map("completed_at")
 
   @@map("mkt_ab_tests")
+}
+
+// =============================================================
+// AI PROVIDERS + ORDER FORM TEMPLATES
+// =============================================================
+
+model AiProvider {
+  id        String   @id @default(uuid())
+  provider  String   @unique // "anthropic" | "openai" | "google"
+  name      String           // "Anthropic" | "OpenAI" | "Google AI"
+  apiKey    String   @map("api_key") // ENCRYPTED with token-encryption.ts
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_providers")
+}
+
+model OrderFormTemplate {
+  id             String           @id @default(uuid())
+  name           String
+  slug           String           @unique
+  paymentMethods Json             @default("[\"cod\"]") @map("payment_methods")
+  createdAt      DateTime         @default(now()) @map("created_at")
+  updatedAt      DateTime         @updatedAt @map("updated_at")
+
+  fields       OrderFormField[]
+  landingPages LandingPage[]
+
+  @@map("mkt_order_form_templates")
+}
+
+model OrderFormField {
+  id         String            @id @default(uuid())
+  templateId String            @map("template_id")
+  template   OrderFormTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  fieldName  String            @map("field_name")
+  label      String
+  type       String            @default("text") // text|email|tel|select|textarea|number
+  required   Boolean           @default(false)
+  options    String?           // comma-separated for select type
+  leadField  String            @map("lead_field") // name|phone|email|address|whatsapp|custom
+  orderNum   Int               @default(0) @map("order_num")
+
+  @@index([templateId])
+  @@map("mkt_order_form_fields")
 }
 
 // =============================================================
