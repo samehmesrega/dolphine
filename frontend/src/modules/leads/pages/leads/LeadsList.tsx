@@ -384,7 +384,7 @@ export default function LeadsList() {
                   )}
                   <td className="px-4 py-3 text-slate-400 text-sm hidden md:table-cell">#{l.number}</td>
                   <td className="px-4 py-3 text-slate-700">
-                    <Link to={`/leads/${l.id}`} className="text-blue-600 hover:underline font-medium">
+                    <Link to={`/leads/leads/${l.id}`} className="text-blue-600 hover:underline font-medium">
                       {l.name}
                     </Link>
                   </td>
