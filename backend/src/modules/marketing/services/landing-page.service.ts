@@ -185,19 +185,17 @@ export async function updateFieldMappings(
   landingPageId: string,
   mappings: Array<{ formFieldName: string; leadField: string }>
 ) {
-  // Delete existing and recreate
-  await prisma.$transaction([
-    prisma.formFieldMapping.deleteMany({ where: { landingPageId } }),
-    ...mappings.map((m) =>
-      prisma.formFieldMapping.create({
-        data: {
-          landingPageId,
-          formFieldName: m.formFieldName,
-          leadField: m.leadField,
-        },
-      })
-    ),
-  ]);
+  // Delete existing and recreate (sequential to avoid unique constraint race)
+  await prisma.formFieldMapping.deleteMany({ where: { landingPageId } });
+  if (mappings.length > 0) {
+    await prisma.formFieldMapping.createMany({
+      data: mappings.map((m) => ({
+        landingPageId,
+        formFieldName: m.formFieldName,
+        leadField: m.leadField,
+      })),
+    });
+  }
   return prisma.formFieldMapping.findMany({ where: { landingPageId } });
 }
 
