@@ -12,6 +12,7 @@ export default function ProductList() {
 
   // Import modal state
   const [importModal, setImportModal] = useState(false);
+  const [showWooImport, setShowWooImport] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [importDetails, setImportDetails] = useState<string[]>([]);
@@ -43,6 +44,24 @@ export default function ProductList() {
       const data = err?.response?.data;
       setImportError(data?.error || 'حدث خطأ أثناء الاستيراد');
       setImportDetails(data?.details || []);
+    },
+  });
+
+  // WooCommerce import
+  const { data: wooData, isLoading: wooLoading, error: wooError } = useQuery({
+    queryKey: ['woo-products'],
+    queryFn: () => kbApi.getWooProducts(),
+    enabled: showWooImport,
+  });
+  const wooProducts: any[] = wooData?.data?.products || [];
+
+  const importWooMutation = useMutation({
+    mutationFn: (wooId: number) => kbApi.importWooProduct(wooId),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['kb-products'] });
+      setShowWooImport(false);
+      const product = res.data?.product;
+      if (product) navigate(`/knowledge-base/products/${product.id}`);
     },
   });
 
@@ -89,6 +108,15 @@ export default function ProductList() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">المنتجات</h1>
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowWooImport(true)}
+            className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 text-sm flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+            </svg>
+            استيراد من WooCommerce
+          </button>
           <button
             onClick={openImportModal}
             className="px-4 py-2 border border-emerald-600 text-emerald-600 rounded-lg hover:bg-emerald-50 text-sm flex items-center gap-1.5"
@@ -308,6 +336,109 @@ export default function ProductList() {
                 ) : (
                   'استيراد'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* WooCommerce Import Modal */}
+      {showWooImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={() => setShowWooImport(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 p-6 max-h-[80vh] flex flex-col"
+            dir="rtl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-bold text-slate-800">استيراد منتج من WooCommerce</h2>
+              <button onClick={() => setShowWooImport(false)} className="text-slate-400 hover:text-slate-600">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {wooLoading ? (
+                <div className="p-8 text-center text-slate-500">
+                  <svg className="animate-spin w-8 h-8 mx-auto mb-3 text-blue-500" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  جاري تحميل المنتجات من WooCommerce...
+                </div>
+              ) : wooError ? (
+                <div className="p-6 text-center">
+                  <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700 font-medium">
+                      {(wooError as any)?.response?.data?.error || 'WooCommerce غير مربوط'}
+                    </p>
+                  </div>
+                </div>
+              ) : wooProducts.length === 0 ? (
+                <div className="p-8 text-center text-slate-500">
+                  <p className="text-sm">لا توجد منتجات في WooCommerce</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {wooProducts.map((wp: any) => (
+                    <div
+                      key={wp.id}
+                      className="border border-slate-200 rounded-xl p-4 hover:border-blue-300 transition-colors"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-semibold text-slate-800 truncate">{wp.name}</h3>
+                          <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-500">
+                            {wp.sku && (
+                              <span className="px-1.5 py-0.5 bg-slate-100 rounded font-mono">
+                                SKU: {wp.sku}
+                              </span>
+                            )}
+                            {wp.price && (
+                              <span>السعر: {wp.price}</span>
+                            )}
+                            {wp.variations && wp.variations.length > 0 && (
+                              <span>{wp.variations.length} فاريشن</span>
+                            )}
+                          </div>
+                          {importWooMutation.isError && importWooMutation.variables === wp.id && (
+                            <p className="mt-2 text-xs text-red-600">
+                              {(importWooMutation.error as any)?.response?.data?.error || 'حدث خطأ أثناء الاستيراد'}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => importWooMutation.mutate(wp.id)}
+                          disabled={importWooMutation.isPending && importWooMutation.variables === wp.id}
+                          className="mr-3 px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-xs disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shrink-0"
+                        >
+                          {importWooMutation.isPending && importWooMutation.variables === wp.id ? (
+                            <>
+                              <svg className="animate-spin w-3.5 h-3.5" viewBox="0 0 24 24" fill="none">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                              </svg>
+                              جاري الاستيراد...
+                            </>
+                          ) : (
+                            'استيراد'
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setShowWooImport(false)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-800 text-sm"
+              >
+                إغلاق
               </button>
             </div>
           </div>

@@ -4,6 +4,7 @@ import multer from 'multer';
 import type { AuthRequest } from '../../../shared/middleware/auth';
 import { requirePermission } from '../../../shared/middleware/auth';
 import * as productService from '../services/kb-product.service';
+import * as wooImportService from '../services/kb-woo-import.service';
 import {
   PRODUCT_IMPORT_TEMPLATE,
   importSchema,
@@ -112,6 +113,29 @@ router.post(
     }
   }
 );
+
+// GET /api/v1/knowledge-base/products/woo-products — list WC products
+router.get('/woo-products', async (req: AuthRequest, res: Response) => {
+  try {
+    const products = await wooImportService.fetchWooProducts();
+    res.json({ products });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// POST /api/v1/knowledge-base/products/import-woo/:wooProductId — import WC product
+router.post('/import-woo/:wooProductId', async (req: AuthRequest, res: Response) => {
+  try {
+    const product = await wooImportService.importWooProduct(
+      Number(req.params.wooProductId),
+      req.user!.userId
+    );
+    res.status(201).json({ product });
+  } catch (err: any) {
+    res.status(400).json({ error: err.message });
+  }
+});
 
 // GET /api/v1/knowledge-base/products/:id
 router.get('/:id', async (req: AuthRequest, res: Response) => {

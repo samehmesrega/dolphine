@@ -121,3 +121,8 @@ export const updateSalesScript = (productId: string, id: string, data: any) =>
   api.put(`/knowledge-base/products/${productId}/sales-scripts/${id}`, data);
 export const deleteSalesScript = (productId: string, id: string) =>
   api.delete(`/knowledge-base/products/${productId}/sales-scripts/${id}`);
+
+// WooCommerce Import
+export const getWooProducts = () => api.get('/knowledge-base/products/woo-products');
+export const importWooProduct = (wooProductId: number) =>
+  api.post(`/knowledge-base/products/import-woo/${wooProductId}`);
