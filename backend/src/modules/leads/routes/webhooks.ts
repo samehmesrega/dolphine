@@ -266,8 +266,34 @@ router.post('/sheets/:token', async (req: Request, res: Response) => {
       console.log('[sheets-webhook] تم إنشاء ليد من شيت:', connection.name);
       res.status(201).json({ success: true });
     } else if (result.skipped) {
+      // Create notification for skipped lead — notify all super admins
+      const skipAdmins = await prisma.user.findMany({ where: { isSuperAdmin: true, isActive: true }, select: { id: true } });
+      for (const admin of skipAdmins) {
+        await prisma.notification.create({
+          data: {
+            userId: admin.id,
+            type: 'sheet_sync_skip',
+            title: 'ليد لم يتم استيراده',
+            body: `تم تجاهل صف من "${connection.name}" — لا يوجد رقم هاتف صالح`,
+            link: '/integrations',
+          },
+        });
+      }
       res.status(200).json({ success: true, skipped: true, reason: 'no_valid_phone' });
     } else {
+      // Create notification for failed import — notify all super admins
+      const errorAdmins = await prisma.user.findMany({ where: { isSuperAdmin: true, isActive: true }, select: { id: true } });
+      for (const admin of errorAdmins) {
+        await prisma.notification.create({
+          data: {
+            userId: admin.id,
+            type: 'sheet_sync_error',
+            title: 'فشل استيراد ليد',
+            body: `فشل استيراد صف من "${connection.name}": ${result.error || 'خطأ غير معروف'}`,
+            link: '/integrations',
+          },
+        });
+      }
       res.status(200).json({ success: false, error: result.error });
     }
   } catch (err: unknown) {

@@ -481,4 +481,83 @@ router.post('/:id/import-all', async (req: Request, res: Response) => {
   }
 });
 
+// GET /api/sheet-connections/:id/auto-sync-script — Generate Google Apps Script for auto-sync
+router.get('/:id/auto-sync-script', async (req: Request, res: Response) => {
+  try {
+    const connection = await prisma.sheetConnection.findUnique({
+      where: { id: String(req.params.id) },
+    });
+    if (!connection) {
+      res.status(404).json({ error: 'الاتصال غير موجود' });
+      return;
+    }
+
+    const baseUrl = process.env.RENDER_EXTERNAL_URL || process.env.API_BASE_URL || `${req.protocol}://${req.get('host')}`;
+    const webhookUrl = `${baseUrl}/api/webhooks/sheets/${connection.token}`;
+
+    const script = `// Dolphin Auto-Sync — ${connection.name}
+// يتم تفعيله تلقائياً عند إضافة صف جديد في الشيت
+
+function onSheetChange(e) {
+  // فقط عند إضافة صف جديد
+  if (e.changeType !== 'INSERT_ROW') return;
+
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) return; // تجاهل لو مفيش بيانات
+
+  var lastCol = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var values = sheet.getRange(lastRow, 1, 1, lastCol).getValues()[0];
+
+  // تجاهل الصفوف الفارغة تماماً
+  var hasData = values.some(function(v) { return v !== '' && v !== null && v !== undefined; });
+  if (!hasData) return;
+
+  // بناء بيانات الصف
+  var rowData = {};
+  for (var i = 0; i < headers.length; i++) {
+    if (headers[i]) {
+      rowData[headers[i]] = (values[i] !== null && values[i] !== undefined) ? String(values[i]) : '';
+    }
+  }
+
+  // إرسال للويب هوك
+  var url = '${webhookUrl}';
+  try {
+    UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify({ row: rowData }),
+      muteHttpExceptions: true
+    });
+  } catch(err) {
+    Logger.log('Dolphin webhook error: ' + err);
+  }
+}
+
+// قم بتشغيل هذه الدالة مرة واحدة فقط لتفعيل المزامنة التلقائية
+function installTrigger() {
+  // حذف أي triggers قديمة
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'onSheetChange') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  // إضافة trigger جديد
+  ScriptApp.newTrigger('onSheetChange')
+    .forSpreadsheet(SpreadsheetApp.getActive())
+    .onChange()
+    .create();
+  Logger.log('✅ تم تفعيل المزامنة التلقائية بنجاح');
+}`;
+
+    res.json({ script, webhookUrl });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'خطأ';
+    res.status(400).json({ error: msg });
+  }
+});
+
 export default router;

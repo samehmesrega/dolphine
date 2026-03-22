@@ -831,6 +831,31 @@ function GoogleSheetsSection() {
   };
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [autoSyncModal, setAutoSyncModal] = useState<{ script: string; webhookUrl: string } | null>(null);
+  const [autoSyncLoading, setAutoSyncLoading] = useState<string | null>(null);
+  const [autoSyncCopied, setAutoSyncCopied] = useState(false);
+
+  const handleAutoSync = async (connectionId: string) => {
+    setAutoSyncLoading(connectionId);
+    try {
+      const { data } = await api.get<{ script: string; webhookUrl: string }>(`/sheet-connections/${connectionId}/auto-sync-script`);
+      setAutoSyncModal(data);
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { error?: string } } };
+      alert(e?.response?.data?.error || 'خطأ في جلب السكربت');
+    } finally {
+      setAutoSyncLoading(null);
+    }
+  };
+
+  const copyAutoSyncScript = () => {
+    if (autoSyncModal) {
+      navigator.clipboard.writeText(autoSyncModal.script);
+      setAutoSyncCopied(true);
+      setTimeout(() => setAutoSyncCopied(false), 2000);
+    }
+  };
+
   const sheetWebhookUrl = (token: string) => `${apiBase}/api/webhooks/sheets/${token}`;
   const copySheetUrl = (id: string, token: string) => {
     navigator.clipboard.writeText(sheetWebhookUrl(token));
@@ -960,6 +985,14 @@ function GoogleSheetsSection() {
                   </button>
                   <button
                     type="button"
+                    onClick={() => handleAutoSync(sc.id)}
+                    disabled={autoSyncLoading === sc.id}
+                    className="text-sm bg-purple-100 text-purple-800 hover:bg-purple-200 px-3 py-1 rounded"
+                  >
+                    {autoSyncLoading === sc.id ? 'جاري...' : 'مزامنة تلقائية'}
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => window.confirm('حذف هذا الاتصال؟') && deleteSheetMutation.mutate(sc.id)}
                     disabled={deleteSheetMutation.isPending}
                     className="text-sm text-red-600 hover:text-red-700"
@@ -994,6 +1027,63 @@ function GoogleSheetsSection() {
             </li>
           ))}
         </ul>
+      )}
+      {/* Auto-Sync Modal */}
+      {autoSyncModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => { setAutoSyncModal(null); setAutoSyncCopied(false); }}>
+          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-slate-800">المزامنة التلقائية — Google Apps Script</h3>
+              <button type="button" onClick={() => { setAutoSyncModal(null); setAutoSyncCopied(false); }} className="text-slate-400 hover:text-slate-600 text-xl">✕</button>
+            </div>
+
+            <div className="mb-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm font-semibold text-blue-800 mb-2">خطوات التفعيل:</p>
+              <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
+                <li>افتح الشيت المربوط</li>
+                <li>من القائمة: Extensions &rarr; Apps Script</li>
+                <li>احذف أي كود موجود والصق الكود أدناه</li>
+                <li>اضغط Save (Ctrl+S)</li>
+                <li>شغّل دالة installTrigger مرة واحدة (من القائمة Run)</li>
+                <li>اقبل الصلاحيات المطلوبة</li>
+                <li>خلاص! أي صف جديد هيتسحب تلقائي</li>
+              </ol>
+            </div>
+
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs text-slate-500">الكود:</p>
+              <button
+                type="button"
+                onClick={copyAutoSyncScript}
+                className="text-sm bg-slate-200 hover:bg-slate-300 px-3 py-1 rounded"
+              >
+                {autoSyncCopied ? 'تم النسخ ✓' : 'نسخ'}
+              </button>
+            </div>
+
+            <textarea
+              readOnly
+              value={autoSyncModal.script}
+              className="w-full h-64 text-xs font-mono bg-slate-50 border border-slate-200 rounded-lg p-3 resize-none focus:outline-none"
+              dir="ltr"
+            />
+
+            <div className="mt-3 text-xs text-slate-500">
+              <span className="font-medium">Webhook URL:</span>{' '}
+              <code className="bg-slate-100 px-1 py-0.5 rounded" dir="ltr">{autoSyncModal.webhookUrl}</code>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => { setAutoSyncModal(null); setAutoSyncCopied(false); }}
+                className="bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-600 text-sm"
+              >
+                إغلاق
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </section>
   );
