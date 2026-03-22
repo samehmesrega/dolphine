@@ -496,19 +496,27 @@ router.get('/:id/auto-sync-script', async (req: Request, res: Response) => {
     const webhookUrl = `${baseUrl}/api/webhooks/sheets/${connection.token}`;
 
     const script = `// Dolphin Auto-Sync — ${connection.name}
-// يتم تفعيله تلقائياً عند إضافة صف جديد في الشيت
+// يراقب الشيت ويبعت أي صف جديد فيه بيانات لدولفين تلقائياً
 
-function onSheetChange(e) {
-  // فقط عند إضافة صف جديد
-  if (e.changeType !== 'INSERT_ROW') return;
+var WEBHOOK_URL = '${webhookUrl}';
+var PROP_KEY = 'dolphin_last_synced_row';
 
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
-  var lastRow = sheet.getLastRow();
-  if (lastRow <= 1) return; // تجاهل لو مفيش بيانات
+function dolphinOnEdit(e) {
+  if (!e || !e.range) return;
 
+  var sheet = e.range.getSheet();
+  var editedRow = e.range.getRow();
+  if (editedRow <= 1) return; // تجاهل الهيدر
+
+  // تحقق إن الصف ده جديد (مش اتبعت قبل كده)
+  var props = PropertiesService.getScriptProperties();
+  var lastSynced = parseInt(props.getProperty(PROP_KEY) || '1', 10);
+  if (editedRow <= lastSynced) return; // صف قديم — اتبعت قبل كده
+
+  // اقرأ بيانات الصف
   var lastCol = sheet.getLastColumn();
   var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var values = sheet.getRange(lastRow, 1, 1, lastCol).getValues()[0];
+  var values = sheet.getRange(editedRow, 1, 1, lastCol).getValues()[0];
 
   // تجاهل الصفوف الفارغة تماماً
   var hasData = values.some(function(v) { return v !== '' && v !== null && v !== undefined; });
@@ -523,34 +531,47 @@ function onSheetChange(e) {
   }
 
   // إرسال للويب هوك
-  var url = '${webhookUrl}';
   try {
-    UrlFetchApp.fetch(url, {
+    var response = UrlFetchApp.fetch(WEBHOOK_URL, {
       method: 'post',
       contentType: 'application/json',
       payload: JSON.stringify({ row: rowData }),
       muteHttpExceptions: true
     });
+    var code = response.getResponseCode();
+    if (code === 201 || code === 200) {
+      // تحديث آخر صف اتبعت بنجاح
+      props.setProperty(PROP_KEY, String(editedRow));
+      Logger.log('✅ تم إرسال الصف ' + editedRow + ' لدولفين');
+    } else {
+      Logger.log('⚠️ رد غير متوقع: ' + code + ' — ' + response.getContentText());
+    }
   } catch(err) {
-    Logger.log('Dolphin webhook error: ' + err);
+    Logger.log('❌ خطأ في الإرسال: ' + err);
   }
 }
 
 // قم بتشغيل هذه الدالة مرة واحدة فقط لتفعيل المزامنة التلقائية
-function installTrigger() {
+function installDolphinSync() {
   // حذف أي triggers قديمة
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'onSheetChange') {
+    if (triggers[i].getHandlerFunction() === 'dolphinOnEdit') {
       ScriptApp.deleteTrigger(triggers[i]);
     }
   }
-  // إضافة trigger جديد
-  ScriptApp.newTrigger('onSheetChange')
+  // إضافة trigger جديد — يشتغل عند أي تعديل
+  ScriptApp.newTrigger('dolphinOnEdit')
     .forSpreadsheet(SpreadsheetApp.getActive())
-    .onChange()
+    .onEdit()
     .create();
-  Logger.log('✅ تم تفعيل المزامنة التلقائية بنجاح');
+
+  // تسجيل آخر صف حالي عشان ما يبعتش الصفوف القديمة
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var lastRow = sheet.getLastRow();
+  PropertiesService.getScriptProperties().setProperty(PROP_KEY, String(lastRow));
+
+  Logger.log('✅ تم تفعيل المزامنة التلقائية — آخر صف: ' + lastRow);
 }`;
 
     res.json({ script, webhookUrl });
