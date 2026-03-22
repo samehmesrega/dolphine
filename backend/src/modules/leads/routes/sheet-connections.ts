@@ -496,58 +496,54 @@ router.get('/:id/auto-sync-script', async (req: Request, res: Response) => {
     const webhookUrl = `${baseUrl}/api/webhooks/sheets/${connection.token}`;
 
     const script = `// Dolphin Auto-Sync — ${connection.name}
-// يراقب الشيت ويبعت أي صف جديد فيه بيانات لدولفين تلقائياً
+// يفحص الشيت كل دقيقة ويبعت أي صفوف جديدة لدولفين تلقائياً
 
 var WEBHOOK_URL = '${webhookUrl}';
 var PROP_KEY = 'dolphin_last_synced_row';
 
-function dolphinOnEdit(e) {
-  if (!e || !e.range) return;
-
-  var sheet = e.range.getSheet();
-  var editedRow = e.range.getRow();
-  if (editedRow <= 1) return; // تجاهل الهيدر
-
-  // تحقق إن الصف ده جديد (مش اتبعت قبل كده)
+function dolphinSync() {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var props = PropertiesService.getScriptProperties();
   var lastSynced = parseInt(props.getProperty(PROP_KEY) || '1', 10);
-  if (editedRow <= lastSynced) return; // صف قديم — اتبعت قبل كده
+  var lastRow = sheet.getLastRow();
 
-  // اقرأ بيانات الصف
+  if (lastRow <= lastSynced) return; // مفيش صفوف جديدة
+
   var lastCol = sheet.getLastColumn();
   var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  var values = sheet.getRange(editedRow, 1, 1, lastCol).getValues()[0];
 
-  // تجاهل الصفوف الفارغة تماماً
-  var hasData = values.some(function(v) { return v !== '' && v !== null && v !== undefined; });
-  if (!hasData) return;
+  // استيراد كل الصفوف الجديدة
+  for (var r = lastSynced + 1; r <= lastRow; r++) {
+    var values = sheet.getRange(r, 1, 1, lastCol).getValues()[0];
 
-  // بناء بيانات الصف
-  var rowData = {};
-  for (var i = 0; i < headers.length; i++) {
-    if (headers[i]) {
-      rowData[headers[i]] = (values[i] !== null && values[i] !== undefined) ? String(values[i]) : '';
+    // تجاهل الصفوف الفارغة
+    var hasData = values.some(function(v) { return v !== '' && v !== null && v !== undefined; });
+    if (!hasData) continue;
+
+    var rowData = {};
+    for (var i = 0; i < headers.length; i++) {
+      if (headers[i]) {
+        rowData[headers[i]] = (values[i] !== null && values[i] !== undefined) ? String(values[i]) : '';
+      }
     }
-  }
 
-  // إرسال للويب هوك
-  try {
-    var response = UrlFetchApp.fetch(WEBHOOK_URL, {
-      method: 'post',
-      contentType: 'application/json',
-      payload: JSON.stringify({ row: rowData }),
-      muteHttpExceptions: true
-    });
-    var code = response.getResponseCode();
-    if (code === 201 || code === 200) {
-      // تحديث آخر صف اتبعت بنجاح
-      props.setProperty(PROP_KEY, String(editedRow));
-      Logger.log('✅ تم إرسال الصف ' + editedRow + ' لدولفين');
-    } else {
-      Logger.log('⚠️ رد غير متوقع: ' + code + ' — ' + response.getContentText());
+    try {
+      var response = UrlFetchApp.fetch(WEBHOOK_URL, {
+        method: 'post',
+        contentType: 'application/json',
+        payload: JSON.stringify({ row: rowData }),
+        muteHttpExceptions: true
+      });
+      var code = response.getResponseCode();
+      if (code === 201 || code === 200) {
+        props.setProperty(PROP_KEY, String(r));
+        Logger.log('✅ صف ' + r + ' — تم');
+      } else {
+        Logger.log('⚠️ صف ' + r + ' — رد: ' + code);
+      }
+    } catch(err) {
+      Logger.log('❌ صف ' + r + ' — خطأ: ' + err);
     }
-  } catch(err) {
-    Logger.log('❌ خطأ في الإرسال: ' + err);
   }
 }
 
@@ -556,22 +552,23 @@ function installDolphinSync() {
   // حذف أي triggers قديمة
   var triggers = ScriptApp.getProjectTriggers();
   for (var i = 0; i < triggers.length; i++) {
-    if (triggers[i].getHandlerFunction() === 'dolphinOnEdit') {
+    if (triggers[i].getHandlerFunction() === 'dolphinSync') {
       ScriptApp.deleteTrigger(triggers[i]);
     }
   }
-  // إضافة trigger جديد — يشتغل عند أي تعديل
-  ScriptApp.newTrigger('dolphinOnEdit')
-    .forSpreadsheet(SpreadsheetApp.getActive())
-    .onEdit()
+  // إضافة trigger كل دقيقة
+  ScriptApp.newTrigger('dolphinSync')
+    .timeBased()
+    .everyMinutes(1)
     .create();
 
   // تسجيل آخر صف حالي عشان ما يبعتش الصفوف القديمة
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var lastRow = sheet.getLastRow();
-  PropertiesService.getScriptProperties().setProperty(PROP_KEY, String(lastRow));
+  props = PropertiesService.getScriptProperties();
+  props.setProperty(PROP_KEY, String(lastRow));
 
-  Logger.log('✅ تم تفعيل المزامنة التلقائية — آخر صف: ' + lastRow);
+  Logger.log('✅ تم تفعيل المزامنة كل دقيقة — آخر صف: ' + lastRow);
 }`;
 
     res.json({ script, webhookUrl });
