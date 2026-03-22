@@ -142,6 +142,10 @@ export async function updateProduct(
     driveFolderUrl: string;
   }>
 ) {
+  // Ensure string fields are strings (frontend may send numbers)
+  if (data.weight !== undefined) data.weight = data.weight != null ? String(data.weight) : undefined;
+  if (data.dimensions !== undefined) data.dimensions = data.dimensions != null ? String(data.dimensions) : undefined;
+
   return prisma.kbProduct.update({
     where: { id },
     data,
