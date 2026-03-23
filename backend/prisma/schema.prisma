@@ -24,6 +24,14 @@ model User {
   phone         String?
   isActive      Boolean   @default(true) @map("is_active")
   isSuperAdmin  Boolean   @default(false) @map("is_super_admin")
+  status        String    @default("active") // "pending", "active", "suspended"
+  authMethod    String    @default("email") @map("auth_method") // "email", "google"
+  emailVerified Boolean   @default(true) @map("email_verified")
+  googleId      String?   @unique @map("google_id")
+  avatarUrl     String?   @map("avatar_url")
+  verificationToken String? @map("verification_token")
+  resetToken        String? @map("reset_token")
+  resetTokenExpiry  DateTime? @map("reset_token_expiry")
   roleId        String    @map("role_id")
   role          Role      @relation(fields: [roleId], references: [id])
   createdAt     DateTime  @default(now()) @map("created_at")

@@ -178,6 +178,75 @@ async function main() {
 
   console.log(`  - KB permissions: ${kbPermissions.length}`);
 
+  // === Seed Pending Role (for new registrations) ===
+  await prisma.role.upsert({
+    where: { slug: 'pending' },
+    update: {},
+    create: { name: 'Pending', slug: 'pending' },
+  });
+  console.log('  - Pending role: created');
+
+  // === Seed Marketing Permissions ===
+  const marketingPermissions = [
+    { name: 'Marketing - View Creatives', slug: 'marketing.creatives.view', module: 'marketing', description: 'عرض الكريتيفز' },
+    { name: 'Marketing - Manage Creatives', slug: 'marketing.creatives.manage', module: 'marketing', description: 'إدارة الكريتيفز' },
+    { name: 'Marketing - View Requests', slug: 'marketing.requests.view', module: 'marketing', description: 'عرض طلبات التصميم' },
+    { name: 'Marketing - Manage Requests', slug: 'marketing.requests.manage', module: 'marketing', description: 'إدارة طلبات التصميم' },
+    { name: 'Marketing - View Ideas', slug: 'marketing.ideas.view', module: 'marketing', description: 'عرض بنك الأفكار' },
+    { name: 'Marketing - Manage Ideas', slug: 'marketing.ideas.manage', module: 'marketing', description: 'إدارة بنك الأفكار' },
+    { name: 'Marketing - View Publishing', slug: 'marketing.publishing.view', module: 'marketing', description: 'عرض النشر والجدولة' },
+    { name: 'Marketing - Manage Publishing', slug: 'marketing.publishing.manage', module: 'marketing', description: 'إدارة النشر والجدولة' },
+    { name: 'Marketing - View Media Buying', slug: 'marketing.media-buying.view', module: 'marketing', description: 'عرض الحملات الإعلانية' },
+    { name: 'Marketing - Manage Media Buying', slug: 'marketing.media-buying.manage', module: 'marketing', description: 'إدارة الحملات الإعلانية' },
+    { name: 'Marketing - View Landing Pages', slug: 'marketing.landing-pages.view', module: 'marketing', description: 'عرض صفحات الهبوط' },
+    { name: 'Marketing - Manage Landing Pages', slug: 'marketing.landing-pages.manage', module: 'marketing', description: 'إدارة صفحات الهبوط' },
+    { name: 'Marketing - View Settings', slug: 'marketing.settings.view', module: 'marketing', description: 'عرض إعدادات التسويق' },
+    { name: 'Marketing - Manage Settings', slug: 'marketing.settings.manage', module: 'marketing', description: 'إدارة إعدادات التسويق' },
+  ];
+
+  for (const perm of marketingPermissions) {
+    await prisma.permission.upsert({
+      where: { slug: perm.slug },
+      update: {},
+      create: perm,
+    });
+  }
+  console.log(`  - Marketing permissions: ${marketingPermissions.length}`);
+
+  // === Seed Settings Permissions ===
+  const settingsPermissions = [
+    { name: 'Settings - View Users', slug: 'settings.users.view', module: 'settings', description: 'عرض المستخدمين' },
+    { name: 'Settings - Manage Users', slug: 'settings.users.manage', module: 'settings', description: 'إدارة المستخدمين' },
+    { name: 'Settings - Manage Roles', slug: 'settings.roles.manage', module: 'settings', description: 'إدارة الأدوار والصلاحيات' },
+  ];
+
+  for (const perm of settingsPermissions) {
+    await prisma.permission.upsert({
+      where: { slug: perm.slug },
+      update: {},
+      create: perm,
+    });
+  }
+  console.log(`  - Settings permissions: ${settingsPermissions.length}`);
+
+  // Assign marketing + settings permissions to admin roles
+  const allNewPerms = [...marketingPermissions, ...settingsPermissions];
+  const adminRolesForNewPerms = await prisma.role.findMany({
+    where: { slug: { in: ['super_admin', 'admin'] } },
+  });
+  for (const role of adminRolesForNewPerms) {
+    for (const perm of allNewPerms) {
+      const permission = await prisma.permission.findUnique({ where: { slug: perm.slug } });
+      if (permission) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+          update: {},
+          create: { roleId: role.id, permissionId: permission.id },
+        });
+      }
+    }
+  }
+
   // === Seed Marketing Projects ===
   const projects = [
     { name: 'Print In', slug: 'print-in', language: 'ar' },
