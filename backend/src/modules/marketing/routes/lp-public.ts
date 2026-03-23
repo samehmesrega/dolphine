@@ -1,7 +1,17 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
+import { z } from 'zod';
 import * as lpService from '../services/landing-page.service';
 import { prisma } from '../../../db';
+
+// Zod schema for form submission — sanitize all fields
+const formSubmissionSchema = z.record(
+  z.string().max(200),
+  z.string().max(2000).trim()
+).refine(
+  (data) => Object.keys(data).length <= 50,
+  { message: 'Too many fields' }
+);
 
 const router = Router();
 
@@ -88,11 +98,21 @@ router.get('/:brand/:slug', async (req: Request, res: Response) => {
 // POST /lp/submit/:landingPageId — Public form submission
 router.post('/submit/:landingPageId', async (req: Request, res: Response) => {
   try {
-    const formData = req.body as Record<string, string>;
+    // Validate & sanitize input
+    const parsed = formSubmissionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ success: false, error: 'بيانات غير صحيحة' });
+    }
+    const formData = parsed.data;
 
     // Honeypot check — bots fill hidden field, humans don't
     if (formData._hp) {
       return res.json({ success: true }); // fake success
+    }
+
+    // Validate landingPageId format
+    if (!/^[a-f0-9-]{36}$/.test(req.params.landingPageId)) {
+      return res.status(400).json({ success: false, error: 'Invalid landing page ID' });
     }
 
     // Basic phone validation

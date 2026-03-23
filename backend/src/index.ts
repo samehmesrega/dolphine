@@ -141,15 +141,23 @@ app.use('/api/marketing', authMiddleware, marketingRoutes);
 app.use('/api/v1/knowledge-base', authMiddleware, knowledgeBaseRoutes);
 app.use('/api/knowledge-base', authMiddleware, knowledgeBaseRoutes);
 
-// Drive image proxy (no auth — images need to load in <img> tags)
+// Drive image proxy — validate fileId format to prevent SSRF
 app.get('/drive-proxy/:fileId', async (req: Request, res: Response) => {
   try {
     const { fileId } = req.params;
-    const size = req.query.s || '1600';
+    // Only allow valid Google Drive file IDs (alphanumeric, hyphens, underscores)
+    if (!fileId || !/^[a-zA-Z0-9_-]{10,80}$/.test(fileId)) {
+      return res.status(400).send('Invalid file ID');
+    }
+    const size = String(req.query.s || '1600').replace(/\D/g, '') || '1600';
     const url = `https://lh3.googleusercontent.com/d/${fileId}=s${size}`;
     const response = await fetch(url);
     if (!response.ok) return res.status(404).send('Not found');
     const contentType = response.headers.get('content-type') || 'image/jpeg';
+    // Only proxy image content types
+    if (!contentType.startsWith('image/')) {
+      return res.status(400).send('Not an image');
+    }
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=86400');
     const buffer = Buffer.from(await response.arrayBuffer());
@@ -159,8 +167,19 @@ app.get('/drive-proxy/:fileId', async (req: Request, res: Response) => {
   }
 });
 
+// Landing page form submission rate limiter (5 req/min per IP)
+const lpSubmitLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'طلبات كثيرة جداً، حاول بعد دقيقة' },
+  keyGenerator: (req) => req.ip || req.socket.remoteAddress || 'unknown',
+  skip: (req) => req.method === 'GET', // only limit POST submissions
+});
+
 // Landing Pages (public routes — no auth)
-app.use('/lp', require('./modules/marketing/routes/lp-public').default);
+app.use('/lp', lpSubmitLimiter, require('./modules/marketing/routes/lp-public').default);
 
 // Webhooks (public, rate-limited)
 // Keeping old path for backwards compatibility with WordPress plugins

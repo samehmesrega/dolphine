@@ -293,44 +293,47 @@ export async function handleFormSubmission(
   const phone = leadData.phone || '';
   const phoneNormalized = phone.replace(/\D/g, '');
 
-  // Duplicate check: same phone + same LP within 24h
-  if (phoneNormalized) {
-    const existing = await prisma.lead.findFirst({
-      where: {
+  // Wrap duplicate check + create in transaction to prevent race condition
+  return prisma.$transaction(async (tx) => {
+    // Duplicate check: same phone + same LP within 24h
+    if (phoneNormalized) {
+      const existing = await tx.lead.findFirst({
+        where: {
+          phoneNormalized,
+          landingPageId,
+          createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
+      });
+      if (existing) return { duplicate: true };
+    }
+
+    // Get default status
+    const defaultStatus = await tx.leadStatus.findFirst({
+      where: { slug: 'new' },
+    });
+    if (!defaultStatus) throw new Error('Default lead status not found');
+
+    // Create lead
+    const lead = await tx.lead.create({
+      data: {
+        name: leadData.name || 'Unknown',
+        phone: phone,
         phoneNormalized,
+        whatsapp: leadData.whatsapp || undefined,
+        email: leadData.email || undefined,
+        address: leadData.address || undefined,
+        source: 'landing_page',
+        sourceDetail: `${lp.brand.name} - ${lp.title}`,
+        statusId: defaultStatus.id,
         landingPageId,
-        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        utmSource: formData._utm_source || undefined,
+        utmMedium: formData._utm_medium || undefined,
+        utmCampaign: formData._utm_campaign || undefined,
+        utmContent: formData._utm_content || undefined,
+        creativeCode: formData._utm_content || undefined,
       },
     });
-    if (existing) return { duplicate: true };
-  }
 
-  // Get default status
-  const defaultStatus = await prisma.leadStatus.findFirst({
-    where: { slug: 'new' },
+    return { lead, duplicate: false };
   });
-  if (!defaultStatus) throw new Error('Default lead status not found');
-
-  // Create lead
-  const lead = await prisma.lead.create({
-    data: {
-      name: leadData.name || 'Unknown',
-      phone: phone,
-      phoneNormalized,
-      whatsapp: leadData.whatsapp || undefined,
-      email: leadData.email || undefined,
-      address: leadData.address || undefined,
-      source: 'landing_page',
-      sourceDetail: `${lp.brand.name} - ${lp.title}`,
-      statusId: defaultStatus.id,
-      landingPageId,
-      utmSource: formData._utm_source || undefined,
-      utmMedium: formData._utm_medium || undefined,
-      utmCampaign: formData._utm_campaign || undefined,
-      utmContent: formData._utm_content || undefined,
-      creativeCode: formData._utm_content || undefined,
-    },
-  });
-
-  return { lead, duplicate: false };
 }

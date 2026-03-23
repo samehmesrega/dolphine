@@ -317,12 +317,6 @@ export async function createLeadFromRow(
   const status = await prisma.leadStatus.findUnique({ where: { slug: statusSlug } });
   if (!status) return { created: false, skipped: false, error: `حالة "${statusSlug}" غير موجودة` };
 
-  const customer = await prisma.customer.upsert({
-    where: { phone: phoneNormalized },
-    update: { email, address },
-    create: { phone: phoneNormalized, name, email, address },
-  });
-
   // تعيين المسؤول من الشيت أو التوزيع التلقائي
   let assignedToId: string | null = null;
   if (mapping.userColumn && mapping.userMapping) {
@@ -335,46 +329,54 @@ export async function createLeadFromRow(
     assignedToId = await getNextAssignedUserId();
   }
 
-  const lead = await prisma.lead.create({
-    data: {
-      name,
-      phone: phoneRaw,
-      phoneNormalized,
-      email,
-      address,
-      customFields: leadCustomFields as object,
-      source: 'google_sheets',
-      sourceDetail: connectionName,
-      statusId: status.id,
-      customerId: customer.id,
-      ...(assignedToId ? { assignedToId } : {}),
-      ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
-    },
+  // Wrap customer + lead + product interest + task in a transaction
+  await prisma.$transaction(async (tx) => {
+    const customer = await tx.customer.upsert({
+      where: { phone: phoneNormalized },
+      update: { email, address },
+      create: { phone: phoneNormalized, name, email, address },
+    });
+
+    const lead = await tx.lead.create({
+      data: {
+        name,
+        phone: phoneRaw,
+        phoneNormalized,
+        email,
+        address,
+        customFields: leadCustomFields as object,
+        source: 'google_sheets',
+        sourceDetail: connectionName,
+        statusId: status.id,
+        customerId: customer.id,
+        ...(assignedToId ? { assignedToId } : {}),
+        ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
+      },
+    });
+
+    if (productId) {
+      await tx.productInterest.create({
+        data: {
+          leadId: lead.id,
+          productId,
+          quantity: 1,
+          customFields: productCustomFields as object,
+        },
+      });
+    }
+
+    if (assignedToId) {
+      await tx.task.create({
+        data: {
+          type: 'new_lead',
+          title: `تواصل مع ليد جديد: ${name}`,
+          leadId: lead.id,
+          assignedToId,
+          status: 'pending',
+        },
+      });
+    }
   });
-
-  if (productId) {
-    await prisma.productInterest.create({
-      data: {
-        leadId: lead.id,
-        productId,
-        quantity: 1,
-        customFields: productCustomFields as object,
-      },
-    });
-  }
-
-  // إنشاء تاسك ليد جديد
-  if (assignedToId) {
-    await prisma.task.create({
-      data: {
-        type: 'new_lead',
-        title: `تواصل مع ليد جديد: ${name}`,
-        leadId: lead.id,
-        assignedToId,
-        status: 'pending',
-      },
-    });
-  }
 
   return { created: true, skipped: false };
 }

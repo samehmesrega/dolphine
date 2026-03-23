@@ -176,51 +176,55 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
       return;
     }
 
-    const customer = await prisma.customer.upsert({
-      where: { phone: phoneNormalized },
-      update: {
-        whatsapp: typeof raw.whatsapp === 'string' ? raw.whatsapp : undefined,
-        email,
-        address,
-      },
-      create: {
-        phone: phoneNormalized,
-        name,
-        email,
-        address,
-      },
-    });
-
     const assignedToId = await getNextAssignedUserId();
 
-    const lead = await prisma.lead.create({
-      data: {
-        name,
-        phone: phoneRaw,
-        phoneNormalized,
-        email,
-        address,
-        customFields: leadCustomFields as object,
-        source: 'form',
-        sourceDetail: connection.shortcode || connection.name,
-        statusId: status.id,
-        customerId: customer.id,
-        ...(assignedToId ? { assignedToId } : {}),
-      },
-      include: { status: true, customer: true, assignedTo: { select: { id: true, name: true } } },
-    });
-
-    if (connection.productId) {
-      await prisma.productInterest.create({
-        data: {
-          leadId: lead.id,
-          productId: connection.productId,
-          quantity: 1,
-          customFields: productCustomFields as object,
+    // Wrap customer upsert + lead create + product interest in a transaction
+    const lead = await prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.upsert({
+        where: { phone: phoneNormalized },
+        update: {
+          whatsapp: typeof raw.whatsapp === 'string' ? raw.whatsapp : undefined,
+          email,
+          address,
+        },
+        create: {
+          phone: phoneNormalized,
+          name,
+          email,
+          address,
         },
       });
-      console.log('[webhook] تم إنشاء اهتمام منتج تلقائياً للمنتج:', connection.productId);
-    }
+
+      const newLead = await tx.lead.create({
+        data: {
+          name,
+          phone: phoneRaw,
+          phoneNormalized,
+          email,
+          address,
+          customFields: leadCustomFields as object,
+          source: 'form',
+          sourceDetail: connection.shortcode || connection.name,
+          statusId: status.id,
+          customerId: customer.id,
+          ...(assignedToId ? { assignedToId } : {}),
+        },
+        include: { status: true, customer: true, assignedTo: { select: { id: true, name: true } } },
+      });
+
+      if (connection.productId) {
+        await tx.productInterest.create({
+          data: {
+            leadId: newLead.id,
+            productId: connection.productId,
+            quantity: 1,
+            customFields: productCustomFields as object,
+          },
+        });
+      }
+
+      return newLead;
+    });
 
     console.log('[webhook] تم إنشاء ليد:', lead.id, lead.name);
     res.status(201).json({ success: true, lead: { id: lead.id, name: lead.name } });
