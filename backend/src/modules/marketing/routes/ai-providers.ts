@@ -28,9 +28,14 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
       orderBy: { createdAt: 'desc' },
     });
     const result = providers.map((provider) => {
-      const masked = provider.apiKey
-        ? decryptToken(provider.apiKey).slice(0, 6) + '****'
-        : '';
+      let masked = '';
+      if (provider.apiKey) {
+        try {
+          masked = decryptToken(provider.apiKey).slice(0, 6) + '****';
+        } catch {
+          masked = provider.apiKey.slice(0, 6) + '****';
+        }
+      }
       return {
         id: provider.id,
         provider: provider.provider,
@@ -71,7 +76,15 @@ router.get('/models', async (_req: AuthRequest, res: Response) => {
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
     const { provider, name, apiKey } = req.body;
-    const encrypted = encryptToken(apiKey);
+    if (!provider || !apiKey) {
+      return res.status(400).json({ error: 'provider و apiKey مطلوبين' });
+    }
+    let encrypted: string;
+    try {
+      encrypted = encryptToken(apiKey);
+    } catch (encErr: any) {
+      return res.status(500).json({ error: 'TOKEN_ENCRYPTION_KEY غير مضبوط. أضفه في ملف .env' });
+    }
     const result = await prisma.aiProvider.upsert({
       where: { provider },
       update: { name, apiKey: encrypted, isActive: true },

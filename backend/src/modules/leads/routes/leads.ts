@@ -210,16 +210,18 @@ type LeadUpdateData = {
 router.post('/bulk-delete', async (req: Request, res: Response) => {
   try {
     const callerId = (req as AuthRequest).user?.userId;
-    if (callerId) {
-      const callerUser = await prisma.user.findUnique({
-        where: { id: callerId },
-        include: { role: true },
-      });
-      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
-      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
-        res.status(403).json({ error: 'ليس لديك صلاحية حذف الليدز' });
-        return;
-      }
+    if (!callerId) {
+      res.status(401).json({ error: 'غير مصرح' });
+      return;
+    }
+    const callerUser = await prisma.user.findUnique({
+      where: { id: callerId },
+      include: { role: true },
+    });
+    const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+    if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+      res.status(403).json({ error: 'ليس لديك صلاحية حذف الليدز' });
+      return;
     }
     const { leadIds } = req.body as { leadIds?: string[] };
     if (!Array.isArray(leadIds) || leadIds.length === 0) {

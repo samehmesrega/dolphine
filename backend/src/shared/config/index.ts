@@ -7,6 +7,11 @@ if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
   process.exit(1);
 }
 
+if (process.env.NODE_ENV === 'production' && !process.env.TOKEN_ENCRYPTION_KEY) {
+  console.error('[SECURITY] TOKEN_ENCRYPTION_KEY غير مضبوط في بيئة الإنتاج! أنشئ واحد بـ: openssl rand -hex 32');
+  process.exit(1);
+}
+
 export const config = {
   port: parseInt(process.env.PORT || '4000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',

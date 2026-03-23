@@ -61,8 +61,17 @@ type GeneralRow = {
   leads_over_time: unknown;
 };
 
-// بناء query المصادر بتعبير label متغيّر
-function sourceQuery(labelExpr: string): string {
+// تعبيرات label المسموحة فقط — whitelist لمنع SQL injection
+const ALLOWED_LABEL_EXPRS: Record<string, string> = {
+  utm_source: `COALESCE(NULLIF(TRIM(l.custom_fields->>'مصدر الزيارة'), ''), '(غير محدد)')`,
+  utm_campaign: `COALESCE(NULLIF(TRIM(l.custom_fields->>'الحملة الإعلانية'), ''), '(غير محدد)')`,
+  form_source: `COALESCE(NULLIF(TRIM(l.source_detail), ''), NULLIF(TRIM(l.source), ''), '(غير محدد)')`,
+};
+
+// بناء query المصادر بتعبير label من الـ whitelist فقط
+function sourceQuery(labelKey: string): string {
+  const labelExpr = ALLOWED_LABEL_EXPRS[labelKey];
+  if (!labelExpr) throw new Error(`Invalid label key: ${labelKey}`);
   return `
     WITH period_leads AS (
       SELECT
@@ -301,15 +310,15 @@ router.get('/sources', async (req: Request, res: Response) => {
 
     const [byUtmSource, byUtmCampaign, byForm] = await Promise.all([
       prisma.$queryRawUnsafe<SourceRow[]>(
-        sourceQuery(`COALESCE(NULLIF(TRIM(l.custom_fields->>'مصدر الزيارة'), ''), '(غير محدد)')`),
+        sourceQuery('utm_source'),
         from, to,
       ),
       prisma.$queryRawUnsafe<SourceRow[]>(
-        sourceQuery(`COALESCE(NULLIF(TRIM(l.custom_fields->>'الحملة الإعلانية'), ''), '(غير محدد)')`),
+        sourceQuery('utm_campaign'),
         from, to,
       ),
       prisma.$queryRawUnsafe<SourceRow[]>(
-        sourceQuery(`COALESCE(NULLIF(TRIM(l.source_detail), ''), NULLIF(TRIM(l.source), ''), '(غير محدد)')`),
+        sourceQuery('form_source'),
         from, to,
       ),
     ]);

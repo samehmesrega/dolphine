@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { extractSpreadsheetId, readHeaders, readRows } from '../services/googleSheets';
 import { normalizePhone } from '../../../shared/utils/phone';
 import { getNextAssignedUserId } from '../services/roundRobin';
+import { encryptToken, decryptToken } from '../../../shared/utils/token-encryption';
 
 const router = Router();
 
@@ -45,9 +46,19 @@ router.get('/google-config', async (_req: Request, res: Response) => {
     const setting = await prisma.integrationSetting.findUnique({
       where: { key: 'google_sheets_api_key' },
     });
+    let apiKeyMasked: string | null = null;
+    if (setting?.value) {
+      try {
+        const decrypted = decryptToken(setting.value);
+        apiKeyMasked = decrypted.slice(0, 6) + '****';
+      } catch {
+        // Legacy plaintext key — mask it directly
+        apiKeyMasked = setting.value.slice(0, 6) + '****';
+      }
+    }
     res.json({
       configured: !!setting?.value,
-      apiKeyMasked: setting?.value ? setting.value.slice(0, 8) + '...' : null,
+      apiKeyMasked,
     });
   } catch (err) {
     console.error('Google config read error:', err);
@@ -62,10 +73,11 @@ router.post('/google-config', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'مفتاح API غير صالح' });
       return;
     }
+    const encrypted = encryptToken(apiKey.trim());
     await prisma.integrationSetting.upsert({
       where: { key: 'google_sheets_api_key' },
-      update: { value: apiKey.trim() },
-      create: { key: 'google_sheets_api_key', value: apiKey.trim() },
+      update: { value: encrypted },
+      create: { key: 'google_sheets_api_key', value: encrypted },
     });
     res.json({ success: true });
   } catch (err) {

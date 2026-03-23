@@ -35,10 +35,15 @@ export async function createTemplate(data: {
   }>;
 }) {
   return prisma.$transaction(async (tx) => {
+    let slug = data.slug || data.name.toLowerCase().replace(/\s+/g, '-') || `form-${Date.now().toString(36)}`;
+    // Ensure unique slug
+    const existing = await tx.orderFormTemplate.findUnique({ where: { slug } });
+    if (existing) slug = `${slug}-${Date.now().toString(36)}`;
+
     const template = await tx.orderFormTemplate.create({
       data: {
         name: data.name,
-        slug: data.slug || data.name.toLowerCase().replace(/\s+/g, '-'),
+        slug,
         paymentMethods: data.paymentMethods || ['cod'],
         fields: {
           create: data.fields.map((f, i) => ({

@@ -334,6 +334,11 @@ export default function LandingPages() {
                     <option key={b.id} value={b.id}>{b.name}</option>
                   ))}
                 </select>
+                {brandOptions.length === 0 && (
+                  <p className="text-xs text-amber-600 mt-1">
+                    لا يوجد براندات. أنشئ براند أولاً من إعدادات التسويق.
+                  </p>
+                )}
               </div>
 
               {createMode === 'ai' && (
@@ -436,6 +441,11 @@ export default function LandingPages() {
                         </optgroup>
                       ))}
                     </select>
+                    {aiModelsFlat.length === 0 && (
+                      <p className="text-xs text-amber-600 mt-1">
+                        لا يوجد موديلات متاحة. أضف API Key من إعدادات التسويق &gt; الذكاء الاصطناعي.
+                      </p>
+                    )}
                   </div>
 
                   <div>

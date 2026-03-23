@@ -129,9 +129,11 @@ export default function OrderForms() {
   const handleNameChange = (name: string) => {
     const slug = name
       .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
+      .replace(/[^\w\u0600-\u06FF\s-]/g, '')
       .replace(/\s+/g, '-')
-      .replace(/-+/g, '-');
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      || `form-${Date.now().toString(36)}`;
     setForm((prev) => ({ ...prev, name, slug }));
   };
 
