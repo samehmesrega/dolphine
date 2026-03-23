@@ -39,8 +39,8 @@ export async function getCreativeROI(creativeCode: string, dateRange: DateRange)
   });
 
   const totalRevenue = ordersData.reduce((sum, o) => {
-    const itemsTotal = o.orderItems.reduce((s, i) => s + i.price * i.quantity, 0);
-    return sum + itemsTotal - (o.discount || 0);
+    const itemsTotal = o.orderItems.reduce((s, i) => s + Number(i.price) * i.quantity, 0);
+    return sum + itemsTotal - Number(o.discount || 0);
   }, 0);
 
   const spend = adMetrics._sum.spend || 0;

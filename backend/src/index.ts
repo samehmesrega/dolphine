@@ -144,12 +144,13 @@ app.use('/api/knowledge-base', authMiddleware, knowledgeBaseRoutes);
 // Drive image proxy — validate fileId format to prevent SSRF
 app.get('/drive-proxy/:fileId', async (req: Request, res: Response) => {
   try {
-    const { fileId } = req.params;
+    const fileId = String(req.params.fileId);
     // Only allow valid Google Drive file IDs (alphanumeric, hyphens, underscores)
     if (!fileId || !/^[a-zA-Z0-9_-]{10,80}$/.test(fileId)) {
       return res.status(400).send('Invalid file ID');
     }
-    const size = String(req.query.s || '1600').replace(/\D/g, '') || '1600';
+    const rawSize = Array.isArray(req.query.s) ? req.query.s[0] : req.query.s;
+    const size = String(rawSize || '1600').replace(/\D/g, '') || '1600';
     const url = `https://lh3.googleusercontent.com/d/${fileId}=s${size}`;
     const response = await fetch(url);
     if (!response.ok) return res.status(404).send('Not found');

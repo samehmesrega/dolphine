@@ -111,7 +111,7 @@ router.post('/submit/:landingPageId', async (req: Request, res: Response) => {
     }
 
     // Validate landingPageId format
-    if (!/^[a-f0-9-]{36}$/.test(req.params.landingPageId)) {
+    if (!/^[a-f0-9-]{36}$/.test(String(req.params.landingPageId))) {
       return res.status(400).json({ success: false, error: 'Invalid landing page ID' });
     }
 
