@@ -55,16 +55,18 @@ router.get('/', async (req: Request, res: Response) => {
 router.post('/bulk-delete', async (req: Request, res: Response) => {
   try {
     const callerId = (req as AuthRequest).user?.userId;
-    if (callerId) {
-      const callerUser = await prisma.user.findUnique({
-        where: { id: callerId },
-        include: { role: true },
-      });
-      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
-      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
-        res.status(403).json({ error: 'ليس لديك صلاحية حذف العملاء' });
-        return;
-      }
+    if (!callerId) {
+      res.status(401).json({ error: 'غير مصرح' });
+      return;
+    }
+    const callerUser = await prisma.user.findUnique({
+      where: { id: callerId },
+      include: { role: true },
+    });
+    const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+    if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+      res.status(403).json({ error: 'ليس لديك صلاحية حذف العملاء' });
+      return;
     }
     const { customerIds } = req.body as { customerIds?: string[] };
     if (!Array.isArray(customerIds) || customerIds.length === 0) {
@@ -93,16 +95,18 @@ router.post('/bulk-delete', async (req: Request, res: Response) => {
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const callerId = (req as AuthRequest).user?.userId;
-    if (callerId) {
-      const callerUser = await prisma.user.findUnique({
-        where: { id: callerId },
-        include: { role: true },
-      });
-      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
-      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
-        res.status(403).json({ error: 'ليس لديك صلاحية حذف العملاء' });
-        return;
-      }
+    if (!callerId) {
+      res.status(401).json({ error: 'غير مصرح' });
+      return;
+    }
+    const callerUser = await prisma.user.findUnique({
+      where: { id: callerId },
+      include: { role: true },
+    });
+    const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
+    if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+      res.status(403).json({ error: 'ليس لديك صلاحية حذف العملاء' });
+      return;
     }
     const id = String(req.params.id);
     const customer = await prisma.customer.findUnique({
