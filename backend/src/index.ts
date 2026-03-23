@@ -134,8 +134,8 @@ app.use('/api/v1/auth', authLimiter, authRoutes);
 app.use('/api/v1/leads', authMiddleware, leadsRoutes);
 
 // Marketing module
-app.use('/api/v1/marketing', authMiddleware, marketingRoutes);
-app.use('/api/marketing', authMiddleware, marketingRoutes);
+app.use('/api/v1/marketing', authMiddleware, requireModule('marketing'), marketingRoutes);
+app.use('/api/marketing', authMiddleware, requireModule('marketing'), marketingRoutes);
 
 // Knowledge Base module
 app.use('/api/v1/knowledge-base', authMiddleware, knowledgeBaseRoutes);

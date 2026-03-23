@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './modules/auth/context/AuthContext';
 import AppShell from './shared/Layout/AppShell';
 import ModuleSwitcher from './shared/Layout/ModuleSwitcher';
+import ErrorBoundary from './shared/components/ErrorBoundary';
 import Login from './modules/auth/pages/Login';
 
 const LeadsModule = lazy(() => import('./modules/leads'));
@@ -103,12 +104,14 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      </QueryClientProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        </QueryClientProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

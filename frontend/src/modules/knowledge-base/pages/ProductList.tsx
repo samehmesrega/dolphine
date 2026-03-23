@@ -2,10 +2,13 @@ import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
 import * as kbApi from '../services/kb-api';
+import { useAuth } from '../../auth/context/AuthContext';
 
 export default function ProductList() {
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const { hasPermission, user } = useAuth();
+  const canManage = hasPermission('*') || hasPermission('products.manage') || ['super_admin', 'admin'].includes(user?.role?.slug ?? '');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState('');
@@ -107,32 +110,34 @@ export default function ProductList() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-slate-800">المنتجات</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowWooImport(true)}
-            className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 text-sm flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-            </svg>
-            استيراد من WooCommerce
-          </button>
-          <button
-            onClick={openImportModal}
-            className="px-4 py-2 border border-emerald-600 text-emerald-600 rounded-lg hover:bg-emerald-50 text-sm flex items-center gap-1.5"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-            </svg>
-            استيراد منتج
-          </button>
-          <Link
-            to="/knowledge-base/products/new"
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
-          >
-            + إضافة منتج
-          </Link>
-        </div>
+        {canManage && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowWooImport(true)}
+              className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-50 text-sm flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
+              </svg>
+              استيراد من WooCommerce
+            </button>
+            <button
+              onClick={openImportModal}
+              className="px-4 py-2 border border-emerald-600 text-emerald-600 rounded-lg hover:bg-emerald-50 text-sm flex items-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              استيراد منتج
+            </button>
+            <Link
+              to="/knowledge-base/products/new"
+              className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 text-sm"
+            >
+              + إضافة منتج
+            </Link>
+          </div>
+        )}
       </div>
 
       {/* Search & Filters */}
