@@ -48,11 +48,23 @@ export async function authMiddleware(
       return;
     }
 
-    const roleSlug = user.role.slug;
+    // Check status field (if it exists — safe for pre-migration)
+    const userStatus = (user as any).status;
+    if (userStatus === 'suspended') {
+      res.status(401).json({ error: 'غير مصرح', message: 'حسابك معطّل' });
+      return;
+    }
+    if (userStatus === 'pending') {
+      res.status(403).json({ error: 'غير مصرح', message: 'حسابك في انتظار موافقة المدير' });
+      return;
+    }
+
+    // Safe role access — handle null/missing role (e.g., pending users)
+    const roleSlug = user.role?.slug ?? 'pending';
     let permissions: string[];
-    if (roleSlug === 'super_admin' || user.isSuperAdmin) {
+    if ((roleSlug === 'super_admin' || user.isSuperAdmin) && user.role) {
       permissions = ['*'];
-    } else {
+    } else if (user.role) {
       const rolePerms = new Set(
         user.role.rolePermissions?.map((rp) => rp.permission.slug) ?? []
       );
@@ -61,6 +73,9 @@ export async function authMiddleware(
         else rolePerms.delete(up.permission.slug);
       }
       permissions = Array.from(rolePerms);
+    } else {
+      // No role assigned — zero permissions
+      permissions = [];
     }
 
     const modules = user.moduleAccess?.map((ma) => ma.module.slug) ?? ['leads'];

@@ -8,9 +8,10 @@ import { authMiddleware, type AuthRequest } from '../../../shared/middleware/aut
 const router = Router();
 
 function getPermissions(
-  role: { slug: string; rolePermissions?: { permission: { slug: string } }[] },
+  role: { slug: string; rolePermissions?: { permission: { slug: string } }[] } | null,
   userPerms: { grant: boolean; permission: { slug: string } }[] = [],
 ) {
+  if (!role) return []; // Pending users with no role → zero permissions
   if (role.slug === 'super_admin') return ['*'];
   const set = new Set((role.rolePermissions ?? []).map((rp) => rp.permission.slug));
   for (const up of userPerms) {
@@ -35,8 +36,26 @@ router.post('/login', async (req: Request, res: Response) => {
         userPermissions: { include: { permission: true } },
       },
     });
-    if (!user || !user.isActive) {
+    if (!user) {
       res.status(401).json({ error: 'بيانات الدخول غير صحيحة' });
+      return;
+    }
+
+    // Check account status (safe — uses optional chaining for pre-migration compat)
+    const userStatus = (user as any).status as string | undefined;
+    if (userStatus === 'pending') {
+      res.status(403).json({ error: 'حسابك في انتظار موافقة المدير' });
+      return;
+    }
+    if (userStatus === 'suspended' || !user.isActive) {
+      res.status(403).json({ error: 'حسابك معطّل — تواصل مع الإدارة' });
+      return;
+    }
+
+    // Check email verification (safe — field may not exist pre-migration)
+    const emailVerified = (user as any).emailVerified as boolean | undefined;
+    if (emailVerified === false) {
+      res.status(403).json({ error: 'يرجى تأكيد الإيميل أولاً', needsVerification: true });
       return;
     }
 
@@ -60,7 +79,9 @@ router.post('/login', async (req: Request, res: Response) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        role: { id: user.role.id, name: user.role.name, slug: user.role.slug },
+        role: user.role
+          ? { id: user.role.id, name: user.role.name, slug: user.role.slug }
+          : { id: '', name: 'Pending', slug: 'pending' },
         permissions,
       },
     });
