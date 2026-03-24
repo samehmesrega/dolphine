@@ -204,7 +204,8 @@ router.post('/register', async (req: Request, res: Response) => {
         data: admins.map((a) => ({
           userId: a.id,
           type: 'new_registration',
-          message: `مستخدم جديد سجّل: ${user.name} (${user.email}) — في انتظار الموافقة`,
+          title: 'طلب تسجيل جديد',
+          body: `مستخدم جديد سجّل: ${user.name} (${user.email}) — في انتظار الموافقة`,
           link: '/settings/pending',
         })),
       });
@@ -326,7 +327,8 @@ router.post('/google', async (req: Request, res: Response) => {
           data: admins.map((a) => ({
             userId: a.id,
             type: 'new_registration',
-            message: `مستخدم جديد سجّل بـ Google: ${newUser.name} (${newUser.email}) — في انتظار الموافقة`,
+            title: 'طلب تسجيل جديد',
+            body: `مستخدم جديد سجّل بـ Google: ${newUser.name} (${newUser.email}) — في انتظار الموافقة`,
             link: '/settings/pending',
           })),
         });
