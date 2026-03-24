@@ -1019,18 +1019,23 @@ model AdMetric {
   adSet       AdSet?    @relation(fields: [adSetId], references: [id], onDelete: Cascade)
   adId        String?   @map("ad_id")
   ad          Ad?       @relation(fields: [adId], references: [id], onDelete: Cascade)
-  impressions Int       @default(0)
-  clicks      Int       @default(0)
-  spend       Float     @default(0)
-  conversions Int       @default(0)
-  leads       Int       @default(0)
-  purchases   Int       @default(0)
-  revenue     Float     @default(0)
-  ctr         Float?    // clicks/impressions
-  cpc         Float?    // spend/clicks
-  cpl         Float?    // spend/leads
-  cpa         Float?    // spend/purchases
-  roas        Float?    // revenue/spend
+  impressions     Int       @default(0)
+  reach           Int       @default(0)
+  clicks          Int       @default(0)
+  outboundClicks  Int       @default(0) @map("outbound_clicks")
+  spend           Float     @default(0)
+  conversions     Int       @default(0)
+  leads           Int       @default(0)      // Meta "lead" actions
+  purchases       Int       @default(0)      // Meta "purchase" = Digitics "lead" (COD form submit)
+  revenue         Float     @default(0)
+  frequency       Float?                     // impressions / reach
+  cpm             Float?                     // cost per 1000 impressions
+  ctr             Float?                     // clicks / impressions
+  outboundCtr     Float?    @map("outbound_ctr") // outbound_clicks / impressions
+  cpc             Float?                     // spend / clicks
+  cpl             Float?                     // spend / purchases (Digitics "lead" = Meta purchase)
+  cpa             Float?                     // spend / confirmed orders (from Dolphin Leads)
+  roas            Float?                     // revenue / spend
 
   @@unique([date, adId])
   @@index([date])

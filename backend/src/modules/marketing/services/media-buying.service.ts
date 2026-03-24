@@ -223,7 +223,11 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
         adAccount: { select: { platform: true, accountName: true, brand: true } },
         metrics: {
           where: metricWhere,
-          select: { spend: true, leads: true, purchases: true, revenue: true, impressions: true, clicks: true },
+          select: {
+            spend: true, leads: true, purchases: true, revenue: true,
+            impressions: true, reach: true, clicks: true, outboundClicks: true,
+            frequency: true, cpm: true,
+          },
         },
       },
       orderBy: { updatedAt: 'desc' },
@@ -237,14 +241,21 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
     const totals = c.metrics.reduce(
       (acc, m) => ({
         spend: acc.spend + m.spend,
-        leads: acc.leads + m.leads,
-        orders: acc.orders + m.purchases,
-        revenue: acc.revenue + m.revenue,
         impressions: acc.impressions + m.impressions,
+        reach: acc.reach + m.reach,
         clicks: acc.clicks + m.clicks,
+        outboundClicks: acc.outboundClicks + m.outboundClicks,
+        leads: acc.leads + m.purchases,       // Digitics "leads" = Meta purchases
+        metaLeads: acc.metaLeads + m.leads,    // Actual Meta lead actions
+        revenue: acc.revenue + m.revenue,
       }),
-      { spend: 0, leads: 0, orders: 0, revenue: 0, impressions: 0, clicks: 0 }
+      { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, metaLeads: 0, revenue: 0 }
     );
+
+    const frequency = totals.reach > 0 ? totals.impressions / totals.reach : 0;
+    const cpm = totals.impressions > 0 ? (totals.spend / totals.impressions) * 1000 : 0;
+    const outboundCtr = totals.impressions > 0 ? (totals.outboundClicks / totals.impressions) * 100 : 0;
+    const cpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
 
     return {
       id: c.id,
@@ -255,9 +266,18 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
       platform: c.adAccount.platform,
       brand: c.adAccount.brand?.name,
       accountName: c.adAccount.accountName,
-      ...totals,
-      roas: totals.spend > 0 ? totals.revenue / totals.spend : 0,
-      cpl: totals.leads > 0 ? totals.spend / totals.leads : 0,
+      spend: totals.spend,
+      impressions: totals.impressions,
+      reach: totals.reach,
+      clicks: totals.clicks,
+      outboundClicks: totals.outboundClicks,
+      leads: totals.leads,           // Digitics leads (= Meta purchases)
+      revenue: totals.revenue,
+      frequency: +frequency.toFixed(2),
+      cpm: +cpm.toFixed(2),
+      outboundCtr: +outboundCtr.toFixed(2),
+      cpl: +cpl.toFixed(2),
+      roas: totals.spend > 0 ? +(totals.revenue / totals.spend).toFixed(2) : 0,
     };
   });
 

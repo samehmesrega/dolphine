@@ -232,7 +232,7 @@ export async function syncInsights(
   const actId = `act_${account.accountId}`;
 
   // Fetch insights at campaign level, broken down by day
-  const fields = 'campaign_id,campaign_name,impressions,clicks,spend,actions,action_values';
+  const fields = 'campaign_id,campaign_name,impressions,reach,clicks,spend,actions,action_values,outbound_clicks,frequency,cpm';
   const params = new URLSearchParams({
     fields,
     access_token: token,
@@ -271,7 +271,12 @@ export async function syncInsights(
 
     const spend = parseFloat(row.spend || '0');
     const impressions = parseInt(row.impressions || '0', 10);
+    const reach = parseInt(row.reach || '0', 10);
     const clicks = parseInt(row.clicks || '0', 10);
+    const outboundClicksArr = row.outbound_clicks || [];
+    const outboundClicks = outboundClicksArr.reduce?.((sum: number, o: any) => sum + parseInt(o.value || '0', 10), 0) || 0;
+    const purchaseCount = parseInt(String(purchases), 10);
+    const cpmValue = parseFloat(row.cpm || '0');
 
     // Normalize date to midnight UTC to avoid timezone duplicates
     const dateStr = String(row.date_start).split('T')[0]; // "2026-03-24"
@@ -290,16 +295,21 @@ export async function syncInsights(
 
     const metricData = {
       impressions,
+      reach,
       clicks,
+      outboundClicks,
       spend,
       conversions: parseInt(String(conversions), 10),
       leads: parseInt(String(leads), 10),
-      purchases: parseInt(String(purchases), 10),
+      purchases: purchaseCount,
       revenue: parseFloat(String(revenue)),
+      frequency: reach > 0 ? impressions / reach : null,
+      cpm: cpmValue || (impressions > 0 ? (spend / impressions) * 1000 : null),
       ctr: impressions > 0 ? (clicks / impressions) * 100 : null,
+      outboundCtr: impressions > 0 ? (outboundClicks / impressions) * 100 : null,
       cpc: clicks > 0 ? spend / clicks : null,
-      cpl: parseInt(String(leads), 10) > 0 ? spend / parseInt(String(leads), 10) : null,
-      cpa: parseInt(String(purchases), 10) > 0 ? spend / parseInt(String(purchases), 10) : null,
+      cpl: purchaseCount > 0 ? spend / purchaseCount : null,  // CPL = spend / Meta purchases (= Digitics leads)
+      cpa: null,  // CPP calculated later from Dolphin Leads confirmed orders
       roas: spend > 0 ? parseFloat(String(revenue)) / spend : null,
     };
 
