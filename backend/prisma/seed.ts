@@ -247,6 +247,22 @@ async function main() {
     }
   }
 
+  // === Seed Brands (mkt_brands) ===
+  const brands = [
+    { name: 'Print In', slug: 'print-in', language: 'ar' },
+    { name: 'Picked In', slug: 'picked-in', language: 'en' },
+    { name: 'Choroida', slug: 'choroida', language: 'en' },
+  ];
+
+  for (const b of brands) {
+    await prisma.brand.upsert({
+      where: { slug: b.slug },
+      update: {},
+      create: b,
+    });
+  }
+  console.log(`  - Brands: ${brands.length}`);
+
   // === Seed Marketing Projects ===
   const projects = [
     { name: 'Print In', slug: 'print-in', language: 'ar' },
