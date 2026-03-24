@@ -192,7 +192,8 @@ router.post('/register', async (req: Request, res: Response) => {
     });
 
     // Send verification email
-    await sendVerificationEmail(emailNorm, user.name, verificationToken);
+    const emailSent = await sendVerificationEmail(emailNorm, user.name, verificationToken);
+    console.log(`[Register] Verification email to ${emailNorm}: ${emailSent ? 'sent' : 'FAILED'}`);
 
     // Notify admins
     const admins = await prisma.user.findMany({

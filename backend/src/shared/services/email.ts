@@ -65,7 +65,7 @@ function emailWrapper(content: string): string {
 }
 
 export async function sendVerificationEmail(to: string, name: string, token: string): Promise<boolean> {
-  const link = `${config.appUrl}/verify-email/${token}`;
+  const link = `${config.appUrl}/api/v1/auth/verify-email/${token}`;
   const html = emailWrapper(`
     <h2 style="color:#1e293b;margin:0 0 16px;font-size:18px;">مرحباً ${name} 👋</h2>
     <p style="color:#475569;line-height:1.7;margin:0 0 24px;">شكراً لتسجيلك في منصة دولفين. اضغط على الزرار أدناه لتأكيد إيميلك:</p>
