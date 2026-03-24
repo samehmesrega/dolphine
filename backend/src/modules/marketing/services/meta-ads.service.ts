@@ -343,10 +343,37 @@ export async function fullSync(adAccountId: string): Promise<{
     // Sync campaigns
     const campaignCount = await syncCampaigns(adAccountId);
 
-    // Sync last 30 days of insights
+    // Sync max available data — Meta API allows up to 37 months
+    // Pull in 90-day chunks to avoid API limits
     const dateTo = new Date().toISOString().split('T')[0];
-    const dateFrom = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const metricCount = await syncInsights(adAccountId, dateFrom, dateTo);
+    const maxMonths = 37;
+    const dateFromMax = new Date();
+    dateFromMax.setMonth(dateFromMax.getMonth() - maxMonths);
+    const dateFromStr = dateFromMax.toISOString().split('T')[0];
+
+    let metricCount = 0;
+    const chunkDays = 90;
+    let chunkEnd = new Date(dateTo);
+    const absoluteStart = new Date(dateFromStr);
+
+    while (chunkEnd > absoluteStart) {
+      const chunkStart = new Date(chunkEnd);
+      chunkStart.setDate(chunkStart.getDate() - chunkDays);
+      if (chunkStart < absoluteStart) chunkStart.setTime(absoluteStart.getTime());
+
+      const from = chunkStart.toISOString().split('T')[0];
+      const to = chunkEnd.toISOString().split('T')[0];
+      console.log(`[Sync] Insights chunk: ${from} → ${to}`);
+
+      try {
+        metricCount += await syncInsights(adAccountId, from, to);
+      } catch (err: any) {
+        console.warn(`[Sync] Chunk ${from}→${to} failed: ${err.message}`);
+      }
+
+      chunkEnd = new Date(chunkStart);
+      chunkEnd.setDate(chunkEnd.getDate() - 1);
+    }
 
     const duration = Date.now() - startTime;
 
