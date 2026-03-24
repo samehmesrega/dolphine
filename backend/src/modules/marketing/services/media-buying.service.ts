@@ -111,22 +111,63 @@ export async function getOverviewMetrics(filters: DashboardFilters) {
 
   const s = metrics._sum;
   const spend = s.spend || 0;
-  const leads = s.leads || 0;
-  const purchases = s.purchases || 0;
+  const metaLeads = s.leads || 0;
+  const purchases = s.purchases || 0;  // Meta "purchase" = Digitics "lead"
   const revenue = s.revenue || 0;
   const clicks = s.clicks || 0;
   const impressions = s.impressions || 0;
 
+  // Dolphin confirmed orders (leads with accounts_confirmed status)
+  const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
+  const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
+
+  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'accounts_confirmed' } });
+  const confirmedOrders = confirmedStatus ? await prisma.lead.count({
+    where: {
+      ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
+      statusId: confirmedStatus.id,
+      deletedAt: null,
+    },
+  }) : 0;
+
+  // Order values for AOVL (all leads) and AOVP (confirmed only)
+  const orderDateWhere = {
+    ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
+    deletedAt: null,
+  };
+
+  const allOrderAgg = await prisma.order.aggregate({
+    where: orderDateWhere,
+    _sum: { partialAmount: true },
+    _count: true,
+  });
+
+  const confirmedOrderAgg = confirmedStatus ? await prisma.order.aggregate({
+    where: {
+      ...orderDateWhere,
+      lead: { statusId: confirmedStatus.id },
+    },
+    _sum: { partialAmount: true },
+    _count: true,
+  }) : { _sum: { partialAmount: null }, _count: 0 };
+
+  const allOrderCount = allOrderAgg._count || 0;
+  const allOrderValue = Number(allOrderAgg._sum.partialAmount || 0);
+  const confirmedOrderCount = confirmedOrderAgg._count || 0;
+  const confirmedOrderValue = Number(confirmedOrderAgg._sum.partialAmount || 0);
+
   return {
     totalSpend: spend,
-    totalLeads: leads,
-    totalOrders: purchases,
+    totalLeads: purchases,         // Digitics "leads" = Meta purchases
+    totalConfirmedOrders: confirmedOrders,
     totalRevenue: revenue,
     totalImpressions: impressions,
     totalClicks: clicks,
     overallROAS: spend > 0 ? revenue / spend : 0,
-    overallCPL: leads > 0 ? spend / leads : 0,
-    overallCPA: purchases > 0 ? spend / purchases : 0,
+    overallCPL: purchases > 0 ? spend / purchases : 0,  // CPL = spend / Meta purchases
+    overallCPP: confirmedOrders > 0 ? spend / confirmedOrders : 0,  // CPP = spend / confirmed
+    aovl: allOrderCount > 0 ? allOrderValue / allOrderCount : 0,
+    aovp: confirmedOrderCount > 0 ? confirmedOrderValue / confirmedOrderCount : 0,
     overallCTR: impressions > 0 ? (clicks / impressions) * 100 : 0,
   };
 }
@@ -237,7 +278,12 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
     prisma.campaign.count({ where: campaignWhere }),
   ]);
 
-  const result = campaigns.map((c) => {
+  // Get confirmed orders per campaign from Dolphin Leads (via utm_campaign = ad set name)
+  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'accounts_confirmed' } });
+  const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
+  const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
+
+  const result = await Promise.all(campaigns.map(async (c) => {
     const totals = c.metrics.reduce(
       (acc, m) => ({
         spend: acc.spend + m.spend,
@@ -257,6 +303,27 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
     const outboundCtr = totals.impressions > 0 ? (totals.outboundClicks / totals.impressions) * 100 : 0;
     const cpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
 
+    // Get confirmed orders from Dolphin via ad set names
+    let confirmedOrders = 0;
+    if (confirmedStatus) {
+      const adSets = await prisma.adSet.findMany({
+        where: { campaignId: c.id },
+        select: { name: true },
+      });
+      const adSetNames = adSets.map((a) => a.name);
+      if (adSetNames.length > 0) {
+        confirmedOrders = await prisma.lead.count({
+          where: {
+            utmCampaign: { in: adSetNames },
+            ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
+            statusId: confirmedStatus.id,
+            deletedAt: null,
+          },
+        });
+      }
+    }
+    const cpp = confirmedOrders > 0 ? totals.spend / confirmedOrders : 0;
+
     return {
       id: c.id,
       name: c.name,
@@ -272,14 +339,16 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
       clicks: totals.clicks,
       outboundClicks: totals.outboundClicks,
       leads: totals.leads,           // Digitics leads (= Meta purchases)
+      confirmedOrders,               // Dolphin confirmed orders
       revenue: totals.revenue,
       frequency: +frequency.toFixed(2),
       cpm: +cpm.toFixed(2),
       outboundCtr: +outboundCtr.toFixed(2),
       cpl: +cpl.toFixed(2),
+      cpp: +cpp.toFixed(2),
       roas: totals.spend > 0 ? +(totals.revenue / totals.spend).toFixed(2) : 0,
     };
-  });
+  }));
 
   return { campaigns: result, total, page, pageSize };
 }

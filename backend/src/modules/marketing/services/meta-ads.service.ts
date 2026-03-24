@@ -217,6 +217,45 @@ export async function syncCampaigns(adAccountId: string): Promise<number> {
     console.log(`[Sync] Campaigns: ${count}/${campaigns.length}`);
   }
 
+  // Sync Ad Sets for each campaign
+  console.log(`[Sync] Syncing ad sets...`);
+  const dbCampaigns = await prisma.campaign.findMany({
+    where: { adAccountId },
+    select: { id: true, platformId: true },
+  });
+
+  let adSetCount = 0;
+  for (const dbCamp of dbCampaigns) {
+    try {
+      const asFields = 'id,name,status,targeting,daily_budget';
+      const asRes = await fetchWithTimeout(
+        `${GRAPH_BASE}/${dbCamp.platformId}/adsets?fields=${asFields}&access_token=${token}&limit=500`
+      );
+      const asData = await asRes.json() as any;
+      if (asData.error) continue;
+
+      for (const as of (asData.data || [])) {
+        const asBudget = as.daily_budget ? parseFloat(as.daily_budget) / 100 : null;
+        await prisma.adSet.upsert({
+          where: { campaignId_platformId: { campaignId: dbCamp.id, platformId: as.id } },
+          update: { name: as.name, status: as.status, budget: asBudget },
+          create: {
+            campaignId: dbCamp.id,
+            platformId: as.id,
+            name: as.name,
+            status: as.status,
+            targeting: as.targeting || null,
+            budget: asBudget,
+          },
+        });
+        adSetCount++;
+      }
+    } catch {
+      // Skip failed campaigns
+    }
+  }
+  console.log(`[Sync] Ad sets: ${adSetCount}`);
+
   return count;
 }
 

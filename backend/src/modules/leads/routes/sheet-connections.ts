@@ -288,11 +288,12 @@ export async function createLeadFromRow(
     utm_content:  'محتوى الإعلان',
     utm_term:     'كلمة البحث',
   };
+  const utmValues: Record<string, string> = {};
   for (const [utmKey, label] of Object.entries(utmLabels)) {
-    // بحث بالاسم الدقيق أو بدون حساسية الحالة
     for (const [col, val] of Object.entries(rowData)) {
       if (col.toLowerCase() === utmKey.toLowerCase() && val.trim()) {
         leadCustomFields[label] = val.trim();
+        utmValues[utmKey] = val.trim();
         break;
       }
     }
@@ -351,6 +352,11 @@ export async function createLeadFromRow(
         customerId: customer.id,
         ...(assignedToId ? { assignedToId } : {}),
         ...(parsedCreatedAt ? { createdAt: parsedCreatedAt } : {}),
+        // Save UTMs to dedicated fields for campaign tracking
+        ...(utmValues.utm_source ? { utmSource: utmValues.utm_source } : {}),
+        ...(utmValues.utm_medium ? { utmMedium: utmValues.utm_medium } : {}),
+        ...(utmValues.utm_campaign ? { utmCampaign: utmValues.utm_campaign } : {}),
+        ...(utmValues.utm_content ? { utmContent: utmValues.utm_content } : {}),
       },
     });
 

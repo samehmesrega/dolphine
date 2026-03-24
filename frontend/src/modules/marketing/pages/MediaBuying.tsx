@@ -90,6 +90,8 @@ export default function MediaBuying() {
     frequency: true,
     leads: true,
     cpl: true,
+    confirmedOrders: true,
+    cpp: true,
     clicks: false,
     impressions: false,
     reach: false,
@@ -105,7 +107,9 @@ export default function MediaBuying() {
     outboundCtr: 'Outbound CTR',
     frequency: 'التكرار',
     leads: 'ليدز',
-    cpl: 'CPL',
+    cpl: 'CPL (تكلفة الليد)',
+    confirmedOrders: 'طلبات مؤكدة',
+    cpp: 'CPP (تكلفة الطلب المؤكد)',
     clicks: 'النقرات',
     impressions: 'الظهور',
     reach: 'الوصول',
@@ -278,25 +282,34 @@ export default function MediaBuying() {
       </div>
 
       {/* Overview Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <p className="text-sm text-slate-500">إجمالي الإنفاق</p>
           <p className="text-2xl font-bold text-red-600">{formatCurrency(overview.totalSpend || 0)}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">إجمالي الليدز</p>
+          <p className="text-sm text-slate-500">ليدز</p>
           <p className="text-2xl font-bold text-blue-600">{formatNumber(overview.totalLeads || 0)}</p>
           <p className="text-xs text-slate-400">CPL: {formatCurrency(overview.overallCPL || 0)}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">إجمالي الطلبات</p>
-          <p className="text-2xl font-bold text-green-600">{formatNumber(overview.totalOrders || 0)}</p>
-          <p className="text-xs text-slate-400">CPA: {formatCurrency(overview.overallCPA || 0)}</p>
+          <p className="text-sm text-slate-500">طلبات مؤكدة</p>
+          <p className="text-2xl font-bold text-green-600">{formatNumber(overview.totalConfirmedOrders || 0)}</p>
+          <p className="text-xs text-slate-400">CPP: {formatCurrency(overview.overallCPP || 0)}</p>
         </div>
         <div className="bg-white rounded-xl border border-slate-200 p-4">
           <p className="text-sm text-slate-500">ROAS</p>
           <p className="text-2xl font-bold text-purple-600">{(overview.overallROAS || 0).toFixed(1)}x</p>
-          <p className="text-xs text-slate-400">الإيرادات: {formatCurrency(overview.totalRevenue || 0)}</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <p className="text-sm text-slate-500">AOVL</p>
+          <p className="text-2xl font-bold text-amber-600">{formatCurrency(overview.aovl || 0)}</p>
+          <p className="text-xs text-slate-400">متوسط قيمة طلب الليد</p>
+        </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <p className="text-sm text-slate-500">AOVP</p>
+          <p className="text-2xl font-bold text-teal-600">{formatCurrency(overview.aovp || 0)}</p>
+          <p className="text-xs text-slate-400">متوسط قيمة الطلب المؤكد</p>
         </div>
       </div>
 
@@ -413,6 +426,8 @@ export default function MediaBuying() {
                   {visibleColumns.frequency && <th className="text-right py-2">التكرار</th>}
                   {visibleColumns.leads && <th className="text-right py-2">ليدز</th>}
                   {visibleColumns.cpl && <th className="text-right py-2">CPL</th>}
+                  {visibleColumns.confirmedOrders && <th className="text-right py-2">طلبات مؤكدة</th>}
+                  {visibleColumns.cpp && <th className="text-right py-2">CPP</th>}
                   {visibleColumns.impressions && <th className="text-right py-2">الظهور</th>}
                   {visibleColumns.reach && <th className="text-right py-2">الوصول</th>}
                   {visibleColumns.clicks && <th className="text-right py-2">النقرات</th>}
@@ -445,6 +460,8 @@ export default function MediaBuying() {
                     {visibleColumns.frequency && <td className="py-2">{(c.frequency || 0).toFixed(2)}</td>}
                     {visibleColumns.leads && <td className="py-2">{formatNumber(c.leads)}</td>}
                     {visibleColumns.cpl && <td className="py-2">{formatCurrency(c.cpl || 0)}</td>}
+                    {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(c.confirmedOrders || 0)}</td>}
+                    {visibleColumns.cpp && <td className="py-2">{formatCurrency(c.cpp || 0)}</td>}
                     {visibleColumns.impressions && <td className="py-2">{formatNumber(c.impressions)}</td>}
                     {visibleColumns.reach && <td className="py-2">{formatNumber(c.reach || 0)}</td>}
                     {visibleColumns.clicks && <td className="py-2">{formatNumber(c.clicks)}</td>}
