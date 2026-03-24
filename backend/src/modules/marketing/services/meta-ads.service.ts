@@ -273,14 +273,15 @@ export async function syncInsights(
     const impressions = parseInt(row.impressions || '0', 10);
     const clicks = parseInt(row.clicks || '0', 10);
 
-    const date = new Date(row.date_start);
+    // Normalize date to midnight UTC to avoid timezone duplicates
+    const dateStr = String(row.date_start).split('T')[0]; // "2026-03-24"
+    const date = new Date(`${dateStr}T00:00:00.000Z`);
 
-    // We need a unique constraint. Use campaign + date as key.
-    // Since AdMetric has @@unique([date, adId]) but adId is optional,
-    // we'll use upsert with a find-first approach.
+    // Find existing metric for same account + campaign + date (prevent duplicates)
     const existingMetric = await prisma.adMetric.findFirst({
       where: {
         date,
+        adAccountId,
         campaignId: campaign.id,
         adSetId: null,
         adId: null,
@@ -340,6 +341,17 @@ export async function fullSync(adAccountId: string): Promise<{
   });
 
   try {
+    // Clean up duplicate metrics first (from previous timezone bugs)
+    await prisma.$executeRaw`
+      DELETE FROM ad_metrics a USING ad_metrics b
+      WHERE a.id > b.id
+        AND a.date = b.date
+        AND a.campaign_id = b.campaign_id
+        AND a.ad_account_id = b.ad_account_id
+        AND a.ad_set_id IS NOT DISTINCT FROM b.ad_set_id
+        AND a.ad_id IS NOT DISTINCT FROM b.ad_id
+    `.catch(() => { /* ignore if no duplicates */ });
+
     // Sync campaigns
     const campaignCount = await syncCampaigns(adAccountId);
 
