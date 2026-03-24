@@ -79,8 +79,41 @@ export default function MediaBuying() {
   const [filterPlatform, setFilterPlatform] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
   const [filterAccount, setFilterAccount] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
+  const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
+    spend: true,
+    cpm: true,
+    outboundCtr: true,
+    frequency: true,
+    leads: true,
+    cpl: true,
+    clicks: false,
+    impressions: false,
+    reach: false,
+    outboundClicks: false,
+    roas: false,
+    revenue: false,
+    status: true,
+  });
+
+  const COLUMN_LABELS: Record<string, string> = {
+    spend: 'الإنفاق',
+    cpm: 'CPM',
+    outboundCtr: 'Outbound CTR',
+    frequency: 'التكرار',
+    leads: 'ليدز',
+    cpl: 'CPL',
+    clicks: 'النقرات',
+    impressions: 'الظهور',
+    reach: 'الوصول',
+    outboundClicks: 'نقرات خارجية',
+    roas: 'ROAS',
+    revenue: 'الإيرادات',
+    status: 'الحالة',
+  };
 
   const { from, to } = getDateRange(datePreset, customRange);
 
@@ -226,9 +259,16 @@ export default function MediaBuying() {
             ))}
           </select>
 
-          {(filterPlatform || filterBrand || filterAccount) && (
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[130px]">
+            <option value="">كل الحالات</option>
+            <option value="ACTIVE">نشطة</option>
+            <option value="PAUSED">متوقفة</option>
+          </select>
+
+          {(filterPlatform || filterBrand || filterAccount || filterStatus) && (
             <button
-              onClick={() => { setFilterPlatform(''); setFilterBrand(''); setFilterAccount(''); }}
+              onClick={() => { setFilterPlatform(''); setFilterBrand(''); setFilterAccount(''); setFilterStatus(''); }}
               className="px-3 py-1.5 text-xs text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50"
             >
               مسح الفلاتر ✕
@@ -329,7 +369,35 @@ export default function MediaBuying() {
 
       {/* Campaigns */}
       <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <h3 className="font-semibold text-slate-700 mb-4">الحملات</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold text-slate-700">الحملات</h3>
+          <div className="relative">
+            <button
+              onClick={() => setShowColumnPicker(!showColumnPicker)}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs border rounded-lg text-slate-600 hover:bg-slate-50"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+              </svg>
+              تخصيص الأعمدة
+            </button>
+            {showColumnPicker && (
+              <div className="absolute left-0 top-full mt-1 bg-white border rounded-lg shadow-lg p-3 z-10 min-w-[200px]">
+                {Object.entries(COLUMN_LABELS).map(([key, label]) => (
+                  <label key={key} className="flex items-center gap-2 py-1 text-sm cursor-pointer hover:bg-slate-50 px-1 rounded">
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns[key] ?? false}
+                      onChange={(e) => setVisibleColumns((prev) => ({ ...prev, [key]: e.target.checked }))}
+                      className="rounded"
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         {campaigns.length === 0 ? (
           <p className="text-slate-400 text-sm py-4 text-center">لا يوجد حملات. اربط حساب إعلاني واعمل مزامنة.</p>
         ) : (
@@ -337,40 +405,58 @@ export default function MediaBuying() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-slate-500 border-b">
-                  <th className="text-right py-2">الحملة</th>
-                  <th className="text-right py-2">المنصة</th>
-                  <th className="text-right py-2">الحالة</th>
-                  <th className="text-right py-2">الإنفاق</th>
-                  <th className="text-right py-2">ليدز</th>
-                  <th className="text-right py-2">طلبات</th>
-                  <th className="text-right py-2">ROAS</th>
-                  <th className="text-right py-2">CPL</th>
+                  <th className="text-right py-2 whitespace-nowrap">الحملة</th>
+                  {visibleColumns.status && <th className="text-right py-2">الحالة</th>}
+                  {visibleColumns.spend && <th className="text-right py-2">الإنفاق</th>}
+                  {visibleColumns.cpm && <th className="text-right py-2">CPM</th>}
+                  {visibleColumns.outboundCtr && <th className="text-right py-2">Outbound CTR</th>}
+                  {visibleColumns.frequency && <th className="text-right py-2">التكرار</th>}
+                  {visibleColumns.leads && <th className="text-right py-2">ليدز</th>}
+                  {visibleColumns.cpl && <th className="text-right py-2">CPL</th>}
+                  {visibleColumns.impressions && <th className="text-right py-2">الظهور</th>}
+                  {visibleColumns.reach && <th className="text-right py-2">الوصول</th>}
+                  {visibleColumns.clicks && <th className="text-right py-2">النقرات</th>}
+                  {visibleColumns.outboundClicks && <th className="text-right py-2">نقرات خارجية</th>}
+                  {visibleColumns.roas && <th className="text-right py-2">ROAS</th>}
+                  {visibleColumns.revenue && <th className="text-right py-2">الإيرادات</th>}
                 </tr>
               </thead>
               <tbody>
-                {campaigns.map((c) => (
+                {campaigns
+                  .filter((c) => !filterStatus || c.status === filterStatus)
+                  .map((c) => (
                   <tr key={c.id} className="border-b last:border-0 hover:bg-slate-50">
                     <td className="py-2">
                       <div className="font-medium">{c.name}</div>
                       {c.brand && <div className="text-xs text-slate-400">{c.brand}</div>}
                     </td>
-                    <td className="py-2">{platformLabels[c.platform] || c.platform}</td>
-                    <td className="py-2">
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
-                        c.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                        c.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-slate-100 text-slate-700'
-                      }`}>{c.status}</span>
-                    </td>
-                    <td className="py-2">{formatCurrency(c.spend)}</td>
-                    <td className="py-2">{formatNumber(c.leads)}</td>
-                    <td className="py-2">{formatNumber(c.orders)}</td>
-                    <td className="py-2">
-                      <span className={`font-semibold ${c.roas >= 3 ? 'text-green-600' : c.roas >= 2 ? 'text-yellow-600' : 'text-red-600'}`}>
-                        {c.roas.toFixed(1)}x
-                      </span>
-                    </td>
-                    <td className="py-2">{formatCurrency(c.cpl)}</td>
+                    {visibleColumns.status && (
+                      <td className="py-2">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          c.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
+                          c.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-700' :
+                          'bg-slate-100 text-slate-700'
+                        }`}>{c.status === 'ACTIVE' ? 'نشطة' : c.status === 'PAUSED' ? 'متوقفة' : c.status}</span>
+                      </td>
+                    )}
+                    {visibleColumns.spend && <td className="py-2">{formatCurrency(c.spend)}</td>}
+                    {visibleColumns.cpm && <td className="py-2">{formatCurrency(c.cpm || 0)}</td>}
+                    {visibleColumns.outboundCtr && <td className="py-2">{(c.outboundCtr || 0).toFixed(2)}%</td>}
+                    {visibleColumns.frequency && <td className="py-2">{(c.frequency || 0).toFixed(2)}</td>}
+                    {visibleColumns.leads && <td className="py-2">{formatNumber(c.leads)}</td>}
+                    {visibleColumns.cpl && <td className="py-2">{formatCurrency(c.cpl || 0)}</td>}
+                    {visibleColumns.impressions && <td className="py-2">{formatNumber(c.impressions)}</td>}
+                    {visibleColumns.reach && <td className="py-2">{formatNumber(c.reach || 0)}</td>}
+                    {visibleColumns.clicks && <td className="py-2">{formatNumber(c.clicks)}</td>}
+                    {visibleColumns.outboundClicks && <td className="py-2">{formatNumber(c.outboundClicks || 0)}</td>}
+                    {visibleColumns.roas && (
+                      <td className="py-2">
+                        <span className={`font-semibold ${c.roas >= 3 ? 'text-green-600' : c.roas >= 2 ? 'text-yellow-600' : 'text-red-600'}`}>
+                          {(c.roas || 0).toFixed(1)}x
+                        </span>
+                      </td>
+                    )}
+                    {visibleColumns.revenue && <td className="py-2">{formatCurrency(c.revenue || 0)}</td>}
                   </tr>
                 ))}
               </tbody>
