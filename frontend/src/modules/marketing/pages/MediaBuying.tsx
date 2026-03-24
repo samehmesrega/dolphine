@@ -13,38 +13,37 @@ type DatePreset = 'today' | 'yesterday' | '7d' | '14d' | 'this_month' | 'last_mo
 
 function getDateRange(preset: DatePreset, custom: { from: string; to: string }) {
   const now = new Date();
-  const pad = (d: Date) => d.toISOString();
-  const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; };
-  const endOfDay = (d: Date) => { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; };
+  // Use YYYY-MM-DD format — no timezone offset issues with Meta API dates stored as midnight UTC
+  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  const daysAgo = (n: number) => { const d = new Date(now); d.setDate(d.getDate() - n); return d; };
 
   switch (preset) {
     case 'today':
-      return { from: pad(startOfDay(now)), to: pad(endOfDay(now)) };
+      return { from: fmt(now), to: fmt(now) };
     case 'yesterday': {
-      const y = new Date(now); y.setDate(y.getDate() - 1);
-      return { from: pad(startOfDay(y)), to: pad(endOfDay(y)) };
+      return { from: fmt(daysAgo(1)), to: fmt(daysAgo(1)) };
     }
     case '7d':
-      return { from: pad(new Date(now.getTime() - 7 * 86400000)), to: pad(now) };
+      return { from: fmt(daysAgo(7)), to: fmt(now) };
     case '14d':
-      return { from: pad(new Date(now.getTime() - 14 * 86400000)), to: pad(now) };
+      return { from: fmt(daysAgo(14)), to: fmt(now) };
     case 'this_month': {
       const s = new Date(now.getFullYear(), now.getMonth(), 1);
-      return { from: pad(startOfDay(s)), to: pad(now) };
+      return { from: fmt(s), to: fmt(now) };
     }
     case 'last_month': {
       const s = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const e = new Date(now.getFullYear(), now.getMonth(), 0);
-      return { from: pad(startOfDay(s)), to: pad(endOfDay(e)) };
+      return { from: fmt(s), to: fmt(e) };
     }
     case 'this_year': {
       const s = new Date(now.getFullYear(), 0, 1);
-      return { from: pad(startOfDay(s)), to: pad(now) };
+      return { from: fmt(s), to: fmt(now) };
     }
     case 'custom':
-      return { from: custom.from ? new Date(custom.from).toISOString() : '', to: custom.to ? new Date(custom.to).toISOString() : '' };
+      return { from: custom.from || '', to: custom.to || '' };
     default:
-      return { from: pad(new Date(now.getTime() - 30 * 86400000)), to: pad(now) };
+      return { from: fmt(daysAgo(30)), to: fmt(now) };
   }
 }
 

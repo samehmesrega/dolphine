@@ -77,8 +77,14 @@ function buildMetricWhere(filters: DashboardFilters, accountIds?: string[]) {
   const where: Record<string, unknown> = {};
   if (filters.from || filters.to) {
     where.date = {};
-    if (filters.from) (where.date as Record<string, unknown>).gte = new Date(filters.from);
-    if (filters.to) (where.date as Record<string, unknown>).lte = new Date(filters.to);
+    if (filters.from) {
+      // "2026-03-17" → start of day UTC
+      (where.date as Record<string, unknown>).gte = new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`);
+    }
+    if (filters.to) {
+      // "2026-03-24" → end of day UTC (include the full day)
+      (where.date as Record<string, unknown>).lte = new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`);
+    }
   }
   if (accountIds && accountIds.length > 0) {
     where.adAccountId = { in: accountIds };
