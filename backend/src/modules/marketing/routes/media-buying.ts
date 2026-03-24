@@ -185,6 +185,36 @@ router.get('/campaigns/:id', async (req: AuthRequest, res: Response) => {
 
 // === Manual Sync ===
 
+// POST /marketing/media-buying/resync — delete all metrics and re-sync from scratch
+router.post('/resync', async (req: AuthRequest, res: Response) => {
+  try {
+    // Delete all metrics
+    const deleted = await prisma.adMetric.deleteMany({});
+    console.log(`[Resync] Deleted ${deleted.count} metrics`);
+
+    // Reset lastSyncAt on all accounts so fullSync pulls full history
+    await prisma.adAccount.updateMany({
+      where: { isActive: true },
+      data: { lastSyncAt: null },
+    });
+
+    // Run full sync for all accounts
+    const accounts = await prisma.adAccount.findMany({ where: { isActive: true } });
+    const results = [];
+    for (const acc of accounts) {
+      try {
+        const syncResult = await metaService.fullSync(acc.id);
+        results.push({ id: acc.id, accountName: acc.accountName, status: 'success', ...syncResult });
+      } catch (e: any) {
+        results.push({ id: acc.id, accountName: acc.accountName, status: 'error', error: e.message });
+      }
+    }
+    res.json({ deleted: deleted.count, results });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /marketing/media-buying/sync
 router.post('/sync', async (req: AuthRequest, res: Response) => {
   try {
