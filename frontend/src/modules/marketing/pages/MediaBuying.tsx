@@ -24,9 +24,9 @@ function getDateRange(preset: DatePreset, custom: { from: string; to: string }) 
       return { from: fmt(daysAgo(1)), to: fmt(daysAgo(1)) };
     }
     case '7d':
-      return { from: fmt(daysAgo(7)), to: fmt(now) };
+      return { from: fmt(daysAgo(7)), to: fmt(daysAgo(1)) };
     case '14d':
-      return { from: fmt(daysAgo(14)), to: fmt(now) };
+      return { from: fmt(daysAgo(14)), to: fmt(daysAgo(1)) };
     case 'this_month': {
       const s = new Date(now.getFullYear(), now.getMonth(), 1);
       return { from: fmt(s), to: fmt(now) };
