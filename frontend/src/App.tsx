@@ -7,10 +7,14 @@ import AppShell from './shared/Layout/AppShell';
 import ModuleSwitcher from './shared/Layout/ModuleSwitcher';
 import ErrorBoundary from './shared/components/ErrorBoundary';
 import Login from './modules/auth/pages/Login';
+import Register from './modules/auth/pages/Register';
+import ForgotPassword from './modules/auth/pages/ForgotPassword';
+import ResetPassword from './modules/auth/pages/ResetPassword';
 
 const LeadsModule = lazy(() => import('./modules/leads'));
 const MarketingModule = lazy(() => import('./modules/marketing'));
 const KnowledgeBaseModule = lazy(() => import('./modules/knowledge-base'));
+const SettingsModule = lazy(() => import('./modules/settings'));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,6 +36,9 @@ function AppRoutes() {
     <Routes>
       {/* Public routes */}
       <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* Marketing module (has its own shell) */}
       <Route
@@ -52,6 +59,18 @@ function AppRoutes() {
           <PrivateRoute>
             <Suspense fallback={<div className="p-8 text-center text-slate-400">جاري التحميل...</div>}>
               <KnowledgeBaseModule />
+            </Suspense>
+          </PrivateRoute>
+        }
+      />
+
+      {/* Settings module (has its own shell) */}
+      <Route
+        path="/settings/*"
+        element={
+          <PrivateRoute>
+            <Suspense fallback={<div className="p-8 text-center text-slate-400">جاري التحميل...</div>}>
+              <SettingsModule />
             </Suspense>
           </PrivateRoute>
         }

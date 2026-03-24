@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../../../shared/services/api';
 
@@ -10,6 +10,8 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const verifyStatus = searchParams.get('verify');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,6 +40,17 @@ export default function Login() {
           <h1 className="text-2xl font-bold text-slate-800">دولفين</h1>
           <p className="text-slate-500 mt-1">نظام إدارة الليدز والمبيعات</p>
         </div>
+        {verifyStatus === 'success' && (
+          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm mb-4 text-center">
+            تم تأكيد الإيميل بنجاح! حسابك في انتظار موافقة المدير.
+          </div>
+        )}
+        {verifyStatus === 'invalid' && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2 rounded-lg text-sm mb-4 text-center">
+            رابط التأكيد غير صالح أو مستخدم مسبقاً.
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -76,6 +89,16 @@ export default function Login() {
             {loading ? 'جاري الدخول...' : 'تسجيل الدخول'}
           </button>
         </form>
+
+        <div className="mt-4 space-y-2 text-center text-sm">
+          <p>
+            <Link to="/forgot-password" className="text-blue-600 hover:underline">نسيت كلمة المرور؟</Link>
+          </p>
+          <p className="text-slate-500">
+            ليس لديك حساب؟{' '}
+            <Link to="/register" className="text-blue-600 hover:underline font-medium">سجّل الآن</Link>
+          </p>
+        </div>
       </div>
     </div>
   );
