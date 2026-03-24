@@ -427,3 +427,57 @@ export async function fullSync(adAccountId: string): Promise<{
     throw error;
   }
 }
+
+// Quick sync — today + yesterday only (for manual refresh)
+export async function quickSync(adAccountId: string): Promise<{
+  campaigns: number;
+  metrics: number;
+  duration: number;
+}> {
+  const startTime = Date.now();
+  const campaignCount = await syncCampaigns(adAccountId);
+
+  const today = new Date().toISOString().split('T')[0];
+  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+  const metricCount = await syncInsights(adAccountId, yesterday, today);
+
+  await prisma.adAccount.update({
+    where: { id: adAccountId },
+    data: { lastSyncAt: new Date() },
+  });
+
+  return { campaigns: campaignCount, metrics: metricCount, duration: Date.now() - startTime };
+}
+
+// Auto-sync all active accounts (called by scheduler)
+export async function autoSyncAll(): Promise<void> {
+  const accounts = await prisma.adAccount.findMany({ where: { isActive: true } });
+  if (accounts.length === 0) return;
+
+  console.log(`[AutoSync] Starting sync for ${accounts.length} accounts...`);
+  for (const acc of accounts) {
+    try {
+      const result = await fullSync(acc.id);
+      console.log(`[AutoSync] ${acc.accountName}: ${result.campaigns} campaigns, ${result.metrics} metrics (${result.duration}ms)`);
+    } catch (err: any) {
+      console.error(`[AutoSync] ${acc.accountName} failed: ${err.message}`);
+    }
+  }
+  console.log('[AutoSync] Done.');
+}
+
+// Start auto-sync scheduler (call once from index.ts)
+export function startAutoSyncScheduler(intervalHours = 2): void {
+  const ms = intervalHours * 60 * 60 * 1000;
+  console.log(`[AutoSync] Scheduler started — every ${intervalHours} hours`);
+
+  // Run first sync after 30 seconds (let server finish starting)
+  setTimeout(() => {
+    autoSyncAll().catch((e) => console.error('[AutoSync] Error:', e));
+  }, 30000);
+
+  // Then every N hours
+  setInterval(() => {
+    autoSyncAll().catch((e) => console.error('[AutoSync] Error:', e));
+  }, ms);
+}

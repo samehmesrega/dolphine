@@ -198,7 +198,7 @@ router.post('/sync', async (req: AuthRequest, res: Response) => {
     const results = [];
     for (const acc of accounts) {
       try {
-        const syncResult = await metaService.fullSync(acc.id);
+        const syncResult = await metaService.quickSync(acc.id);
         results.push({ id: acc.id, accountName: acc.accountName, status: 'success', ...syncResult });
       } catch (e: any) {
         results.push({ id: acc.id, accountName: acc.accountName, status: 'error', error: e.message });

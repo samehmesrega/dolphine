@@ -227,4 +227,11 @@ app.use(globalErrorHandler);
 
 app.listen(config.port, () => {
   logger.info(`Dolphin Platform API running on port ${config.port}`);
+
+  // Start Meta Ads auto-sync (every 2 hours)
+  import('./modules/marketing/services/meta-ads.service').then((metaService) => {
+    metaService.startAutoSyncScheduler(2);
+  }).catch((err) => {
+    logger.warn(`[AutoSync] Failed to start scheduler: ${err.message}`);
+  });
 });
