@@ -13,8 +13,8 @@ type DatePreset = 'today' | 'yesterday' | '7d' | '14d' | 'this_month' | 'last_mo
 
 function getDateRange(preset: DatePreset, custom: { from: string; to: string }) {
   const now = new Date();
-  // Use YYYY-MM-DD format — no timezone offset issues with Meta API dates stored as midnight UTC
-  const fmt = (d: Date) => d.toISOString().split('T')[0];
+  // Use YYYY-MM-DD in LOCAL timezone (not UTC) to avoid off-by-one day errors
+  const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const daysAgo = (n: number) => { const d = new Date(now); d.setDate(d.getDate() - n); return d; };
 
   switch (preset) {
