@@ -343,13 +343,25 @@ export async function fullSync(adAccountId: string): Promise<{
     // Sync campaigns
     const campaignCount = await syncCampaigns(adAccountId);
 
-    // Sync max available data — Meta API allows up to 37 months
-    // Pull in 90-day chunks to avoid API limits
+    // Determine sync range: if first sync → full history (37 months), otherwise last 7 days
+    const account = await prisma.adAccount.findUnique({ where: { id: adAccountId } });
+    const lastSync = account?.lastSyncAt;
     const dateTo = new Date().toISOString().split('T')[0];
-    const maxMonths = 37;
-    const dateFromMax = new Date();
-    dateFromMax.setMonth(dateFromMax.getMonth() - maxMonths);
-    const dateFromStr = dateFromMax.toISOString().split('T')[0];
+
+    let dateFromStr: string;
+    if (!lastSync) {
+      // First sync — pull max available (37 months)
+      const dateFromMax = new Date();
+      dateFromMax.setMonth(dateFromMax.getMonth() - 37);
+      dateFromStr = dateFromMax.toISOString().split('T')[0];
+      console.log(`[Sync] First sync — pulling full history from ${dateFromStr}`);
+    } else {
+      // Subsequent sync — pull last 7 days (covers delays + corrections)
+      const d = new Date();
+      d.setDate(d.getDate() - 7);
+      dateFromStr = d.toISOString().split('T')[0];
+      console.log(`[Sync] Incremental sync — last 7 days from ${dateFromStr}`);
+    }
 
     let metricCount = 0;
     const chunkDays = 90;
@@ -374,6 +386,12 @@ export async function fullSync(adAccountId: string): Promise<{
       chunkEnd = new Date(chunkStart);
       chunkEnd.setDate(chunkEnd.getDate() - 1);
     }
+
+    // Update lastSyncAt
+    await prisma.adAccount.update({
+      where: { id: adAccountId },
+      data: { lastSyncAt: new Date() },
+    });
 
     const duration = Date.now() - startTime;
 
