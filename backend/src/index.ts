@@ -23,6 +23,7 @@ import authRoutes from './modules/auth/routes';
 import leadsRoutes from './modules/leads/routes';
 import marketingRoutes from './modules/marketing/routes';
 import knowledgeBaseRoutes from './modules/knowledge-base/routes';
+import settingsRoutes from './modules/settings/routes';
 
 // يسمح بـ users.manage أو مدير السيلز
 function requireUsersAccess(
@@ -140,6 +141,10 @@ app.use('/api/marketing', authMiddleware, marketingRoutes);
 // Knowledge Base module
 app.use('/api/v1/knowledge-base', authMiddleware, knowledgeBaseRoutes);
 app.use('/api/knowledge-base', authMiddleware, knowledgeBaseRoutes);
+
+// Settings module
+app.use('/api/v1/settings', authMiddleware, settingsRoutes);
+app.use('/api/settings', authMiddleware, settingsRoutes);
 
 // Drive image proxy — validate fileId format to prevent SSRF
 app.get('/drive-proxy/:fileId', async (req: Request, res: Response) => {

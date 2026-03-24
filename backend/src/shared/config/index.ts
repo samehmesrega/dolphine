@@ -39,4 +39,19 @@ export const config = {
     .filter(Boolean),
   sentryDsn: process.env.SENTRY_DSN || '',
   tokenEncryptionKey: process.env.TOKEN_ENCRYPTION_KEY || '',
+  smtp: {
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    user: process.env.SMTP_USER || '',
+    pass: process.env.SMTP_PASS || '',
+    from: process.env.SMTP_FROM || process.env.SMTP_USER || '',
+  },
+  appUrl: process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:4000',
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+  },
+  recaptcha: {
+    secretKey: process.env.RECAPTCHA_SECRET_KEY || '',
+  },
 };
