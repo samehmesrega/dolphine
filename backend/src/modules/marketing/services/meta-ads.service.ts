@@ -341,16 +341,25 @@ export async function fullSync(adAccountId: string): Promise<{
   });
 
   try {
-    // Clean up duplicate metrics first (from previous timezone bugs)
+    // Normalize all dates to midnight UTC (fix timezone drift from previous syncs)
     await prisma.$executeRaw`
-      DELETE FROM ad_metrics a USING ad_metrics b
-      WHERE a.id > b.id
-        AND a.date = b.date
-        AND a.campaign_id = b.campaign_id
-        AND a.ad_account_id = b.ad_account_id
-        AND a.ad_set_id IS NOT DISTINCT FROM b.ad_set_id
-        AND a.ad_id IS NOT DISTINCT FROM b.ad_id
-    `.catch(() => { /* ignore if no duplicates */ });
+      UPDATE ad_metrics SET date = DATE(date)::timestamp AT TIME ZONE 'UTC'
+      WHERE date != DATE(date)::timestamp AT TIME ZONE 'UTC'
+    `.catch((e: any) => { console.warn('[Sync] Date normalize skipped:', e.message); });
+
+    // Clean up duplicate metrics (from previous timezone bugs — same day stored with different times)
+    await prisma.$executeRaw`
+      DELETE FROM ad_metrics WHERE id IN (
+        SELECT id FROM (
+          SELECT id, ROW_NUMBER() OVER (
+            PARTITION BY ad_account_id, campaign_id, DATE(date),
+              COALESCE(ad_set_id, ''), COALESCE(ad_id, '')
+            ORDER BY id
+          ) AS rn
+          FROM ad_metrics
+        ) sub WHERE rn > 1
+      )
+    `.catch((e: any) => { console.warn('[Sync] Dedup skipped:', e.message); });
 
     // Sync campaigns
     const campaignCount = await syncCampaigns(adAccountId);
