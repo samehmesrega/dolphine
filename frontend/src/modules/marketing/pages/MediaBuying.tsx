@@ -576,10 +576,10 @@ export default function MediaBuying() {
                   </tr>
                 ))}
               </tbody>
-              {(() => { const t = calcTotals(filteredCampaigns); return (
+              {(() => { const t = calcTotals(filteredCampaigns); const o = overview; return (
               <tfoot>
-                <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold text-slate-700">
-                  <td className="py-2">الإجمالي ({filteredCampaigns.length})</td>
+                <tr className="border-t border-slate-200 bg-slate-50 text-slate-600">
+                  <td className="py-2 font-medium">إجمالي الظاهر ({filteredCampaigns.length})</td>
                   {visibleColumns.status && <td className="py-2"></td>}
                   {visibleColumns.spend && <td className="py-2">{formatCurrency(t.spend)}</td>}
                   {visibleColumns.cpm && <td className="py-2">{formatCurrency(t.cpm)}</td>}
@@ -595,6 +595,24 @@ export default function MediaBuying() {
                   {visibleColumns.outboundClicks && <td className="py-2">{formatNumber(t.outboundClicks)}</td>}
                   {visibleColumns.roas && <td className="py-2">{t.roas.toFixed(1)}x</td>}
                   {visibleColumns.revenue && <td className="py-2">{formatCurrency(t.revenue)}</td>}
+                </tr>
+                <tr className="border-t-2 border-slate-300 bg-blue-50 font-bold text-slate-800">
+                  <td className="py-2">الإجمالي الفعلي (من Meta)</td>
+                  {visibleColumns.status && <td className="py-2"></td>}
+                  {visibleColumns.spend && <td className="py-2">{formatCurrency(o.totalSpend || 0)}</td>}
+                  {visibleColumns.cpm && <td className="py-2">—</td>}
+                  {visibleColumns.outboundCtr && <td className="py-2">—</td>}
+                  {visibleColumns.frequency && <td className="py-2">—</td>}
+                  {visibleColumns.leads && <td className="py-2">{formatNumber(o.totalLeads || 0)}</td>}
+                  {visibleColumns.cpl && <td className="py-2">{formatCurrency(o.overallCPL || 0)}</td>}
+                  {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(o.totalConfirmedOrders || 0)}</td>}
+                  {visibleColumns.cpp && <td className="py-2">{formatCurrency(o.overallCPP || 0)}</td>}
+                  {visibleColumns.impressions && <td className="py-2">—</td>}
+                  {visibleColumns.reach && <td className="py-2">—</td>}
+                  {visibleColumns.clicks && <td className="py-2">—</td>}
+                  {visibleColumns.outboundClicks && <td className="py-2">—</td>}
+                  {visibleColumns.roas && <td className="py-2">{(o.overallROAS || 0).toFixed(1)}x</td>}
+                  {visibleColumns.revenue && <td className="py-2">—</td>}
                 </tr>
               </tfoot>
               ); })()}

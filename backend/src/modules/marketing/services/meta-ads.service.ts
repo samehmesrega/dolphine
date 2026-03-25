@@ -308,60 +308,91 @@ export async function syncInsights(
 
   const insightFields = 'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,reach,clicks,spend,actions,action_values,outbound_clicks,frequency,cpm';
 
-  // Pull insights at all 3 levels
-  const levels = ['campaign', 'adset', 'ad'] as const;
-  let allRows: any[] = [];
-
-  for (const level of levels) {
-    const params = new URLSearchParams({
+  // Helper to fetch all pages of insights
+  async function fetchAllInsights(level: string): Promise<any[]> {
+    let allData: any[] = [];
+    let url: string | null = `${GRAPH_BASE}/${actId}/insights?` + new URLSearchParams({
       fields: insightFields,
       access_token: token,
       time_range: JSON.stringify({ since: dateFrom, until: dateTo }),
       time_increment: '1',
       level,
-      limit: '1000',
-    });
+      limit: '500',
+    }).toString();
 
-    try {
-      const res = await fetchWithTimeout(`${GRAPH_BASE}/${actId}/insights?${params}`, undefined, 30000);
-      const data = await res.json() as any;
-      if (data.error) {
-        console.warn(`[Sync] ${level} insights error: ${data.error.message}`);
-        continue;
+    while (url) {
+      try {
+        const res = await fetchWithTimeout(url, undefined, 30000);
+        const data = await res.json() as any;
+        if (data.error) {
+          console.warn(`[Sync] ${level} insights error: ${data.error.message}`);
+          break;
+        }
+        const rows = data.data || [];
+        rows.forEach((r: any) => r._level = level);
+        allData = allData.concat(rows);
+        // Follow pagination
+        url = data.paging?.next || null;
+      } catch (err: any) {
+        console.warn(`[Sync] ${level} page fetch failed: ${err.message}`);
+        break;
       }
-      const rows = data.data || [];
-      rows.forEach((r: any) => r._level = level);
-      allRows = allRows.concat(rows);
-      console.log(`[Sync] ${level} insights: ${rows.length} rows`);
-    } catch (err: any) {
-      console.warn(`[Sync] ${level} insights fetch failed: ${err.message}`);
     }
+    return allData;
+  }
+
+  // Pull insights at all 3 levels with pagination
+  let allRows: any[] = [];
+  for (const level of ['campaign', 'adset', 'ad']) {
+    const rows = await fetchAllInsights(level);
+    allRows = allRows.concat(rows);
+    console.log(`[Sync] ${level} insights: ${rows.length} rows`);
   }
 
   let count = 0;
   for (const row of allRows) {
-    // Find campaign
-    const campaign = await prisma.campaign.findFirst({
+    // Find or create campaign
+    let campaign = await prisma.campaign.findFirst({
       where: { adAccountId, platformId: row.campaign_id },
     });
+    if (!campaign && row.campaign_id) {
+      campaign = await prisma.campaign.create({
+        data: {
+          adAccountId,
+          platformId: row.campaign_id,
+          name: row.campaign_name || `Campaign ${row.campaign_id}`,
+          status: 'UNKNOWN',
+        },
+      });
+    }
     if (!campaign) continue;
 
     // Find ad set and ad if applicable
     let adSetId: string | null = null;
     let adId: string | null = null;
 
-    if (row._level === 'adset' || row._level === 'ad') {
-      const adSet = row.adset_id ? await prisma.adSet.findFirst({
+    if ((row._level === 'adset' || row._level === 'ad') && row.adset_id) {
+      let adSet = await prisma.adSet.findFirst({
         where: { campaignId: campaign.id, platformId: row.adset_id },
-      }) : null;
-      adSetId = adSet?.id || null;
+      });
+      if (!adSet) {
+        adSet = await prisma.adSet.create({
+          data: { campaignId: campaign.id, platformId: row.adset_id, name: row.adset_name || `AdSet ${row.adset_id}`, status: 'UNKNOWN' },
+        });
+      }
+      adSetId = adSet.id;
     }
 
-    if (row._level === 'ad') {
-      const ad = row.ad_id && adSetId ? await prisma.ad.findFirst({
+    if (row._level === 'ad' && row.ad_id && adSetId) {
+      let ad = await prisma.ad.findFirst({
         where: { adSetId, platformId: row.ad_id },
-      }) : null;
-      adId = ad?.id || null;
+      });
+      if (!ad) {
+        ad = await prisma.ad.create({
+          data: { adSetId, platformId: row.ad_id, name: row.ad_name || `Ad ${row.ad_id}`, status: 'UNKNOWN' },
+        });
+      }
+      adId = ad.id;
     }
 
     // Parse actions (leads, purchases)
