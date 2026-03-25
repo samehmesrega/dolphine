@@ -145,7 +145,7 @@ export default function MediaBuying() {
   });
   const { data: campaignsData } = useQuery({
     queryKey: ['mb-campaigns', filterKey],
-    queryFn: () => mktApi.getMediaBuyingCampaigns(params),
+    queryFn: () => mktApi.getMediaBuyingCampaigns({ ...params, pageSize: '500' }),
   });
   const { data: accountsData } = useQuery({
     queryKey: ['marketing', 'ad-accounts'],
