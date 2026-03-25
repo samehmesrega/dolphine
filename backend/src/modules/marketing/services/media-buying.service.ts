@@ -94,32 +94,55 @@ function buildMetricWhere(filters: DashboardFilters, accountIds?: string[]) {
 
 export async function getOverviewMetrics(filters: DashboardFilters) {
   const accountIds = await resolveAccountIds(filters);
-  const where = {
-    ...buildMetricWhere(filters, accountIds),
-    adSetId: null,  // Only campaign-level metrics (prevent double/triple counting)
-    adId: null,
-  };
 
-  const metrics = await prisma.adMetric.aggregate({
-    where,
-    _sum: {
-      impressions: true,
-      clicks: true,
-      spend: true,
-      conversions: true,
-      leads: true,
-      purchases: true,
-      revenue: true,
+  // Use account-level insights from Meta API directly for accurate totals
+  const accounts = await prisma.adAccount.findMany({
+    where: {
+      isActive: true,
+      ...(accountIds ? { id: { in: accountIds } } : {}),
     },
   });
 
-  const s = metrics._sum;
-  const spend = s.spend || 0;
-  const metaLeads = s.leads || 0;
-  const purchases = s.purchases || 0;  // Meta "purchase" = Digitics "lead"
-  const revenue = s.revenue || 0;
-  const clicks = s.clicks || 0;
-  const impressions = s.impressions || 0;
+  let totalSpend = 0, totalImpressions = 0, totalClicks = 0, totalPurchases = 0, totalLeads = 0, totalRevenue = 0;
+
+  if (accounts.length > 0 && filters.from && filters.to) {
+    const { decryptToken } = await import('../../../shared/utils/token-encryption');
+    const GRAPH_BASE = 'https://graph.facebook.com/v21.0';
+
+    for (const acc of accounts) {
+      try {
+        const token = decryptToken(acc.accessToken);
+        const actId = `act_${acc.accountId}`;
+        const fields = 'impressions,reach,clicks,spend,actions,action_values,outbound_clicks';
+        const params = new URLSearchParams({
+          fields,
+          access_token: token,
+          time_range: JSON.stringify({ since: filters.from, until: filters.to }),
+        });
+        const res = await fetch(`${GRAPH_BASE}/${actId}/insights?${params}`);
+        const data = await res.json() as any;
+        if (data.data && data.data[0]) {
+          const row = data.data[0];
+          totalSpend += parseFloat(row.spend || '0');
+          totalImpressions += parseInt(row.impressions || '0', 10);
+          totalClicks += parseInt(row.clicks || '0', 10);
+          const actions = row.actions || [];
+          const actionValues = row.action_values || [];
+          totalPurchases += parseInt(actions.find((a: any) => a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || '0', 10);
+          totalLeads += parseInt(actions.find((a: any) => a.action_type === 'lead')?.value || '0', 10);
+          totalRevenue += parseFloat(actionValues.find((a: any) => a.action_type === 'purchase' || a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || '0');
+        }
+      } catch (err: any) {
+        console.warn(`[Overview] Failed to fetch insights for ${acc.accountName}: ${err.message}`);
+      }
+    }
+  }
+
+  const spend = totalSpend;
+  const purchases = totalPurchases;  // Meta "purchase" = Digitics "lead"
+  const revenue = totalRevenue;
+  const impressions = totalImpressions;
+  const clicks = totalClicks;
 
   // Dolphin confirmed orders (leads with accounts_confirmed status)
   const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
