@@ -80,7 +80,7 @@ export default function MediaBuying() {
   const [filterBrand, setFilterBrand] = useState('');
   const [filterAccount, setFilterAccount] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterActivity, setFilterActivity] = useState<'' | 'active' | 'zero'>('');
+  const [filterActivity, setFilterActivity] = useState<'' | 'active' | 'zero'>('active');
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
@@ -447,7 +447,11 @@ export default function MediaBuying() {
               <tbody>
                 {campaigns
                   .filter((c) => !filterStatus || c.status === filterStatus)
-                  .filter((c) => !filterActivity || (filterActivity === 'active' ? c.impressions > 0 : c.impressions === 0))
+                  .filter((c) => {
+                    if (!filterActivity) return true;
+                    const hasActivity = c.spend > 0 || c.impressions > 0 || (c.reach || 0) > 0;
+                    return filterActivity === 'active' ? hasActivity : !hasActivity;
+                  })
                   .map((c) => (
                   <tr key={c.id} className="border-b last:border-0 hover:bg-slate-50">
                     <td className="py-2">
