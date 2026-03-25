@@ -72,8 +72,18 @@ const platformColors: Record<string, string> = {
   snapchat: 'bg-yellow-400',
 };
 
+type ReportTab = 'overview' | 'campaigns' | 'adsets' | 'ads';
+
+const REPORT_TABS: { key: ReportTab; label: string }[] = [
+  { key: 'overview', label: 'نظرة عامة' },
+  { key: 'campaigns', label: 'تقارير الحملات' },
+  { key: 'adsets', label: 'تقارير الأد سيت' },
+  { key: 'ads', label: 'تقارير الإعلانات' },
+];
+
 export default function MediaBuying() {
   const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<ReportTab>('overview');
   const [datePreset, setDatePreset] = useState<DatePreset>('this_month');
   const [customRange, setCustomRange] = useState({ from: '', to: '' });
   const [filterPlatform, setFilterPlatform] = useState('');
@@ -84,6 +94,8 @@ export default function MediaBuying() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [sortKey, setSortKey] = useState<string>('spend');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     spend: true,
     cpm: true,
@@ -184,12 +196,36 @@ export default function MediaBuying() {
   const brandsList: any[] = brandsData?.data?.brands || [];
   const totalPlatformSpend = platforms.reduce((sum, p) => sum + p.spend, 0);
 
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortKey(key);
+      setSortDir('desc');
+    }
+  };
+
+  const sortArrow = (key: string) => sortKey === key ? (sortDir === 'desc' ? ' ▼' : ' ▲') : '';
+
+  const filteredCampaigns = campaigns
+    .filter((c) => !filterStatus || c.status === filterStatus)
+    .filter((c) => {
+      if (!filterActivity) return true;
+      const hasActivity = c.spend > 0 || c.impressions > 0 || (c.reach || 0) > 0;
+      return filterActivity === 'active' ? hasActivity : !hasActivity;
+    })
+    .sort((a, b) => {
+      const av = a[sortKey] ?? 0;
+      const bv = b[sortKey] ?? 0;
+      return sortDir === 'desc' ? (bv > av ? 1 : -1) : (av > bv ? 1 : -1);
+    });
+
   return (
     <div className="space-y-6" dir="rtl">
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-2xl font-bold text-slate-800">ميديا باينج</h1>
+        <h1 className="text-2xl font-bold text-slate-800">تقارير الحملات</h1>
         <div className="flex items-center gap-2">
           {syncResult && (
             <span className={`text-xs px-3 py-1 rounded-full ${syncResult.startsWith('فشل') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
@@ -288,6 +324,26 @@ export default function MediaBuying() {
           )}
         </div>
       </div>
+
+      {/* Report Tabs */}
+      <div className="flex gap-1 border-b border-slate-200">
+        {REPORT_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+              activeTab === tab.key
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Overview Tab */}
+      {activeTab === 'overview' && <>
 
       {/* Overview Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -388,8 +444,10 @@ export default function MediaBuying() {
         </div>
       </div>
 
-      {/* Campaigns */}
-      <div className="bg-white rounded-xl border border-slate-200 p-4">
+      </>}
+
+      {/* Campaigns Tab */}
+      {activeTab === 'campaigns' && <div className="bg-white rounded-xl border border-slate-200 p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-slate-700">الحملات</h3>
           <div className="relative">
@@ -428,31 +486,24 @@ export default function MediaBuying() {
                 <tr className="text-slate-500 border-b">
                   <th className="text-right py-2 whitespace-nowrap">الحملة</th>
                   {visibleColumns.status && <th className="text-right py-2">الحالة</th>}
-                  {visibleColumns.spend && <th className="text-right py-2">الإنفاق</th>}
-                  {visibleColumns.cpm && <th className="text-right py-2">CPM</th>}
-                  {visibleColumns.outboundCtr && <th className="text-right py-2">Outbound CTR</th>}
-                  {visibleColumns.frequency && <th className="text-right py-2">التكرار</th>}
-                  {visibleColumns.leads && <th className="text-right py-2">ليدز</th>}
-                  {visibleColumns.cpl && <th className="text-right py-2">CPL</th>}
-                  {visibleColumns.confirmedOrders && <th className="text-right py-2">طلبات مؤكدة</th>}
-                  {visibleColumns.cpp && <th className="text-right py-2">CPP</th>}
-                  {visibleColumns.impressions && <th className="text-right py-2">الظهور</th>}
-                  {visibleColumns.reach && <th className="text-right py-2">الوصول</th>}
-                  {visibleColumns.clicks && <th className="text-right py-2">النقرات</th>}
-                  {visibleColumns.outboundClicks && <th className="text-right py-2">نقرات خارجية</th>}
-                  {visibleColumns.roas && <th className="text-right py-2">ROAS</th>}
-                  {visibleColumns.revenue && <th className="text-right py-2">الإيرادات</th>}
+                  {visibleColumns.spend && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('spend')}>الإنفاق{sortArrow('spend')}</th>}
+                  {visibleColumns.cpm && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpm')}>CPM{sortArrow('cpm')}</th>}
+                  {visibleColumns.outboundCtr && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('outboundCtr')}>Outbound CTR{sortArrow('outboundCtr')}</th>}
+                  {visibleColumns.frequency && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('frequency')}>التكرار{sortArrow('frequency')}</th>}
+                  {visibleColumns.leads && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('leads')}>ليدز{sortArrow('leads')}</th>}
+                  {visibleColumns.cpl && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpl')}>CPL{sortArrow('cpl')}</th>}
+                  {visibleColumns.confirmedOrders && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('confirmedOrders')}>طلبات مؤكدة{sortArrow('confirmedOrders')}</th>}
+                  {visibleColumns.cpp && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpp')}>CPP{sortArrow('cpp')}</th>}
+                  {visibleColumns.impressions && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('impressions')}>الظهور{sortArrow('impressions')}</th>}
+                  {visibleColumns.reach && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('reach')}>الوصول{sortArrow('reach')}</th>}
+                  {visibleColumns.clicks && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('clicks')}>النقرات{sortArrow('clicks')}</th>}
+                  {visibleColumns.outboundClicks && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('outboundClicks')}>نقرات خارجية{sortArrow('outboundClicks')}</th>}
+                  {visibleColumns.roas && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('roas')}>ROAS{sortArrow('roas')}</th>}
+                  {visibleColumns.revenue && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('revenue')}>الإيرادات{sortArrow('revenue')}</th>}
                 </tr>
               </thead>
               <tbody>
-                {campaigns
-                  .filter((c) => !filterStatus || c.status === filterStatus)
-                  .filter((c) => {
-                    if (!filterActivity) return true;
-                    const hasActivity = c.spend > 0 || c.impressions > 0 || (c.reach || 0) > 0;
-                    return filterActivity === 'active' ? hasActivity : !hasActivity;
-                  })
-                  .map((c) => (
+                {filteredCampaigns.map((c) => (
                   <tr key={c.id} className="border-b last:border-0 hover:bg-slate-50">
                     <td className="py-2">
                       <div className="font-medium">{c.name}</div>
@@ -493,7 +544,24 @@ export default function MediaBuying() {
             </table>
           </div>
         )}
-      </div>
+      </div>}
+
+      {/* Ad Sets Tab */}
+      {activeTab === 'adsets' && (
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+          <p className="text-lg mb-1">تقارير الأد سيت</p>
+          <p className="text-sm">قريباً — سيتم عرض بيانات كل أد سيت بالتفصيل</p>
+        </div>
+      )}
+
+      {/* Ads Tab */}
+      {activeTab === 'ads' && (
+        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
+          <p className="text-lg mb-1">تقارير الإعلانات</p>
+          <p className="text-sm">قريباً — سيتم عرض بيانات كل إعلان بالتفصيل</p>
+        </div>
+      )}
+
     </div>
   );
 }
