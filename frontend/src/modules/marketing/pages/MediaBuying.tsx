@@ -84,7 +84,7 @@ const REPORT_TABS: { key: ReportTab; label: string }[] = [
 export default function MediaBuying() {
   const qc = useQueryClient();
   const [activeTab, setActiveTab] = useState<ReportTab>('overview');
-  const [datePreset, setDatePreset] = useState<DatePreset>('this_month');
+  const [datePreset, setDatePreset] = useState<DatePreset>('today');
   const [customRange, setCustomRange] = useState({ from: '', to: '' });
   const [filterPlatform, setFilterPlatform] = useState('');
   const [filterBrand, setFilterBrand] = useState('');
@@ -98,20 +98,20 @@ export default function MediaBuying() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
     spend: true,
-    cpm: true,
-    outboundCtr: true,
-    frequency: true,
     leads: true,
     cpl: true,
     confirmedOrders: true,
     cpp: true,
+    roas: true,
+    cpm: false,
+    outboundCtr: false,
+    frequency: false,
     clicks: false,
     impressions: false,
     reach: false,
     outboundClicks: false,
-    roas: false,
     revenue: false,
-    status: true,
+    status: false,
   });
 
   const COLUMN_LABELS: Record<string, string> = {

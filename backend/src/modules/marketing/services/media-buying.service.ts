@@ -94,7 +94,11 @@ function buildMetricWhere(filters: DashboardFilters, accountIds?: string[]) {
 
 export async function getOverviewMetrics(filters: DashboardFilters) {
   const accountIds = await resolveAccountIds(filters);
-  const where = buildMetricWhere(filters, accountIds);
+  const where = {
+    ...buildMetricWhere(filters, accountIds),
+    adSetId: null,  // Only campaign-level metrics (prevent double/triple counting)
+    adId: null,
+  };
 
   const metrics = await prisma.adMetric.aggregate({
     where,
@@ -193,7 +197,7 @@ export async function getMetricsByPlatform(filters: DashboardFilters) {
   const results = [];
   for (const [platform, ids] of Object.entries(platformMap)) {
     const metrics = await prisma.adMetric.aggregate({
-      where: { ...dateWhere, adAccountId: { in: ids } },
+      where: { ...dateWhere, adAccountId: { in: ids }, adSetId: null, adId: null },
       _sum: { spend: true, leads: true, purchases: true, revenue: true, impressions: true, clicks: true },
     });
     const s = metrics._sum;
@@ -229,7 +233,7 @@ export async function getMetricsByBrand(filters: DashboardFilters) {
     if (ids.length === 0) continue;
 
     const metrics = await prisma.adMetric.aggregate({
-      where: { ...dateWhere, adAccountId: { in: ids } },
+      where: { ...dateWhere, adAccountId: { in: ids }, adSetId: null, adId: null },
       _sum: { spend: true, leads: true, purchases: true, revenue: true },
     });
     const s = metrics._sum;
@@ -263,7 +267,7 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
       include: {
         adAccount: { select: { platform: true, accountName: true, brand: true } },
         metrics: {
-          where: metricWhere,
+          where: { ...metricWhere, adSetId: null, adId: null },  // Campaign-level only
           select: {
             spend: true, leads: true, purchases: true, revenue: true,
             impressions: true, reach: true, clicks: true, outboundClicks: true,
