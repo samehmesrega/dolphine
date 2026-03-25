@@ -139,62 +139,54 @@ export async function getOverviewMetrics(filters: DashboardFilters) {
   }
 
   const spend = totalSpend;
-  const purchases = totalPurchases;  // Meta "purchase" = Digitics "lead"
+  const metaLeads = totalPurchases;  // Meta "purchase" = form submissions on landing page
   const revenue = totalRevenue;
   const impressions = totalImpressions;
   const clicks = totalClicks;
 
-  // Dolphin confirmed orders (leads with accounts_confirmed status)
+  // Date range for Dolphin queries
   const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
   const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
+  const dateWhere = dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {};
 
-  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'accounts_confirmed' } });
-  const confirmedOrders = confirmedStatus ? await prisma.lead.count({
-    where: {
-      ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
-      statusId: confirmedStatus.id,
-      deletedAt: null,
-    },
-  }) : 0;
-
-  // Order values for AOVL (all leads) and AOVP (confirmed only)
-  const orderDateWhere = {
-    ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
-    deletedAt: null,
-  };
-
-  const allOrderAgg = await prisma.order.aggregate({
-    where: orderDateWhere,
-    _sum: { partialAmount: true },
-    _count: true,
+  // Dolphin leads count (actual leads in CRM)
+  const dolphinLeads = await prisma.lead.count({
+    where: { ...dateWhere, deletedAt: null },
   });
 
+  // Dolphin confirmed orders (leads with accounts_confirmed status)
+  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'accounts_confirmed' } });
+  const confirmedOrders = confirmedStatus ? await prisma.lead.count({
+    where: { ...dateWhere, statusId: confirmedStatus.id, deletedAt: null },
+  }) : 0;
+
+  // Order values for confirmed orders (Est. AOV)
   const confirmedOrderAgg = confirmedStatus ? await prisma.order.aggregate({
     where: {
-      ...orderDateWhere,
+      ...dateWhere,
+      deletedAt: null,
       lead: { statusId: confirmedStatus.id },
     },
     _sum: { partialAmount: true },
     _count: true,
   }) : { _sum: { partialAmount: null }, _count: 0 };
 
-  const allOrderCount = allOrderAgg._count || 0;
-  const allOrderValue = Number(allOrderAgg._sum.partialAmount || 0);
   const confirmedOrderCount = confirmedOrderAgg._count || 0;
   const confirmedOrderValue = Number(confirmedOrderAgg._sum.partialAmount || 0);
 
   return {
     totalSpend: spend,
-    totalLeads: purchases,         // Digitics "leads" = Meta purchases
+    dolphinLeads,                    // Actual leads in Dolphin CRM
+    metaLeads,                       // Meta purchases (shown as sub-text)
     totalConfirmedOrders: confirmedOrders,
     totalRevenue: revenue,
     totalImpressions: impressions,
     totalClicks: clicks,
-    overallROAS: spend > 0 ? revenue / spend : 0,
-    overallCPL: purchases > 0 ? spend / purchases : 0,  // CPL = spend / Meta purchases
-    overallCPP: confirmedOrders > 0 ? spend / confirmedOrders : 0,  // CPP = spend / confirmed
-    aovl: allOrderCount > 0 ? allOrderValue / allOrderCount : 0,
-    aovp: confirmedOrderCount > 0 ? confirmedOrderValue / confirmedOrderCount : 0,
+    cpl: dolphinLeads > 0 ? spend / dolphinLeads : 0,             // CPL = spend / Dolphin leads
+    confirmedCost: confirmedOrders > 0 ? spend / confirmedOrders : 0,  // Cost per confirmed
+    estAov: confirmedOrderCount > 0 ? confirmedOrderValue / confirmedOrderCount : 0,  // Est. AOV
+    estRoas: spend > 0 ? confirmedOrderValue / spend : 0,          // Est. ROAS = confirmed value / spend
+    confirmedRate: dolphinLeads > 0 ? (confirmedOrders / dolphinLeads) * 100 : 0,  // Conversion %
     overallCTR: impressions > 0 ? (clicks / impressions) * 100 : 0,
   };
 }

@@ -380,35 +380,83 @@ export default function MediaBuying() {
       {/* Overview Tab */}
       {activeTab === 'overview' && <>
 
-      {/* Overview Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">إجمالي الإنفاق</p>
-          <p className="text-2xl font-bold text-red-600">{formatCurrency(overview.totalSpend || 0)}</p>
+      {/* Funnel: Spend */}
+      <div className="bg-gradient-to-l from-red-50 to-white rounded-2xl border border-red-200 p-5">
+        <p className="text-sm font-semibold text-red-500 mb-1">إجمالي الإنفاق</p>
+        <p className="text-3xl font-extrabold text-red-600">{formatCurrency(overview.totalSpend || 0)}</p>
+      </div>
+
+      <div className="text-center text-slate-300 text-xl">▼</div>
+
+      {/* Funnel: Leads */}
+      <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-1">
+        <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+        الليدز
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 border-r-4 border-r-blue-500 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">الليدز</p>
+          <p className="text-2xl font-extrabold text-blue-600">{formatNumber(overview.dolphinLeads || 0)}</p>
+          <p className="text-xs text-slate-400 mt-1">ميتا: {formatNumber(overview.metaLeads || 0)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">ليدز</p>
-          <p className="text-2xl font-bold text-blue-600">{formatNumber(overview.totalLeads || 0)}</p>
-          <p className="text-xs text-slate-400">CPL: {formatCurrency(overview.overallCPL || 0)}</p>
+        <div className="bg-white rounded-2xl border border-slate-200 border-r-4 border-r-blue-500 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">تكلفة الليد (CPL)</p>
+          <p className="text-2xl font-extrabold text-blue-600">{formatCurrency(overview.cpl || 0)}</p>
+          <p className="text-xs text-slate-400 mt-1">الإنفاق ÷ ليدز دولفين</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">طلبات مؤكدة</p>
-          <p className="text-2xl font-bold text-green-600">{formatNumber(overview.totalConfirmedOrders || 0)}</p>
-          <p className="text-xs text-slate-400">CPP: {formatCurrency(overview.overallCPP || 0)}</p>
+      </div>
+
+      <div className="text-center text-slate-300 text-xl">▼</div>
+
+      {/* Funnel: Confirmed */}
+      <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-1">
+        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+        الطلبات المؤكدة
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="bg-white rounded-2xl border border-slate-200 border-r-4 border-r-green-500 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">المؤكد</p>
+          <p className="text-2xl font-extrabold text-green-600">{formatNumber(overview.totalConfirmedOrders || 0)}</p>
+          <p className="text-xs text-slate-400 mt-1">{(overview.confirmedRate || 0).toFixed(0)}% من الليدز</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">ROAS</p>
-          <p className="text-2xl font-bold text-purple-600">{(overview.overallROAS || 0).toFixed(1)}x</p>
+        <div className="bg-white rounded-2xl border border-slate-200 border-r-4 border-r-green-500 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">تكلفة المؤكد</p>
+          <p className="text-2xl font-extrabold text-green-600">{formatCurrency(overview.confirmedCost || 0)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">AOVL</p>
-          <p className="text-2xl font-bold text-amber-600">{formatCurrency(overview.aovl || 0)}</p>
-          <p className="text-xs text-slate-400">متوسط قيمة طلب الليد</p>
+        <div className="bg-white rounded-2xl border border-slate-200 border-r-4 border-r-green-500 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">م. القيمة (متوقع)</p>
+          <p className="text-2xl font-extrabold text-amber-600">{formatCurrency(overview.estAov || 0)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <p className="text-sm text-slate-500">AOVP</p>
-          <p className="text-2xl font-bold text-teal-600">{formatCurrency(overview.aovp || 0)}</p>
-          <p className="text-xs text-slate-400">متوسط قيمة الطلب المؤكد</p>
+        <div className="bg-white rounded-2xl border border-slate-200 border-r-4 border-r-green-500 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">ROAS متوقع</p>
+          <p className="text-2xl font-extrabold text-purple-600">{(overview.estRoas || 0).toFixed(2)}x</p>
+        </div>
+      </div>
+
+      <div className="text-center text-slate-300 text-xl">▼</div>
+
+      {/* Funnel: Delivered (placeholder) */}
+      <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-1">
+        <span className="w-2 h-2 rounded-full bg-purple-500"></span>
+        الطلبات المُوصّلة
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 opacity-50">
+        <div className="bg-white rounded-2xl border border-dashed border-slate-300 border-r-4 border-r-purple-400 p-5 relative">
+          <span className="absolute top-2 left-2 text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-semibold">قريباً</span>
+          <p className="text-xs font-semibold text-slate-400 mb-1">المُوصّل</p>
+          <p className="text-2xl font-extrabold text-purple-600">—</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-dashed border-slate-300 border-r-4 border-r-purple-400 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">تكلفة التوصيلة</p>
+          <p className="text-2xl font-extrabold text-purple-600">—</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-dashed border-slate-300 border-r-4 border-r-purple-400 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">م. القيمة (فعلي)</p>
+          <p className="text-2xl font-extrabold text-amber-600">—</p>
+        </div>
+        <div className="bg-white rounded-2xl border border-dashed border-slate-300 border-r-4 border-r-purple-400 p-5">
+          <p className="text-xs font-semibold text-slate-400 mb-1">ROAS فعلي</p>
+          <p className="text-2xl font-extrabold text-purple-600">—</p>
         </div>
       </div>
 
