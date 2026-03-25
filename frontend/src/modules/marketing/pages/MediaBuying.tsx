@@ -220,6 +220,29 @@ export default function MediaBuying() {
 
   const sortArrow = (key: string) => sortKey === key ? (sortDir === 'desc' ? ' ▼' : ' ▲') : '';
 
+  // Totals helper
+  const calcTotals = (items: any[]) => {
+    const t = items.reduce((acc, c) => ({
+      spend: acc.spend + (c.spend || 0),
+      impressions: acc.impressions + (c.impressions || 0),
+      reach: acc.reach + (c.reach || 0),
+      clicks: acc.clicks + (c.clicks || 0),
+      outboundClicks: acc.outboundClicks + (c.outboundClicks || 0),
+      leads: acc.leads + (c.leads || 0),
+      confirmedOrders: acc.confirmedOrders + (c.confirmedOrders || 0),
+      revenue: acc.revenue + (c.revenue || 0),
+    }), { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, confirmedOrders: 0, revenue: 0 });
+    return {
+      ...t,
+      cpm: t.impressions > 0 ? +((t.spend / t.impressions) * 1000).toFixed(2) : 0,
+      outboundCtr: t.impressions > 0 ? +((t.outboundClicks / t.impressions) * 100).toFixed(2) : 0,
+      frequency: t.reach > 0 ? +(t.impressions / t.reach).toFixed(2) : 0,
+      cpl: t.leads > 0 ? +(t.spend / t.leads).toFixed(2) : 0,
+      cpp: t.confirmedOrders > 0 ? +(t.spend / t.confirmedOrders).toFixed(2) : 0,
+      roas: t.spend > 0 ? +(t.revenue / t.spend).toFixed(2) : 0,
+    };
+  };
+
   const filteredCampaigns = campaigns
     .filter((c) => !filterStatus || c.status === filterStatus)
     .filter((c) => {
@@ -553,6 +576,28 @@ export default function MediaBuying() {
                   </tr>
                 ))}
               </tbody>
+              {(() => { const t = calcTotals(filteredCampaigns); return (
+              <tfoot>
+                <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold text-slate-700">
+                  <td className="py-2">الإجمالي ({filteredCampaigns.length})</td>
+                  {visibleColumns.status && <td className="py-2"></td>}
+                  {visibleColumns.spend && <td className="py-2">{formatCurrency(t.spend)}</td>}
+                  {visibleColumns.cpm && <td className="py-2">{formatCurrency(t.cpm)}</td>}
+                  {visibleColumns.outboundCtr && <td className="py-2">{t.outboundCtr.toFixed(2)}%</td>}
+                  {visibleColumns.frequency && <td className="py-2">{t.frequency.toFixed(2)}</td>}
+                  {visibleColumns.leads && <td className="py-2">{formatNumber(t.leads)}</td>}
+                  {visibleColumns.cpl && <td className="py-2">{formatCurrency(t.cpl)}</td>}
+                  {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(t.confirmedOrders)}</td>}
+                  {visibleColumns.cpp && <td className="py-2">{formatCurrency(t.cpp)}</td>}
+                  {visibleColumns.impressions && <td className="py-2">{formatNumber(t.impressions)}</td>}
+                  {visibleColumns.reach && <td className="py-2">{formatNumber(t.reach)}</td>}
+                  {visibleColumns.clicks && <td className="py-2">{formatNumber(t.clicks)}</td>}
+                  {visibleColumns.outboundClicks && <td className="py-2">{formatNumber(t.outboundClicks)}</td>}
+                  {visibleColumns.roas && <td className="py-2">{t.roas.toFixed(1)}x</td>}
+                  {visibleColumns.revenue && <td className="py-2">{formatCurrency(t.revenue)}</td>}
+                </tr>
+              </tfoot>
+              ); })()}
             </table>
           </div>
         )}
@@ -599,6 +644,21 @@ export default function MediaBuying() {
                     </tr>
                   ))}
                 </tbody>
+                {(() => { const filtered = adSets.filter((a) => !filterStatus || a.status === filterStatus).filter((a) => !filterActivity || (filterActivity === 'active' ? a.spend > 0 || a.impressions > 0 : a.spend === 0 && a.impressions === 0)); const t = calcTotals(filtered); return (
+                <tfoot>
+                  <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold text-slate-700">
+                    <td className="py-2">الإجمالي ({filtered.length})</td>
+                    <td className="py-2"></td>
+                    <td className="py-2"></td>
+                    <td className="py-2">{formatCurrency(t.spend)}</td>
+                    <td className="py-2">{formatCurrency(t.cpm)}</td>
+                    <td className="py-2">{t.outboundCtr.toFixed(2)}%</td>
+                    <td className="py-2">{t.frequency.toFixed(2)}</td>
+                    <td className="py-2">{formatNumber(t.leads)}</td>
+                    <td className="py-2">{formatCurrency(t.cpl)}</td>
+                  </tr>
+                </tfoot>
+                ); })()}
               </table>
             </div>
           )}
@@ -646,6 +706,21 @@ export default function MediaBuying() {
                     </tr>
                   ))}
                 </tbody>
+                {(() => { const filtered = ads.filter((a) => !filterStatus || a.status === filterStatus).filter((a) => !filterActivity || (filterActivity === 'active' ? a.spend > 0 || a.impressions > 0 : a.spend === 0 && a.impressions === 0)); const t = calcTotals(filtered); return (
+                <tfoot>
+                  <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold text-slate-700">
+                    <td className="py-2">الإجمالي ({filtered.length})</td>
+                    <td className="py-2"></td>
+                    <td className="py-2"></td>
+                    <td className="py-2">{formatCurrency(t.spend)}</td>
+                    <td className="py-2">{formatCurrency(t.cpm)}</td>
+                    <td className="py-2">{t.outboundCtr.toFixed(2)}%</td>
+                    <td className="py-2">{t.frequency.toFixed(2)}</td>
+                    <td className="py-2">{formatNumber(t.leads)}</td>
+                    <td className="py-2">{formatCurrency(t.cpl)}</td>
+                  </tr>
+                </tfoot>
+                ); })()}
               </table>
             </div>
           )}
