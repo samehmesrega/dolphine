@@ -158,6 +158,17 @@ export default function MediaBuying() {
   const { data: campaignsData } = useQuery({
     queryKey: ['mb-campaigns', filterKey],
     queryFn: () => mktApi.getMediaBuyingCampaigns({ ...params, pageSize: '500' }),
+    enabled: activeTab === 'overview' || activeTab === 'campaigns',
+  });
+  const { data: adSetsData } = useQuery({
+    queryKey: ['mb-adsets', filterKey],
+    queryFn: () => mktApi.getMediaBuyingAdSets(params),
+    enabled: activeTab === 'adsets',
+  });
+  const { data: adsData } = useQuery({
+    queryKey: ['mb-ads', filterKey],
+    queryFn: () => mktApi.getMediaBuyingAds(params),
+    enabled: activeTab === 'ads',
   });
   const { data: accountsData } = useQuery({
     queryKey: ['marketing', 'ad-accounts'],
@@ -192,6 +203,8 @@ export default function MediaBuying() {
   const platforms: any[] = platformData?.data?.platforms || [];
   const brands: any[] = brandData?.data?.brands || [];
   const campaigns: any[] = campaignsData?.data?.campaigns || [];
+  const adSets: any[] = adSetsData?.data?.adSets || [];
+  const ads: any[] = adsData?.data?.ads || [];
   const accounts: any[] = accountsData?.data?.accounts || [];
   const brandsList: any[] = brandsData?.data?.brands || [];
   const totalPlatformSpend = platforms.reduce((sum, p) => sum + p.spend, 0);
@@ -300,18 +313,17 @@ export default function MediaBuying() {
             ))}
           </select>
 
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[130px]">
-            <option value="">كل الحالات</option>
-            <option value="ACTIVE">نشطة</option>
-            <option value="PAUSED">متوقفة</option>
-          </select>
-
-          <select value={filterActivity} onChange={(e) => setFilterActivity(e.target.value as '' | 'active' | 'zero')}
-            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[130px]">
-            <option value="">كل النشاط</option>
-            <option value="active">نشطة فعلاً (فيها ظهور)</option>
-            <option value="zero">بدون نشاط</option>
+          <select value={`${filterStatus}|${filterActivity}`} onChange={(e) => {
+            const [s, a] = e.target.value.split('|');
+            setFilterStatus(s);
+            setFilterActivity(a as '' | 'active' | 'zero');
+          }}
+            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[180px]">
+            <option value="|active">نشطة فعلاً (فيها صرف أو ظهور)</option>
+            <option value="|">الكل</option>
+            <option value="ACTIVE|">نشطة (ACTIVE)</option>
+            <option value="PAUSED|">متوقفة (PAUSED)</option>
+            <option value="|zero">بدون نشاط</option>
           </select>
 
           {(filterPlatform || filterBrand || filterAccount || filterStatus || filterActivity) && (
@@ -548,17 +560,95 @@ export default function MediaBuying() {
 
       {/* Ad Sets Tab */}
       {activeTab === 'adsets' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
-          <p className="text-lg mb-1">تقارير الأد سيت</p>
-          <p className="text-sm">قريباً — سيتم عرض بيانات كل أد سيت بالتفصيل</p>
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <h3 className="font-semibold text-slate-700 mb-4">تقارير الأد سيت</h3>
+          {adSets.length === 0 ? (
+            <p className="text-slate-400 text-sm py-4 text-center">لا يوجد بيانات. اعمل مزامنة أولاً.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-slate-500 border-b">
+                    <th className="text-right py-2">الأد سيت</th>
+                    <th className="text-right py-2">الحملة</th>
+                    <th className="text-right py-2">الحالة</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('spend')}>الإنفاق{sortArrow('spend')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('cpm')}>CPM{sortArrow('cpm')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('outboundCtr')}>Outbound CTR{sortArrow('outboundCtr')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('frequency')}>التكرار{sortArrow('frequency')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('leads')}>ليدز{sortArrow('leads')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('cpl')}>CPL{sortArrow('cpl')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {adSets
+                    .filter((a) => !filterStatus || a.status === filterStatus)
+                    .filter((a) => !filterActivity || (filterActivity === 'active' ? a.spend > 0 || a.impressions > 0 : a.spend === 0 && a.impressions === 0))
+                    .sort((a, b) => { const av = a[sortKey] ?? 0; const bv = b[sortKey] ?? 0; return sortDir === 'desc' ? (bv > av ? 1 : -1) : (av > bv ? 1 : -1); })
+                    .map((a) => (
+                    <tr key={a.id} className="border-b last:border-0 hover:bg-slate-50">
+                      <td className="py-2 font-medium">{a.name}</td>
+                      <td className="py-2 text-xs text-slate-400">{a.campaignName}</td>
+                      <td className="py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${a.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{a.status === 'ACTIVE' ? 'نشط' : 'متوقف'}</span></td>
+                      <td className="py-2">{formatCurrency(a.spend)}</td>
+                      <td className="py-2">{formatCurrency(a.cpm || 0)}</td>
+                      <td className="py-2">{(a.outboundCtr || 0).toFixed(2)}%</td>
+                      <td className="py-2">{(a.frequency || 0).toFixed(2)}</td>
+                      <td className="py-2">{formatNumber(a.leads)}</td>
+                      <td className="py-2">{formatCurrency(a.cpl || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 
       {/* Ads Tab */}
       {activeTab === 'ads' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400">
-          <p className="text-lg mb-1">تقارير الإعلانات</p>
-          <p className="text-sm">قريباً — سيتم عرض بيانات كل إعلان بالتفصيل</p>
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <h3 className="font-semibold text-slate-700 mb-4">تقارير الإعلانات</h3>
+          {ads.length === 0 ? (
+            <p className="text-slate-400 text-sm py-4 text-center">لا يوجد بيانات. اعمل مزامنة أولاً.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-slate-500 border-b">
+                    <th className="text-right py-2">الإعلان</th>
+                    <th className="text-right py-2">الأد سيت</th>
+                    <th className="text-right py-2">الحالة</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('spend')}>الإنفاق{sortArrow('spend')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('cpm')}>CPM{sortArrow('cpm')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('outboundCtr')}>Outbound CTR{sortArrow('outboundCtr')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('frequency')}>التكرار{sortArrow('frequency')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('leads')}>ليدز{sortArrow('leads')}</th>
+                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('cpl')}>CPL{sortArrow('cpl')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ads
+                    .filter((a) => !filterStatus || a.status === filterStatus)
+                    .filter((a) => !filterActivity || (filterActivity === 'active' ? a.spend > 0 || a.impressions > 0 : a.spend === 0 && a.impressions === 0))
+                    .sort((a, b) => { const av = a[sortKey] ?? 0; const bv = b[sortKey] ?? 0; return sortDir === 'desc' ? (bv > av ? 1 : -1) : (av > bv ? 1 : -1); })
+                    .map((a) => (
+                    <tr key={a.id} className="border-b last:border-0 hover:bg-slate-50">
+                      <td className="py-2 font-medium">{a.name}</td>
+                      <td className="py-2 text-xs text-slate-400">{a.adSetName}</td>
+                      <td className="py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${a.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{a.status === 'ACTIVE' ? 'نشط' : 'متوقف'}</span></td>
+                      <td className="py-2">{formatCurrency(a.spend)}</td>
+                      <td className="py-2">{formatCurrency(a.cpm || 0)}</td>
+                      <td className="py-2">{(a.outboundCtr || 0).toFixed(2)}%</td>
+                      <td className="py-2">{(a.frequency || 0).toFixed(2)}</td>
+                      <td className="py-2">{formatNumber(a.leads)}</td>
+                      <td className="py-2">{formatCurrency(a.cpl || 0)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

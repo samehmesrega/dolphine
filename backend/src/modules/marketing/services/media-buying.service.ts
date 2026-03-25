@@ -369,6 +369,112 @@ export async function getCampaignDetail(id: string) {
   });
 }
 
+// === Ad Set Reports ===
+
+export async function getAdSetsWithMetrics(filters: DashboardFilters & { page?: number; pageSize?: number }) {
+  const { page = 1, pageSize = 500 } = filters;
+  const accountIds = await resolveAccountIds(filters);
+  const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
+  const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
+
+  const adSetWhere: any = {};
+  if (accountIds && accountIds.length > 0) {
+    adSetWhere.campaign = { adAccountId: { in: accountIds } };
+  }
+
+  const adSets = await prisma.adSet.findMany({
+    where: adSetWhere,
+    include: {
+      campaign: { select: { name: true, adAccount: { select: { platform: true, brand: true } } } },
+      metrics: {
+        where: {
+          ...(dateFrom || dateTo ? { date: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
+        },
+        select: { spend: true, impressions: true, reach: true, clicks: true, outboundClicks: true, leads: true, purchases: true, revenue: true, cpm: true },
+      },
+    },
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+  });
+
+  const result = adSets.map((as) => {
+    const t = as.metrics.reduce(
+      (acc, m) => ({
+        spend: acc.spend + m.spend, impressions: acc.impressions + m.impressions, reach: acc.reach + m.reach,
+        clicks: acc.clicks + m.clicks, outboundClicks: acc.outboundClicks + m.outboundClicks,
+        leads: acc.leads + m.purchases, revenue: acc.revenue + m.revenue,
+      }),
+      { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, revenue: 0 }
+    );
+    return {
+      id: as.id, name: as.name, status: as.status, campaignName: as.campaign.name,
+      platform: as.campaign.adAccount.platform, brand: as.campaign.adAccount.brand?.name,
+      spend: t.spend, impressions: t.impressions, reach: t.reach, clicks: t.clicks, outboundClicks: t.outboundClicks,
+      leads: t.leads, revenue: t.revenue,
+      frequency: t.reach > 0 ? +(t.impressions / t.reach).toFixed(2) : 0,
+      cpm: t.impressions > 0 ? +((t.spend / t.impressions) * 1000).toFixed(2) : 0,
+      outboundCtr: t.impressions > 0 ? +((t.outboundClicks / t.impressions) * 100).toFixed(2) : 0,
+      cpl: t.leads > 0 ? +(t.spend / t.leads).toFixed(2) : 0,
+      roas: t.spend > 0 ? +(t.revenue / t.spend).toFixed(2) : 0,
+    };
+  });
+
+  return { adSets: result, total: result.length };
+}
+
+// === Ad Reports ===
+
+export async function getAdsWithMetrics(filters: DashboardFilters & { page?: number; pageSize?: number }) {
+  const { page = 1, pageSize = 500 } = filters;
+  const accountIds = await resolveAccountIds(filters);
+  const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
+  const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
+
+  const adWhere: any = {};
+  if (accountIds && accountIds.length > 0) {
+    adWhere.adSet = { campaign: { adAccountId: { in: accountIds } } };
+  }
+
+  const ads = await prisma.ad.findMany({
+    where: adWhere,
+    include: {
+      adSet: { select: { name: true, campaign: { select: { name: true, adAccount: { select: { platform: true, brand: true } } } } } },
+      metrics: {
+        where: {
+          ...(dateFrom || dateTo ? { date: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
+        },
+        select: { spend: true, impressions: true, reach: true, clicks: true, outboundClicks: true, leads: true, purchases: true, revenue: true, cpm: true },
+      },
+    },
+    skip: (page - 1) * pageSize,
+    take: pageSize,
+  });
+
+  const result = ads.map((ad) => {
+    const t = ad.metrics.reduce(
+      (acc, m) => ({
+        spend: acc.spend + m.spend, impressions: acc.impressions + m.impressions, reach: acc.reach + m.reach,
+        clicks: acc.clicks + m.clicks, outboundClicks: acc.outboundClicks + m.outboundClicks,
+        leads: acc.leads + m.purchases, revenue: acc.revenue + m.revenue,
+      }),
+      { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, revenue: 0 }
+    );
+    return {
+      id: ad.id, name: ad.name, status: ad.status, adSetName: ad.adSet.name, campaignName: ad.adSet.campaign.name,
+      platform: ad.adSet.campaign.adAccount.platform, brand: ad.adSet.campaign.adAccount.brand?.name,
+      spend: t.spend, impressions: t.impressions, reach: t.reach, clicks: t.clicks, outboundClicks: t.outboundClicks,
+      leads: t.leads, revenue: t.revenue,
+      frequency: t.reach > 0 ? +(t.impressions / t.reach).toFixed(2) : 0,
+      cpm: t.impressions > 0 ? +((t.spend / t.impressions) * 1000).toFixed(2) : 0,
+      outboundCtr: t.impressions > 0 ? +((t.outboundClicks / t.impressions) * 100).toFixed(2) : 0,
+      cpl: t.leads > 0 ? +(t.spend / t.leads).toFixed(2) : 0,
+      roas: t.spend > 0 ? +(t.revenue / t.spend).toFixed(2) : 0,
+    };
+  });
+
+  return { ads: result, total: result.length };
+}
+
 // === Sync Schedule ===
 
 export async function getSyncSchedule() {

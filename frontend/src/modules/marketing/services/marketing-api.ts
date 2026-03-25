@@ -136,6 +136,10 @@ export const getMediaBuyingCampaigns = (params?: Record<string, string>) =>
   api.get('/marketing/media-buying/campaigns', { params });
 export const getMediaBuyingCampaign = (id: string) =>
   api.get(`/marketing/media-buying/campaigns/${id}`);
+export const getMediaBuyingAdSets = (params?: Record<string, string>) =>
+  api.get('/marketing/media-buying/adsets', { params });
+export const getMediaBuyingAds = (params?: Record<string, string>) =>
+  api.get('/marketing/media-buying/ads', { params });
 export const syncAccounts = (adAccountId?: string) =>
   api.post('/marketing/media-buying/sync', adAccountId ? { adAccountId } : {});
 export const getSyncSchedule = () => api.get('/marketing/media-buying/sync-schedule');

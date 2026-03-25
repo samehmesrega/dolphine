@@ -256,6 +256,42 @@ export async function syncCampaigns(adAccountId: string): Promise<number> {
   }
   console.log(`[Sync] Ad sets: ${adSetCount}`);
 
+  // Sync Ads for each ad set
+  console.log(`[Sync] Syncing ads...`);
+  const dbAdSets = await prisma.adSet.findMany({
+    where: { campaign: { adAccountId } },
+    select: { id: true, platformId: true },
+  });
+
+  let adCount = 0;
+  for (const dbAs of dbAdSets) {
+    try {
+      const adFields = 'id,name,status,creative{id,name}';
+      const adRes = await fetchWithTimeout(
+        `${GRAPH_BASE}/${dbAs.platformId}/ads?fields=${adFields}&access_token=${token}&limit=500`
+      );
+      const adData = await adRes.json() as any;
+      if (adData.error) continue;
+
+      for (const ad of (adData.data || [])) {
+        await prisma.ad.upsert({
+          where: { adSetId_platformId: { adSetId: dbAs.id, platformId: ad.id } },
+          update: { name: ad.name, status: ad.status },
+          create: {
+            adSetId: dbAs.id,
+            platformId: ad.id,
+            name: ad.name,
+            status: ad.status,
+          },
+        });
+        adCount++;
+      }
+    } catch {
+      // Skip failed ad sets
+    }
+  }
+  console.log(`[Sync] Ads: ${adCount}`);
+
   return count;
 }
 
@@ -270,34 +306,63 @@ export async function syncInsights(
   const token = decryptToken(account.accessToken);
   const actId = `act_${account.accountId}`;
 
-  // Fetch insights at campaign level, broken down by day
-  const fields = 'campaign_id,campaign_name,impressions,reach,clicks,spend,actions,action_values,outbound_clicks,frequency,cpm';
-  const params = new URLSearchParams({
-    fields,
-    access_token: token,
-    time_range: JSON.stringify({ since: dateFrom, until: dateTo }),
-    time_increment: '1', // daily breakdown
-    level: 'campaign',
-    limit: '1000',
-  });
+  const insightFields = 'campaign_id,campaign_name,adset_id,adset_name,ad_id,ad_name,impressions,reach,clicks,spend,actions,action_values,outbound_clicks,frequency,cpm';
 
-  const res = await fetchWithTimeout(`${GRAPH_BASE}/${actId}/insights?${params}`, undefined, 30000);
-  const data = await res.json() as any;
+  // Pull insights at all 3 levels
+  const levels = ['campaign', 'adset', 'ad'] as const;
+  let allRows: any[] = [];
 
-  if (data.error) {
-    throw new Error(`Meta API error: ${data.error.message}`);
+  for (const level of levels) {
+    const params = new URLSearchParams({
+      fields: insightFields,
+      access_token: token,
+      time_range: JSON.stringify({ since: dateFrom, until: dateTo }),
+      time_increment: '1',
+      level,
+      limit: '1000',
+    });
+
+    try {
+      const res = await fetchWithTimeout(`${GRAPH_BASE}/${actId}/insights?${params}`, undefined, 30000);
+      const data = await res.json() as any;
+      if (data.error) {
+        console.warn(`[Sync] ${level} insights error: ${data.error.message}`);
+        continue;
+      }
+      const rows = data.data || [];
+      rows.forEach((r: any) => r._level = level);
+      allRows = allRows.concat(rows);
+      console.log(`[Sync] ${level} insights: ${rows.length} rows`);
+    } catch (err: any) {
+      console.warn(`[Sync] ${level} insights fetch failed: ${err.message}`);
+    }
   }
 
-  const rows = data.data || [];
-  console.log(`[Sync] Found ${rows.length} insight rows, processing...`);
-
   let count = 0;
-  for (const row of rows) {
-    // Find or skip campaign
+  for (const row of allRows) {
+    // Find campaign
     const campaign = await prisma.campaign.findFirst({
       where: { adAccountId, platformId: row.campaign_id },
     });
     if (!campaign) continue;
+
+    // Find ad set and ad if applicable
+    let adSetId: string | null = null;
+    let adId: string | null = null;
+
+    if (row._level === 'adset' || row._level === 'ad') {
+      const adSet = row.adset_id ? await prisma.adSet.findFirst({
+        where: { campaignId: campaign.id, platformId: row.adset_id },
+      }) : null;
+      adSetId = adSet?.id || null;
+    }
+
+    if (row._level === 'ad') {
+      const ad = row.ad_id && adSetId ? await prisma.ad.findFirst({
+        where: { adSetId, platformId: row.ad_id },
+      }) : null;
+      adId = ad?.id || null;
+    }
 
     // Parse actions (leads, purchases)
     const actions = row.actions || [];
@@ -321,14 +386,14 @@ export async function syncInsights(
     const dateStr = String(row.date_start).split('T')[0]; // "2026-03-24"
     const date = new Date(`${dateStr}T00:00:00.000Z`);
 
-    // Find existing metric for same account + campaign + date (prevent duplicates)
+    // Find existing metric for same account + campaign + adset + ad + date
     const existingMetric = await prisma.adMetric.findFirst({
       where: {
         date,
         adAccountId,
         campaignId: campaign.id,
-        adSetId: null,
-        adId: null,
+        adSetId: row._level === 'campaign' ? null : adSetId,
+        adId: row._level !== 'ad' ? null : adId,
       },
     });
 
@@ -363,6 +428,8 @@ export async function syncInsights(
           date,
           adAccountId,
           campaignId: campaign.id,
+          ...(adSetId ? { adSetId } : {}),
+          ...(adId ? { adId } : {}),
           ...metricData,
         },
       });

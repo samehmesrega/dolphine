@@ -183,6 +183,32 @@ router.get('/campaigns/:id', async (req: AuthRequest, res: Response) => {
   }
 });
 
+// GET /api/v1/marketing/media-buying/adsets
+router.get('/adsets', async (req: AuthRequest, res: Response) => {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const data = await mbService.getAdSetsWithMetrics({
+      from: q.from, to: q.to, platform: q.platform, brandId: q.brandId, adAccountId: q.adAccountId,
+    });
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// GET /api/v1/marketing/media-buying/ads
+router.get('/ads', async (req: AuthRequest, res: Response) => {
+  try {
+    const q = req.query as Record<string, string | undefined>;
+    const data = await mbService.getAdsWithMetrics({
+      from: q.from, to: q.to, platform: q.platform, brandId: q.brandId, adAccountId: q.adAccountId,
+    });
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // === Manual Sync ===
 
 // POST /marketing/media-buying/resync — delete all metrics and re-sync from scratch
