@@ -80,6 +80,7 @@ export default function MediaBuying() {
   const [filterBrand, setFilterBrand] = useState('');
   const [filterAccount, setFilterAccount] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
+  const [filterActivity, setFilterActivity] = useState<'' | 'active' | 'zero'>('');
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
@@ -270,9 +271,16 @@ export default function MediaBuying() {
             <option value="PAUSED">متوقفة</option>
           </select>
 
-          {(filterPlatform || filterBrand || filterAccount || filterStatus) && (
+          <select value={filterActivity} onChange={(e) => setFilterActivity(e.target.value as '' | 'active' | 'zero')}
+            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[130px]">
+            <option value="">كل النشاط</option>
+            <option value="active">نشطة فعلاً (فيها ظهور)</option>
+            <option value="zero">بدون نشاط</option>
+          </select>
+
+          {(filterPlatform || filterBrand || filterAccount || filterStatus || filterActivity) && (
             <button
-              onClick={() => { setFilterPlatform(''); setFilterBrand(''); setFilterAccount(''); setFilterStatus(''); }}
+              onClick={() => { setFilterPlatform(''); setFilterBrand(''); setFilterAccount(''); setFilterStatus(''); setFilterActivity(''); }}
               className="px-3 py-1.5 text-xs text-slate-500 border border-slate-200 rounded-lg hover:bg-slate-50"
             >
               مسح الفلاتر ✕
@@ -439,6 +447,7 @@ export default function MediaBuying() {
               <tbody>
                 {campaigns
                   .filter((c) => !filterStatus || c.status === filterStatus)
+                  .filter((c) => !filterActivity || (filterActivity === 'active' ? c.impressions > 0 : c.impressions === 0))
                   .map((c) => (
                   <tr key={c.id} className="border-b last:border-0 hover:bg-slate-50">
                     <td className="py-2">
