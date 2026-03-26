@@ -398,7 +398,11 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
     const id = String(req.params.id);
     const order = await prisma.order.findUnique({
       where: { id },
-      include: { orderItems: { include: { product: true } } },
+      include: {
+        orderItems: { include: { product: true } },
+        lead: { select: { assignedTo: { select: { name: true } } } },
+        createdBy: { select: { name: true } },
+      },
     });
     if (!order) {
       res.status(404).json({ error: 'الطلب غير موجود' });
@@ -434,6 +438,37 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'الطلب لا يحتوي عناصر' });
       return;
     }
+    // Build customer_note — product-level notes from each item
+    const customerNoteLines: string[] = [];
+    for (const item of order.orderItems) {
+      const productLabel = item.productName || item.product?.name || 'منتج';
+      const variation = item.variation ? Object.values(item.variation as Record<string, string>).join(' - ') : '';
+      const label = variation ? `📦 ${productLabel} (${variation})` : `📦 ${productLabel}`;
+      customerNoteLines.push(label);
+      if (item.notes?.trim()) {
+        customerNoteLines.push(`   ملاحظة: ${item.notes.trim()}`);
+      }
+    }
+    const customerNote = customerNoteLines.length > 0 ? customerNoteLines.join('\n') : undefined;
+
+    // Build internal order note — sales info, payment details
+    const salesName = order.lead?.assignedTo?.name || order.createdBy?.name || '—';
+    const totalPrice = order.orderItems.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
+    const discount = Number(order.discount) || 0;
+    const finalTotal = totalPrice - discount;
+    const paidAmount = order.paymentType === 'full' ? finalTotal : (Number(order.partialAmount) || 0);
+    const remaining = finalTotal - paidAmount;
+
+    const internalNoteLines = [
+      `🔹 السيلز: ${salesName}`,
+      `🔹 المبلغ المدفوع: ${paidAmount} EGP`,
+      `🔹 المبلغ المتبقي: ${remaining} EGP`,
+    ];
+    if (order.notes?.trim()) {
+      internalNoteLines.push(`🔹 ملاحظات: ${order.notes.trim()}`);
+    }
+    const internalNote = internalNoteLines.join('\n');
+
     const wooId = await createWooCommerceOrder({
       billing: {
         first_name: firstName,
@@ -450,7 +485,8 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
       payment_method: 'cod',
       payment_method_title: order.paymentType === 'full' ? 'دفع كامل' : 'دفع جزئي',
       set_paid: false,
-    });
+      customer_note: customerNote,
+    }, internalNote);
     await prisma.order.update({ where: { id }, data: { wooCommerceId: wooId } });
     const updated = await prisma.order.findUnique({
       where: { id },

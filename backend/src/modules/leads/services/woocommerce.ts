@@ -145,13 +145,23 @@ export type WCOrderPayload = {
   payment_method?: string;
   payment_method_title?: string;
   set_paid?: boolean;
+  customer_note?: string;
 };
 
-export async function createWooCommerceOrder(payload: WCOrderPayload): Promise<number> {
+export async function createWooCommerceOrder(payload: WCOrderPayload, internalNote?: string): Promise<number> {
   const order = await wcFetch<{ id: number }>('/orders', {
     method: 'POST',
     body: JSON.stringify(payload),
   });
+
+  // Add private order note (visible in admin only)
+  if (internalNote) {
+    await wcFetch(`/orders/${order.id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ note: internalNote, customer_note: false }),
+    }).catch((err) => console.error('[WooCommerce] Failed to add order note:', err));
+  }
+
   return order.id;
 }
 
