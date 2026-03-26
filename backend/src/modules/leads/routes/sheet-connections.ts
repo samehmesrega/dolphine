@@ -266,12 +266,16 @@ export async function createLeadFromRow(
   const email = (mapping.email ? (rowData[mapping.email] ?? '').trim() : '') || undefined;
   const address = (mapping.address ? (rowData[mapping.address] ?? '').trim() : '') || undefined;
 
-  // تاريخ الإنشاء من الشيت
+  // تاريخ الإنشاء من الشيت (يُعامل كتوقيت مصر UTC+2)
   let parsedCreatedAt: Date | undefined;
   if (mapping.createdAt) {
     const rawDate = (rowData[mapping.createdAt] ?? '').trim();
     if (rawDate) {
-      const d = new Date(rawDate);
+      console.log(`[Sheet Date Debug] raw: "${rawDate}" | mapping key: "${mapping.createdAt}"`);
+      // Append timezone offset if not present — Sheet dates are in Egypt time (UTC+2)
+      const hasTimezone = /[+-]\d{2}:?\d{2}$|Z$/i.test(rawDate);
+      const d = new Date(hasTimezone ? rawDate : rawDate + ' GMT+0200');
+      console.log(`[Sheet Date Debug] parsed: "${d.toISOString()}" | hasTimezone: ${hasTimezone}`);
       if (!isNaN(d.getTime())) parsedCreatedAt = d;
     }
   }
