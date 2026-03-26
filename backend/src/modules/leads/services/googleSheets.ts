@@ -71,6 +71,21 @@ export async function readRows(
 
   const headers = await readHeaders(spreadsheetId, sheetName);
 
+  // First check how many rows the sheet has — avoid requesting beyond grid limits
+  const metaUrl = `${SHEETS_API_BASE}/${spreadsheetId}?fields=sheets(properties(title,gridProperties))&key=${apiKey}`;
+  const metaRes = await fetch(metaUrl);
+  if (metaRes.ok) {
+    const meta = (await metaRes.json()) as { sheets?: Array<{ properties: { title: string; gridProperties: { rowCount: number } } }> };
+    const sheet = meta.sheets?.find(s => s.properties.title === sheetName);
+    if (sheet) {
+      const maxRows = sheet.properties.gridProperties.rowCount;
+      if (startRow > maxRows) {
+        // No new rows to read
+        return { headers, rows: [] };
+      }
+    }
+  }
+
   const range = encodeURIComponent(`${sheetName}!${startRow}:${startRow + 50000}`);
   const url = `${SHEETS_API_BASE}/${spreadsheetId}/values/${range}?key=${apiKey}`;
 
