@@ -254,14 +254,7 @@ export default function LeadDetailPage() {
     });
   };
 
-  if (!id) return (
-    <div className="p-4">
-      <p className="text-slate-500">معرف الليد غير صالح.</p>
-      <Link to="/leads" className="text-blue-600 mt-2 inline-block">← العودة للقائمة</Link>
-    </div>
-  );
-
-  // Check if lead already has an active order (must be before any early return)
+  // Check if lead already has an active order (must be before ALL early returns)
   const { data: existingOrders } = useQuery({
     queryKey: ['lead-orders', lead?.id],
     queryFn: async () => {
@@ -275,6 +268,13 @@ export default function LeadDetailPage() {
     enabled: !!lead?.id,
   });
   const hasOrder = (existingOrders ?? 0) > 0;
+
+  if (!id) return (
+    <div className="p-4">
+      <p className="text-slate-500">معرف الليد غير صالح.</p>
+      <Link to="/leads" className="text-blue-600 mt-2 inline-block">← العودة للقائمة</Link>
+    </div>
+  );
 
   if (isLoading || !lead) return (
     <div className="p-4 text-slate-500">جاري التحميل...</div>
