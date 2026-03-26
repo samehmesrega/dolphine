@@ -25,12 +25,32 @@ export default function MarketingShell({ children }: { children: ReactNode }) {
   const { user, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const isAdmin = hasPermission('*') || ADMIN_ROLES.includes(user?.role?.slug ?? '');
 
   return (
     <div className="flex min-h-screen bg-slate-50" dir="rtl">
+      {/* Mobile overlay */}
+      {mobileOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setMobileOpen(false)} />
+      )}
+
+      {/* Mobile hamburger */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-3 right-3 z-30 bg-slate-800 text-white p-2.5 rounded-xl shadow-lg"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
       {/* Sidebar */}
-      <aside className={`${collapsed ? 'w-16' : 'w-64'} bg-slate-800 text-white transition-all duration-300 flex flex-col`}>
+      <aside className={`
+        fixed inset-y-0 right-0 z-50 md:static md:z-auto transition-transform duration-200 md:translate-x-0
+        ${mobileOpen ? 'translate-x-0' : 'translate-x-full'}
+        ${collapsed ? 'w-16' : 'w-64'} bg-slate-800 text-white flex flex-col
+      `}>
         <div className="p-4 border-b border-slate-700 flex items-center justify-between">
           {!collapsed && (
             <div>

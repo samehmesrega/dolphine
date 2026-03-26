@@ -3,7 +3,11 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../../../db';
 import type { AuthRequest } from '../../../shared/middleware/auth';
+import { requirePermission } from '../../../shared/middleware/auth';
 import { sendAccountApprovedEmail } from '../../../shared/services/email';
+
+// Middleware: require users.manage permission for write operations
+const requireManage = requirePermission('users.manage');
 
 const router = Router();
 
@@ -67,7 +71,7 @@ router.get('/pending', async (_req: AuthRequest, res: Response) => {
 });
 
 // PATCH /settings/users/:id/approve — approve pending user
-router.patch('/:id/approve', async (req: AuthRequest, res: Response) => {
+router.patch('/:id/approve', requireManage, async (req: AuthRequest, res: Response) => {
   try {
     const { roleId } = req.body;
     if (!roleId) {
@@ -97,7 +101,7 @@ router.patch('/:id/approve', async (req: AuthRequest, res: Response) => {
 });
 
 // PATCH /settings/users/:id/reject — reject pending user
-router.patch('/:id/reject', async (req: AuthRequest, res: Response) => {
+router.patch('/:id/reject', requireManage, async (req: AuthRequest, res: Response) => {
   try {
     await prisma.user.update({
       where: { id: String(req.params.id) },
@@ -127,7 +131,7 @@ router.get('/permissions', async (_req: AuthRequest, res: Response) => {
 });
 
 // PUT /settings/users/roles/:id/permissions — update role permissions
-router.put('/roles/:id/permissions', async (req: AuthRequest, res: Response) => {
+router.put('/roles/:id/permissions', requireManage, async (req: AuthRequest, res: Response) => {
   try {
     const roleId = String(req.params.id);
     const { permissionIds } = req.body as { permissionIds: string[] };
@@ -166,7 +170,7 @@ const createUserSchema = z.object({
 });
 
 // POST /settings/users — create user (admin)
-router.post('/', async (req: AuthRequest, res: Response) => {
+router.post('/', requireManage, async (req: AuthRequest, res: Response) => {
   try {
     const parsed = createUserSchema.safeParse(req.body);
     if (!parsed.success) {

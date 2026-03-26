@@ -311,9 +311,9 @@ export default function MediaBuying() {
         )}
 
         {/* Dropdowns */}
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-2">
           <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[130px]">
+            className="border rounded-lg px-2 py-1.5 text-sm text-slate-700">
             <option value="">كل المنصات</option>
             {['meta', 'google', 'tiktok', 'snapchat'].map((p) => (
               <option key={p} value={p}>{platformLabels[p]}</option>
@@ -321,7 +321,7 @@ export default function MediaBuying() {
           </select>
 
           <select value={filterBrand} onChange={(e) => setFilterBrand(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[130px]">
+            className="border rounded-lg px-2 py-1.5 text-sm text-slate-700">
             <option value="">كل البراندات</option>
             {brandsList.map((b: any) => (
               <option key={b.id} value={b.id}>{b.name}</option>
@@ -329,7 +329,7 @@ export default function MediaBuying() {
           </select>
 
           <select value={filterAccount} onChange={(e) => setFilterAccount(e.target.value)}
-            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[160px]">
+            className="border rounded-lg px-2 py-1.5 text-sm text-slate-700">
             <option value="">كل الحسابات</option>
             {accounts.map((a: any) => (
               <option key={a.id} value={a.id}>{a.accountName}</option>
@@ -341,7 +341,7 @@ export default function MediaBuying() {
             setFilterStatus(s);
             setFilterActivity(a as '' | 'active' | 'zero');
           }}
-            className="border rounded-lg px-3 py-1.5 text-sm text-slate-700 min-w-[180px]">
+            className="border rounded-lg px-2 py-1.5 text-sm text-slate-700 col-span-2 md:col-span-1">
             <option value="|active">نشطة فعلاً (فيها صرف أو ظهور)</option>
             <option value="|">الكل</option>
             <option value="ACTIVE|">نشطة (ACTIVE)</option>

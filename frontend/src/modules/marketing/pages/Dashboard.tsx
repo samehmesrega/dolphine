@@ -63,7 +63,7 @@ export default function MarketingDashboard() {
       </div>
 
       {/* Performance Cards */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border p-4">
           <p className="text-sm text-gray-500">إجمالي الإنفاق</p>
           <p className="text-2xl font-bold text-red-600">{formatCurrency(performance.totalAdSpend || 0)}</p>
@@ -84,7 +84,7 @@ export default function MarketingDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Top Creatives by Leads */}
         <div className="bg-white rounded-xl border p-4">
           <h3 className="font-semibold mb-3">أعلى كرييتيف (بعدد الليدز)</h3>
