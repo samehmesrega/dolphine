@@ -146,6 +146,7 @@ export type WCOrderPayload = {
   payment_method_title?: string;
   set_paid?: boolean;
   customer_note?: string;
+  status?: string;
 };
 
 export async function createWooCommerceOrder(payload: WCOrderPayload, internalNote?: string): Promise<number> {

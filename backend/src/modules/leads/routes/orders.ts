@@ -466,6 +466,8 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
     if (order.notes?.trim()) {
       internalNoteLines.push(`🔹 ملاحظات: ${order.notes.trim()}`);
     }
+    internalNoteLines.push('');
+    internalNoteLines.push('تم الرفع من خلال دولفين ليدز — تم المراجعة من قسم الحسابات');
     const internalNote = internalNoteLines.join('\n');
 
     const wooId = await createWooCommerceOrder({
@@ -484,6 +486,7 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
       payment_method: 'cod',
       payment_method_title: order.paymentType === 'full' ? 'دفع كامل' : 'دفع جزئي',
       set_paid: false,
+      status: 'processing',
       customer_note: customerNote,
     }, internalNote);
     await prisma.order.update({ where: { id }, data: { wooCommerceId: wooId } });

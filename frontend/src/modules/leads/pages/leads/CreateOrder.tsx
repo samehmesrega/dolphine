@@ -391,6 +391,12 @@ export default function CreateOrderPage() {
                   onChange={(e) => updateItem(index, 'price', parseFloat(e.target.value) || 0)}
                 />
               </div>
+              <div className="w-24">
+                <label className="block text-xs text-slate-500 mb-1">الإجمالي</label>
+                <div className="w-full border rounded px-2 py-2 bg-slate-50 text-slate-700 font-medium text-sm">
+                  {(item.quantity * item.price).toLocaleString()} ج.م
+                </div>
+              </div>
               <div className="flex-1 min-w-[100px]">
                 <label className="block text-xs text-slate-500 mb-1">ملاحظات</label>
                 <input
@@ -416,7 +422,7 @@ export default function CreateOrderPage() {
             </div>
             {discount > 0 && (
               <div className="flex justify-between text-red-600">
-                <span>الخصم</span>
+                <span>الخصم {discountReason ? `(${discountReason})` : ''}</span>
                 <span className="font-medium">- {discount.toLocaleString()} ج.م</span>
               </div>
             )}
