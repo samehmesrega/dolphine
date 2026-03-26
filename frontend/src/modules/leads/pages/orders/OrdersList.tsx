@@ -199,7 +199,7 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                       </td>
                       <td className="py-3 px-4 hidden md:table-cell">{o.paymentType === 'full' ? 'كامل' : 'جزئي'}</td>
                       <td className="py-3 px-4">
-                        <Link to={`/orders/${o.id}`} className="text-blue-600 hover:text-blue-800 font-medium">
+                        <Link to={`/leads/orders/${o.id}`} className="text-blue-600 hover:text-blue-800 font-medium">
                           تفاصيل
                         </Link>
                       </td>
