@@ -267,6 +267,17 @@ export default function LeadDetailPage() {
 
   const isConfirmed = lead.status?.slug === 'confirmed';
 
+  // Check if lead already has an active order
+  const { data: existingOrders } = useQuery({
+    queryKey: ['lead-orders', lead.id],
+    queryFn: async () => {
+      const { data } = await api.get('/orders', { params: { leadId: lead.id, pageSize: 1 } });
+      return data as { total: number };
+    },
+    enabled: !!lead.id,
+  });
+  const hasOrder = (existingOrders?.total ?? 0) > 0;
+
   return (
     <div>
       {/* Header */}
@@ -423,15 +434,15 @@ export default function LeadDetailPage() {
                 )}
 
                 <Link
-                  to={isConfirmed ? `/leads/leads/${lead.id}/create-order` : '#'}
-                  onClick={(e) => { if (!isConfirmed) e.preventDefault(); }}
+                  to={isConfirmed && !hasOrder ? `/leads/leads/${lead.id}/create-order` : '#'}
+                  onClick={(e) => { if (!isConfirmed || hasOrder) e.preventDefault(); }}
                   className={`block w-full px-4 py-2.5 text-center rounded-lg text-sm font-medium transition ${
-                    isConfirmed
+                    isConfirmed && !hasOrder
                       ? 'bg-blue-600 text-white hover:bg-blue-700'
                       : 'bg-slate-100 text-slate-400 cursor-not-allowed'
                   }`}
                 >
-                  إنشاء الطلب
+                  {hasOrder ? 'تم إنشاء الطلب' : 'إنشاء الطلب'}
                 </Link>
                 {!isConfirmed && (
                   <p className="text-xs text-slate-400">يتطلب حالة «طلب مؤكد»</p>

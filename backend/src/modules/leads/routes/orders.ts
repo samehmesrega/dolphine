@@ -37,10 +37,13 @@ const createOrderSchema = z.object({
 router.get('/', async (req: Request, res: Response) => {
   try {
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const leadId = typeof req.query.leadId === 'string' ? req.query.leadId : undefined;
     const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize), 10) || 20));
 
-    const where = status ? { status } : {};
+    const where: Record<string, unknown> = { deletedAt: null };
+    if (status) where.status = status;
+    if (leadId) where.leadId = leadId;
     const [total, orders] = await prisma.$transaction([
       prisma.order.count({ where }),
       prisma.order.findMany({
@@ -90,6 +93,15 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
     });
     if (!foundLead) {
       res.status(404).json({ error: 'الليد غير موجود' });
+      return;
+    }
+
+    // Prevent duplicate orders — one active order per lead
+    const existingOrder = await prisma.order.findFirst({
+      where: { leadId, deletedAt: null },
+    });
+    if (existingOrder) {
+      res.status(409).json({ error: 'هذا الليد لديه طلب بالفعل. احذف الطلب الأول لإنشاء طلب جديد.' });
       return;
     }
 
