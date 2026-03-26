@@ -51,8 +51,9 @@ router.get('/', async (req: Request, res: Response) => {
     if (assignedToId !== undefined) where.assignedToId = assignedToId;
     if (from || to) {
       where.createdAt = {};
-      if (from) where.createdAt.gte = new Date(from + 'T00:00:00');
-      if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999');
+      // Egypt timezone (UTC+2) — midnight in Egypt = 10:00 PM previous day in UTC
+      if (from) where.createdAt.gte = new Date(from + 'T00:00:00+02:00');
+      if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999+02:00');
     }
     if (search && search.trim()) {
       const s = search.trim();
