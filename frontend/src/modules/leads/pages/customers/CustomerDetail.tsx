@@ -166,7 +166,7 @@ export default function CustomerDetail() {
                       {new Date(lead.createdAt).toLocaleDateString('ar-EG')}
                     </td>
                     <td className="px-4 py-3">
-                      <Link to={`/leads/${lead.id}`} className="text-blue-600 hover:text-blue-800">
+                      <Link to={`/leads/leads/${lead.id}`} className="text-blue-600 hover:text-blue-800">
                         تفاصيل
                       </Link>
                     </td>

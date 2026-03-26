@@ -316,7 +316,7 @@ export default function TasksPage() {
                       <span className="font-medium">{task.lead.name}</span>
                       <span className="text-slate-400 text-xs">(#{task.lead.number})</span>
                       <Link
-                        to={`/leads/${task.lead.id}`}
+                        to={`/leads/leads/${task.lead.id}`}
                         className="text-blue-600 hover:text-blue-800 font-medium text-xs mr-1"
                       >
                         فتح الليد ←
