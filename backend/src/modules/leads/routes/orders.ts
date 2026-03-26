@@ -400,8 +400,7 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
       where: { id },
       include: {
         orderItems: { include: { product: true } },
-        lead: { select: { assignedTo: { select: { name: true } } } },
-        createdBy: { select: { name: true } },
+        lead: { select: { name: true, assignedTo: { select: { name: true } } } },
       },
     });
     if (!order) {
@@ -452,8 +451,8 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
     const customerNote = customerNoteLines.length > 0 ? customerNoteLines.join('\n') : undefined;
 
     // Build internal order note — sales info, payment details
-    const salesName = order.lead?.assignedTo?.name || order.createdBy?.name || '—';
-    const totalPrice = order.orderItems.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
+    const salesName = order.lead?.assignedTo?.name || '—';
+    const totalPrice = order.orderItems.reduce((sum: number, i: { price: unknown; quantity: number }) => sum + Number(i.price) * i.quantity, 0);
     const discount = Number(order.discount) || 0;
     const finalTotal = totalPrice - discount;
     const paidAmount = order.paymentType === 'full' ? finalTotal : (Number(order.partialAmount) || 0);
