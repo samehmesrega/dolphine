@@ -152,15 +152,19 @@ export default function OrderDetailPage() {
             {order.lead && (
               <div>
                 <dt className="text-slate-500">الليد</dt>
-                <dd><Link to={`/leads/${order.lead.id}`} className="text-blue-600 hover:underline">{order.lead.name}</Link></dd>
+                <dd><Link to={`/leads/leads/${order.lead.id}`} className="text-blue-600 hover:underline">{order.lead.name}</Link></dd>
               </div>
             )}
           </dl>
           {order.transferImage && (
             <div className="mt-4">
-              <span className="text-slate-500 text-sm">صورة التحويل</span>
-              <a href={`/uploads/${order.transferImage}`} target="_blank" rel="noreferrer" className="block mt-1 text-blue-600 hover:underline">
-                عرض الصورة
+              <span className="text-slate-500 text-sm block mb-2">صورة التحويل</span>
+              <a href={`/uploads/${order.transferImage}`} target="_blank" rel="noreferrer">
+                <img
+                  src={`/uploads/${order.transferImage}`}
+                  alt="صورة التحويل"
+                  className="max-w-full max-h-[400px] rounded-lg border border-slate-200 object-contain"
+                />
               </a>
             </div>
           )}

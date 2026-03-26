@@ -227,7 +227,7 @@ export default function CreateOrderPage() {
     return (
       <div className="p-4">
         <p className="text-slate-500">معرف الليد غير صالح.</p>
-        <Link to="/leads" className="text-blue-600 mt-2 inline-block">← ليدز</Link>
+        <Link to="/leads/leads" className="text-blue-600 mt-2 inline-block">← ليدز</Link>
       </div>
     );
   }
@@ -239,7 +239,7 @@ export default function CreateOrderPage() {
   return (
     <div>
       <div className="flex items-center gap-4 mb-6">
-        <Link to={`/leads/${id}`} className="text-slate-600 hover:text-slate-800">← تفاصيل الليد</Link>
+        <Link to={`/leads/leads/${id}`} className="text-slate-600 hover:text-slate-800">← تفاصيل الليد</Link>
         <h1 className="text-2xl font-bold text-slate-800">إنشاء طلب من الليد</h1>
       </div>
 
@@ -548,7 +548,7 @@ export default function CreateOrderPage() {
           >
             {createMutation.isPending ? 'جاري الحفظ...' : 'إنشاء الطلب'}
           </button>
-          <Link to={`/leads/${id}`} className="px-6 py-2 border rounded-lg text-slate-700">
+          <Link to={`/leads/leads/${id}`} className="px-6 py-2 border rounded-lg text-slate-700">
             إلغاء
           </Link>
         </div>

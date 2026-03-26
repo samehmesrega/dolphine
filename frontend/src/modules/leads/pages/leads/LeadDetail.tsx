@@ -423,7 +423,7 @@ export default function LeadDetailPage() {
                 )}
 
                 <Link
-                  to={isConfirmed ? `/leads/${lead.id}/create-order` : '#'}
+                  to={isConfirmed ? `/leads/leads/${lead.id}/create-order` : '#'}
                   onClick={(e) => { if (!isConfirmed) e.preventDefault(); }}
                   className={`block w-full px-4 py-2.5 text-center rounded-lg text-sm font-medium transition ${
                     isConfirmed
