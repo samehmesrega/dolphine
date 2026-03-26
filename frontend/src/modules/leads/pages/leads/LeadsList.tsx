@@ -41,6 +41,8 @@ async function fetchLeads(params: {
   search?: string;
   statusId?: string;
   assignedToId?: string;
+  from?: string;
+  to?: string;
   sortBy?: string;
   order?: string;
   page: number;
@@ -84,6 +86,39 @@ export default function LeadsList() {
   const [search, setSearch] = useState('');
   const [statusId, setStatusId] = useState<string>('');
   const [assignedToId, setAssignedToId] = useState<string>('');
+  const [datePreset, setDatePreset] = useState<string>('');
+  const [fromDate, setFromDate] = useState<string>('');
+  const [toDate, setToDate] = useState<string>('');
+
+  const applyDatePreset = (preset: string) => {
+    setDatePreset(preset);
+    setPage(1);
+    const today = new Date();
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const todayStr = fmt(today);
+    if (preset === 'today') { setFromDate(todayStr); setToDate(todayStr); }
+    else if (preset === 'yesterday') {
+      const y = new Date(today); y.setDate(y.getDate()-1); const ys = fmt(y);
+      setFromDate(ys); setToDate(ys);
+    }
+    else if (preset === '7d') {
+      const d = new Date(today); d.setDate(d.getDate()-6);
+      setFromDate(fmt(d)); setToDate(todayStr);
+    }
+    else if (preset === '30d') {
+      const d = new Date(today); d.setDate(d.getDate()-29);
+      setFromDate(fmt(d)); setToDate(todayStr);
+    }
+    else if (preset === 'this_month') {
+      setFromDate(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`); setToDate(todayStr);
+    }
+    else if (preset === 'last_month') {
+      const s = new Date(today.getFullYear(), today.getMonth()-1, 1);
+      const e = new Date(today.getFullYear(), today.getMonth(), 0);
+      setFromDate(fmt(s)); setToDate(fmt(e));
+    }
+    else { setFromDate(''); setToDate(''); }
+  };
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [order, setOrder] = useState<string>('desc');
   const [page, setPage] = useState(1);
@@ -147,12 +182,14 @@ export default function LeadsList() {
       search: search.trim() || undefined,
       statusId: statusId || undefined,
       assignedToId: assignedToId || undefined,
+      from: fromDate || undefined,
+      to: toDate || undefined,
       sortBy,
       order,
       page,
       pageSize,
     }),
-    [search, statusId, assignedToId, sortBy, order, page]
+    [search, statusId, assignedToId, fromDate, toDate, sortBy, order, page]
   );
 
   const { data, isLoading, isFetching, isError, error: listError } = useQuery({
@@ -252,6 +289,50 @@ export default function LeadsList() {
       )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
+        {/* Date filter — compact row */}
+        <div className="flex flex-wrap items-center gap-2 mb-3 pb-3 border-b border-slate-100">
+          <span className="text-xs text-slate-500 font-medium">الفترة:</span>
+          {[
+            { key: '', label: 'الكل' },
+            { key: 'today', label: 'اليوم' },
+            { key: 'yesterday', label: 'أمس' },
+            { key: '7d', label: '٧ أيام' },
+            { key: '30d', label: '٣٠ يوم' },
+            { key: 'this_month', label: 'هذا الشهر' },
+            { key: 'last_month', label: 'الشهر الماضي' },
+          ].map(p => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => applyDatePreset(p.key)}
+              className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                datePreset === p.key
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+          <input
+            type="date"
+            value={fromDate}
+            onChange={e => { setFromDate(e.target.value); setDatePreset('custom'); setPage(1); }}
+            className="border border-slate-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300"
+          />
+          <span className="text-xs text-slate-400">→</span>
+          <input
+            type="date"
+            value={toDate}
+            onChange={e => { setToDate(e.target.value); setDatePreset('custom'); setPage(1); }}
+            className="border border-slate-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300"
+          />
+          {fromDate && (
+            <span className="text-xs text-blue-600 font-semibold mr-2">
+              {data?.total ?? '...'} ليد
+            </span>
+          )}
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <input
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"

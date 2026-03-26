@@ -15,6 +15,8 @@ const listQuerySchema = z.object({
   search: z.string().optional(),
   statusId: z.preprocess((v) => (v === '' || v === undefined ? undefined : v), z.string().uuid().optional()),
   assignedToId: z.preprocess((v) => (v === '' || v === undefined ? undefined : v), z.string().uuid().optional().nullable()),
+  from: z.string().optional(),
+  to: z.string().optional(),
   sortBy: z.enum(['createdAt', 'name', 'statusId']).optional().default('createdAt'),
   order: z.enum(['asc', 'desc']).optional().default('desc'),
   page: z.coerce.number().int().min(1).optional().default(1),
@@ -24,6 +26,7 @@ const listQuerySchema = z.object({
 type LeadWhere = {
   statusId?: string;
   assignedToId?: string | null;
+  createdAt?: { gte?: Date; lte?: Date };
   OR?: Array<
     | { name: { contains: string; mode: 'insensitive' } }
     | { phone: { contains: string } }
@@ -40,12 +43,17 @@ router.get('/', async (req: Request, res: Response) => {
       return;
     }
 
-    const { search, statusId, assignedToId, sortBy, order, page, pageSize } = parsed.data;
+    const { search, statusId, assignedToId, from, to, sortBy, order, page, pageSize } = parsed.data;
     const skip = (page - 1) * pageSize;
 
     const where: LeadWhere = {};
     if (statusId) where.statusId = statusId;
     if (assignedToId !== undefined) where.assignedToId = assignedToId;
+    if (from || to) {
+      where.createdAt = {};
+      if (from) where.createdAt.gte = new Date(from + 'T00:00:00');
+      if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999');
+    }
     if (search && search.trim()) {
       const s = search.trim();
       const normalized = normalizePhone(s) || undefined;
