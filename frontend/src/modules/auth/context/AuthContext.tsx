@@ -28,16 +28,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return u ? JSON.parse(u) : null;
   });
 
+  // Refresh user data on mount and every 10 minutes (keeps permissions fresh + detects token expiry)
   useEffect(() => {
     if (!token) return;
-    // دايماً نجدد الصلاحيات من السيرفر عشان أي تغيير في الـ permissions يتطبق فوراً
-    api.get('/auth/me')
-      .then(({ data }) => {
-        const u = { ...data.user, permissions: data.user.permissions ?? [] };
-        setUser(u);
-        localStorage.setItem('dolphin_user', JSON.stringify(u));
-      })
-      .catch(() => {});
+
+    const refreshUser = () => {
+      api.get('/auth/me')
+        .then(({ data }) => {
+          const u = { ...data.user, permissions: data.user.permissions ?? [] };
+          setUser(u);
+          localStorage.setItem('dolphin_user', JSON.stringify(u));
+        })
+        .catch((err) => {
+          if (err.response?.status === 401) {
+            // Token expired — log out
+            logout();
+            window.location.href = '/login';
+          }
+        });
+    };
+
+    refreshUser();
+    const interval = setInterval(refreshUser, 10 * 60 * 1000); // every 10 minutes
+    return () => clearInterval(interval);
   }, [token]);
 
   const login = (newToken: string, newUser: User) => {

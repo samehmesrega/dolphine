@@ -160,6 +160,27 @@ export async function syncCampaigns(adAccountId: string): Promise<number> {
   const account = await prisma.adAccount.findUnique({ where: { id: adAccountId } });
   if (!account) throw new Error('Ad account not found');
 
+  // Check token expiry
+  if (account.tokenExpiry && new Date(account.tokenExpiry) < new Date()) {
+    // Notify admins about expired token
+    const admins = await prisma.user.findMany({
+      where: { isActive: true, role: { slug: { in: ['super_admin', 'admin'] } } },
+      select: { id: true },
+    });
+    if (admins.length > 0) {
+      await prisma.notification.createMany({
+        data: admins.map((a) => ({
+          userId: a.id,
+          type: 'meta_token_expired',
+          title: 'انتهت صلاحية حساب Meta',
+          body: `حساب ${account.accountName} محتاج إعادة ربط — الـ token انتهى`,
+          link: '/marketing/settings',
+        })),
+      }).catch(() => {});
+    }
+    throw new Error(`Token expired for ${account.accountName} — يرجى إعادة الربط من الإعدادات`);
+  }
+
   const token = decryptToken(account.accessToken);
   const actId = `act_${account.accountId}`;
 

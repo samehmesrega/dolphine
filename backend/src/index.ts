@@ -48,6 +48,9 @@ function requireUsersAccess(
 
 const app = express();
 
+// Trust proxy (Render uses reverse proxy — fixes rate limiter X-Forwarded-For warning)
+app.set('trust proxy', 1);
+
 // ===== Structured Logging =====
 app.use(
   pinoHttp({
@@ -65,10 +68,17 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || config.nodeEnv === 'development') {
+      // Allow requests without origin (server-to-server, Postman, etc.)
+      if (!origin) {
         callback(null, true);
         return;
       }
+      // Development: allow localhost
+      if (config.nodeEnv === 'development' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+        callback(null, true);
+        return;
+      }
+      // Production: check allowed origins
       if (config.allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {

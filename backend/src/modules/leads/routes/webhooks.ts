@@ -176,6 +176,22 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
       return;
     }
 
+    // Duplicate detection: skip if same phone + same source in last 24h
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const existingLead = await prisma.lead.findFirst({
+      where: {
+        phoneNormalized,
+        source: 'form_webhook',
+        createdAt: { gte: oneDayAgo },
+        deletedAt: null,
+      },
+    });
+    if (existingLead) {
+      console.log(`[webhook] تجاهل: ليد مكرر — ${phoneNormalized} (${existingLead.id})`);
+      res.status(200).json({ success: true, skipped: true, reason: 'duplicate', existingLeadId: existingLead.id });
+      return;
+    }
+
     const assignedToId = await getNextAssignedUserId();
 
     // Wrap customer upsert + lead create + product interest in a transaction
