@@ -261,22 +261,26 @@ export default function LeadDetailPage() {
     </div>
   );
 
+  // Check if lead already has an active order (must be before any early return)
+  const { data: existingOrders } = useQuery({
+    queryKey: ['lead-orders', lead?.id],
+    queryFn: async () => {
+      try {
+        const { data } = await api.get('/orders', { params: { leadId: lead!.id, pageSize: 1 } });
+        return (data as { total: number }).total;
+      } catch {
+        return 0;
+      }
+    },
+    enabled: !!lead?.id,
+  });
+  const hasOrder = (existingOrders ?? 0) > 0;
+
   if (isLoading || !lead) return (
     <div className="p-4 text-slate-500">جاري التحميل...</div>
   );
 
   const isConfirmed = lead.status?.slug === 'confirmed';
-
-  // Check if lead already has an active order
-  const { data: existingOrders } = useQuery({
-    queryKey: ['lead-orders', lead.id],
-    queryFn: async () => {
-      const { data } = await api.get('/orders', { params: { leadId: lead.id, pageSize: 1 } });
-      return data as { total: number };
-    },
-    enabled: !!lead.id,
-  });
-  const hasOrder = (existingOrders?.total ?? 0) > 0;
 
   return (
     <div>
