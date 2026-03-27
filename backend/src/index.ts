@@ -200,6 +200,7 @@ app.use('/lp', lpSubmitLimiter, require('./modules/marketing/routes/lp-public').
 // Webhooks (public, rate-limited)
 // Keeping old path for backwards compatibility with WordPress plugins
 app.use('/api/webhooks', webhookLimiter, require('./modules/leads/routes/webhooks').default);
+app.use('/api/webhooks/bosta', webhookLimiter, require('./modules/leads/routes/bosta-webhook').default);
 
 // === Backwards compatibility: /api/* routes redirect to /api/v1/* ===
 // This ensures the existing frontend works while we migrate
@@ -213,6 +214,7 @@ app.use('/api/customers', authMiddleware, require('./modules/leads/routes/custom
 app.use('/api/dashboard', authMiddleware, require('./modules/leads/routes/dashboard').default);
 app.use('/api/shifts', authMiddleware, require('./modules/leads/routes/shifts').default);
 app.use('/api/woocommerce', authMiddleware, require('./modules/leads/routes/woocommerce').default);
+app.use('/api/bosta', authMiddleware, require('./modules/leads/routes/bosta').default);
 app.use('/api/form-connections', authMiddleware, require('./modules/leads/routes/form-connections').default);
 app.use('/api/sheet-connections', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/sheet-connections').default);
 app.use('/api/notifications', authMiddleware, require('./modules/leads/routes/notifications').default);

@@ -187,6 +187,16 @@ export async function fetchWooCommerceOrders(
   return wcFetch<WCOrderResponse[]>(path);
 }
 
+/**
+ * إضافة ملاحظة على طلب ووكومرس (لإرسال رقم التتبع مثلاً)
+ */
+export async function addWooCommerceOrderNote(wooId: number, note: string): Promise<void> {
+  await wcFetch(`/orders/${wooId}/notes`, {
+    method: 'POST',
+    body: JSON.stringify({ note, customer_note: false }),
+  });
+}
+
 export async function fetchWooCommerceProducts(page = 1, perPage = 100): Promise<
   Array<{
     id: number;

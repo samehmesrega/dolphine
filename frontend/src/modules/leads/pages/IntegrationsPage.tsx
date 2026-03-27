@@ -70,6 +70,25 @@ function useWooConfig() {
   });
 }
 
+type BostaConfig = {
+  configured: boolean;
+  enabled: boolean;
+  baseUrl: string;
+  apiKeyMasked: string;
+  source: 'db' | 'env';
+  webhookUrl: string;
+};
+
+function useBostaConfig() {
+  return useQuery({
+    queryKey: ['bosta-config'],
+    queryFn: async () => {
+      const { data } = await api.get<BostaConfig>('/bosta/config');
+      return data;
+    },
+  });
+}
+
 function useProducts() {
   return useQuery({
     queryKey: ['products'],
@@ -1102,6 +1121,38 @@ export default function IntegrationsPage() {
   const [wooConsumerKey, setWooConsumerKey] = useState('');
   const [wooConsumerSecret, setWooConsumerSecret] = useState('');
 
+  // بوسطة
+  const { data: bostaConfig, isLoading: loadingBosta } = useBostaConfig();
+  const [bostaApiKey, setBostaApiKey] = useState('');
+  const [bostaBaseUrl, setBostaBaseUrl] = useState('https://app.bosta.co/api/v2');
+  const [bostaEnabled, setBostaEnabled] = useState(false);
+  const [bostaCopied, setBostaCopied] = useState(false);
+
+  const saveBostaToggleMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      await api.post('/bosta/config', { enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bosta-config'] });
+    },
+  });
+
+  const saveBostaMutation = useMutation({
+    mutationFn: async (body: { apiKey?: string; baseUrl?: string }) => {
+      await api.post('/bosta/config', body);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bosta-config'] });
+    },
+  });
+
+  React.useEffect(() => {
+    if (bostaConfig) {
+      setBostaBaseUrl(bostaConfig.baseUrl || 'https://app.bosta.co/api/v2');
+      setBostaEnabled(bostaConfig.enabled);
+    }
+  }, [bostaConfig]);
+
   const saveWooMutation = useMutation({
     mutationFn: async (body: { baseUrl: string; consumerKey: string; consumerSecret: string }) => {
       await api.post('/woocommerce/config', body);
@@ -1304,6 +1355,150 @@ export default function IntegrationsPage() {
                     )}
                   </div>
                 )}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
+      {/* بوسطة للشحن */}
+      <section className="bg-white rounded-xl shadow p-6">
+        <h2 className="text-lg font-semibold text-slate-800 mb-2">بوسطة للشحن</h2>
+        <p className="text-slate-600 text-sm mb-4">
+          ربط الطلبات مع شركة بوسطة للشحن. عند تأكيد الطلب من الحسابات، يتم رفع الشحنة تلقائياً لبوسطة.
+        </p>
+        {loadingBosta ? (
+          <p className="text-slate-500">جاري التحميل...</p>
+        ) : (
+          <>
+            {/* حالة الاتصال + زرار التفعيل */}
+            <div className="flex items-center gap-3 mb-4">
+              <span
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                  !bostaEnabled
+                    ? 'bg-slate-100 text-slate-600'
+                    : bostaConfig?.configured
+                    ? 'bg-green-100 text-green-800'
+                    : 'bg-amber-100 text-amber-800'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full ${
+                  !bostaEnabled ? 'bg-slate-400' : bostaConfig?.configured ? 'bg-green-500' : 'bg-amber-500'
+                }`} />
+                {!bostaEnabled ? 'معطّل' : bostaConfig?.configured ? 'متصل ومفعّل' : 'غير مضبوط'}
+              </span>
+              {bostaConfig?.source === 'env' && bostaConfig?.configured && (
+                <span className="text-slate-500 text-sm">(من متغيرات البيئة)</span>
+              )}
+            </div>
+
+            {/* Toggle تفعيل/إيقاف */}
+            <div className="flex items-center gap-3 mb-5">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={bostaEnabled}
+                onClick={() => {
+                  const next = !bostaEnabled;
+                  setBostaEnabled(next);
+                  saveBostaToggleMutation.mutate(next);
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  bostaEnabled ? 'bg-green-500' : 'bg-slate-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    bostaEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className="text-sm text-slate-700">
+                {bostaEnabled ? 'رفع الشحنات لبوسطة مفعّل' : 'رفع الشحنات لبوسطة معطّل'}
+              </span>
+            </div>
+
+            {/* فورم الإعدادات */}
+            <form
+              className="space-y-3 max-w-xl"
+              onSubmit={(e) => {
+                e.preventDefault();
+                saveBostaMutation.mutate({
+                  apiKey: bostaApiKey.trim() || undefined,
+                  baseUrl: bostaBaseUrl.trim() || undefined,
+                });
+              }}
+            >
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">API Key</label>
+                <input
+                  type="password"
+                  value={bostaApiKey}
+                  onChange={(e) => setBostaApiKey(e.target.value)}
+                  placeholder={bostaConfig?.apiKeyMasked || 'أدخل مفتاح API من بوسطة'}
+                  className="border border-slate-300 rounded-lg px-3 py-2 w-full"
+                  autoComplete="off"
+                />
+                {bostaConfig?.apiKeyMasked && !bostaApiKey && (
+                  <p className="text-xs text-slate-500 mt-1">اتركه فارغاً للإبقاء على القيمة الحالية</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Base URL</label>
+                <input
+                  type="url"
+                  value={bostaBaseUrl}
+                  onChange={(e) => setBostaBaseUrl(e.target.value)}
+                  placeholder="https://app.bosta.co/api/v2"
+                  className="border border-slate-300 rounded-lg px-3 py-2 w-full"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={
+                  (!bostaApiKey.trim() && !bostaBaseUrl.trim()) ||
+                  saveBostaMutation.isPending
+                }
+                className="bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-600 disabled:opacity-50"
+              >
+                {saveBostaMutation.isPending ? 'جاري الحفظ...' : 'حفظ إعدادات بوسطة'}
+              </button>
+              {saveBostaMutation.isError && (
+                <p className="text-red-600 text-sm">
+                  {(() => {
+                    const e = saveBostaMutation.error as { response?: { data?: { error?: string }; status?: number } };
+                    const apiError = e?.response?.data?.error;
+                    if (typeof apiError === 'string') return apiError;
+                    return (saveBostaMutation.error as Error)?.message || 'حدث خطأ';
+                  })()}
+                </p>
+              )}
+              {saveBostaMutation.isSuccess && <p className="text-green-600 text-sm">تم الحفظ.</p>}
+            </form>
+
+            {/* Webhook URL للنسخ */}
+            {bostaConfig?.webhookUrl && (
+              <div className="mt-5 pt-5 border-t border-slate-200">
+                <h3 className="text-md font-semibold text-slate-700 mb-2">رابط الـ Webhook</h3>
+                <p className="text-slate-500 text-sm mb-2">
+                  انسخ هذا الرابط وأضفه في إعدادات الـ Webhook في Dashboard بوسطة لاستقبال تحديثات الشحنات.
+                </p>
+                <div className="flex items-center gap-2">
+                  <code className="text-xs bg-slate-100 px-3 py-2 rounded flex-1 truncate">
+                    {bostaConfig.webhookUrl}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(bostaConfig.webhookUrl);
+                      setBostaCopied(true);
+                      setTimeout(() => setBostaCopied(false), 2000);
+                    }}
+                    className="text-sm bg-slate-200 hover:bg-slate-300 px-3 py-2 rounded whitespace-nowrap"
+                  >
+                    {bostaCopied ? 'تم النسخ' : 'نسخ'}
+                  </button>
+                </div>
               </div>
             )}
           </>

@@ -1,0 +1,276 @@
+/**
+ * تكامل بوسطة - رفع الشحنات وتتبعها
+ * الإعدادات: من قاعدة البيانات (صفحة الربط) أو من متغيرات البيئة
+ * API Reference: https://docs.bosta.co (v2)
+ */
+
+import { prisma } from '../../../db';
+import { config } from '../../../shared/config';
+import { Decimal } from '@prisma/client/runtime/library';
+
+// ===== Config =====
+
+const ENV_KEYS = {
+  apiKey: config.bosta.apiKey || '',
+  baseUrl: (config.bosta.baseUrl || 'https://app.bosta.co/api/v2').replace(/\/$/, ''),
+};
+
+const DB_KEYS = {
+  apiKey: 'bosta_api_key',
+  baseUrl: 'bosta_base_url',
+  enabled: 'bosta_enabled',
+} as const;
+
+export type BostaConfig = {
+  apiKey: string;
+  baseUrl: string;
+};
+
+async function getFromDb(): Promise<BostaConfig | null> {
+  const rows = await prisma.integrationSetting.findMany({
+    where: { key: { in: [DB_KEYS.apiKey, DB_KEYS.baseUrl] } },
+  });
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+  const apiKey = map.get(DB_KEYS.apiKey) || '';
+  const baseUrl = (map.get(DB_KEYS.baseUrl) || '').replace(/\/$/, '');
+  if (apiKey && baseUrl) return { apiKey, baseUrl };
+  if (apiKey) return { apiKey, baseUrl: ENV_KEYS.baseUrl };
+  return null;
+}
+
+export async function getBostaConfig(): Promise<BostaConfig | null> {
+  const fromDb = await getFromDb();
+  if (fromDb) return fromDb;
+  if (ENV_KEYS.apiKey) {
+    return { apiKey: ENV_KEYS.apiKey, baseUrl: ENV_KEYS.baseUrl };
+  }
+  return null;
+}
+
+function maskSecret(s: string, prefixLen = 5): string {
+  if (!s || s.length <= prefixLen) return '••••••••';
+  return s.slice(0, prefixLen) + '••••••••';
+}
+
+export async function getBostaConfigForUI(): Promise<{
+  configured: boolean;
+  enabled: boolean;
+  baseUrl: string;
+  apiKeyMasked: string;
+  source: 'db' | 'env';
+}> {
+  const enabled = await isEnabled();
+  const fromDb = await getFromDb();
+  if (fromDb) {
+    return {
+      configured: true,
+      enabled,
+      baseUrl: fromDb.baseUrl,
+      apiKeyMasked: maskSecret(fromDb.apiKey),
+      source: 'db',
+    };
+  }
+  if (ENV_KEYS.apiKey) {
+    return {
+      configured: true,
+      enabled,
+      baseUrl: ENV_KEYS.baseUrl,
+      apiKeyMasked: maskSecret(ENV_KEYS.apiKey),
+      source: 'env',
+    };
+  }
+  return {
+    configured: false,
+    enabled,
+    baseUrl: ENV_KEYS.baseUrl || 'https://app.bosta.co/api/v2',
+    apiKeyMasked: '',
+    source: 'env',
+  };
+}
+
+async function isEnabled(): Promise<boolean> {
+  const row = await prisma.integrationSetting.findUnique({ where: { key: DB_KEYS.enabled } });
+  return row?.value === 'true';
+}
+
+/**
+ * هل التكامل مفعّل ومُعدّ؟ (يُستخدم قبل رفع الشحنات)
+ */
+export async function isConfigured(): Promise<boolean> {
+  const enabled = await isEnabled();
+  if (!enabled) return false;
+  const c = await getBostaConfig();
+  return !!c;
+}
+
+// ===== API Fetch Wrapper =====
+
+async function bostaFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const cfg = await getBostaConfig();
+  if (!cfg) throw new Error('إعدادات بوسطة غير مكتملة (أدخل البيانات من صفحة الربط أو متغيرات البيئة)');
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const url = `${cfg.baseUrl}/${path}`;
+    const res = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': cfg.apiKey,
+        ...options.headers,
+      },
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      let errMsg = text;
+      try {
+        const j = JSON.parse(text);
+        errMsg = j.message || j.errorCode || text;
+      } catch {}
+      throw new Error(`بوسطة: ${res.status} ${errMsg}`);
+    }
+
+    return res.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// ===== Delivery Functions =====
+
+type BostaDeliveryResponse = {
+  success: boolean;
+  message: string;
+  data: {
+    _id: string;
+    trackingNumber: string;
+    businessReference: string;
+    state: { code: number; value: string };
+  };
+};
+
+type OrderWithItems = {
+  id: string;
+  number: number;
+  shippingName: string;
+  shippingPhone: string;
+  shippingGovernorate: string | null;
+  shippingCity: string | null;
+  shippingAddress: string | null;
+  notes: string | null;
+  discount: Decimal | null;
+  partialAmount: Decimal | null;
+  orderItems: Array<{
+    productName: string | null;
+    quantity: number;
+    price: Decimal;
+    product?: { name: string } | null;
+  }>;
+};
+
+/**
+ * إنشاء شحنة على بوسطة
+ */
+export async function createBostaDelivery(
+  order: OrderWithItems,
+): Promise<{ deliveryId: string; trackingNumber: string }> {
+  // حساب مبلغ الدفع عند الاستلام (المبلغ المتبقي فقط)
+  const totalPrice = order.orderItems.reduce(
+    (sum, item) => sum + Number(item.price) * item.quantity,
+    0,
+  );
+  const cod = Math.max(0, totalPrice - Number(order.discount || 0) - Number(order.partialAmount || 0));
+
+  // تقسيم الاسم
+  const nameParts = (order.shippingName || '').trim().split(/\s+/);
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.slice(1).join(' ') || '';
+
+  // وصف المنتجات
+  const itemNames = order.orderItems
+    .map((it) => it.product?.name || it.productName || 'منتج')
+    .join(', ');
+  const itemsCount = order.orderItems.reduce((sum, it) => sum + it.quantity, 0);
+
+  // المدينة
+  const city = order.shippingCity || order.shippingGovernorate || '';
+
+  const payload = {
+    type: 10, // Package Delivery
+    cod,
+    receiver: {
+      firstName,
+      lastName,
+      phone: order.shippingPhone,
+    },
+    dropOffAddress: {
+      city,
+      firstLine: order.shippingAddress || city || 'عنوان غير محدد',
+    },
+    businessReference: String(order.number),
+    notes: order.notes || undefined,
+    specs: {
+      packageType: 'Parcel',
+      size: 'MEDIUM',
+      packageDetails: {
+        itemsCount,
+        description: itemNames,
+      },
+    },
+    allowToOpenPackage: true,
+  };
+
+  const result = await bostaFetch<BostaDeliveryResponse>('deliveries?apiVersion=1', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+
+  if (!result.success || !result.data) {
+    throw new Error(result.message || 'فشل إنشاء الشحنة على بوسطة');
+  }
+
+  return {
+    deliveryId: result.data._id,
+    trackingNumber: result.data.trackingNumber,
+  };
+}
+
+/**
+ * عرض تفاصيل شحنة
+ */
+export async function getDeliveryByTracking(trackingNumber: string): Promise<unknown> {
+  const result = await bostaFetch<{ success: boolean; data: unknown }>(
+    `deliveries/business/${trackingNumber}`,
+  );
+  return result.data;
+}
+
+/**
+ * إلغاء شحنة
+ */
+export async function terminateDelivery(trackingNumber: string): Promise<void> {
+  await bostaFetch(`deliveries/business/${trackingNumber}/terminate`, {
+    method: 'DELETE',
+  });
+}
+
+// ===== Cities Cache =====
+
+let citiesCache: Array<{ _id: string; name: string; nameAr: string; code: string }> | null = null;
+let citiesCacheTime = 0;
+const CITIES_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+export async function getCities(): Promise<Array<{ _id: string; name: string; nameAr: string; code: string }>> {
+  if (citiesCache && Date.now() - citiesCacheTime < CITIES_CACHE_TTL) {
+    return citiesCache;
+  }
+
+  const result = await bostaFetch<{ success: boolean; data: { list: Array<{ _id: string; name: string; nameAr: string; code: string }> } }>('cities');
+  citiesCache = result.data?.list || [];
+  citiesCacheTime = Date.now();
+  return citiesCache;
+}

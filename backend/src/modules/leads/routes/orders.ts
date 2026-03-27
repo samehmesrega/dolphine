@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { uploadSingle } from '../../../shared/middleware/upload';
 import { normalizePhone } from '../../../shared/utils/phone';
 import { AuthRequest } from '../../../shared/middleware/auth';
-import { createWooCommerceOrder, isConfigured as isWooConfigured } from '../services/woocommerce';
+import { createWooCommerceOrder, isConfigured as isWooConfigured, addWooCommerceOrderNote } from '../services/woocommerce';
+import { createBostaDelivery, isConfigured as isBostaConfigured } from '../services/bosta';
 import { auditLog } from '../services/audit';
 
 const router = Router();
@@ -383,10 +384,121 @@ router.patch('/:id', async (req: Request, res: Response) => {
       oldData: { status: order.status },
       newData: { status: updated.status, ...(action === 'reject' ? { rejectedReason: rejectedReason?.trim() } : {}) },
     });
+
+    // بعد تأكيد الحسابات، رفع الشحنة لبوسطة تلقائياً
+    if (action === 'confirm') {
+      const bostaEnabled = await isBostaConfigured();
+      if (bostaEnabled) {
+        try {
+          const bostaResult = await createBostaDelivery(updated);
+          await prisma.order.update({
+            where: { id },
+            data: {
+              bostaDeliveryId: bostaResult.deliveryId,
+              trackingNumber: bostaResult.trackingNumber,
+              bostaStatus: 'Pickup requested',
+            },
+          });
+          // مزامنة رقم التتبع مع ووكومرس
+          if (updated.wooCommerceId) {
+            const wooConfigured = await isWooConfigured();
+            if (wooConfigured) {
+              await addWooCommerceOrderNote(
+                updated.wooCommerceId,
+                `بوسطة - رقم التتبع: ${bostaResult.trackingNumber}`,
+              ).catch((err) => console.error('[Bosta→WooCommerce] Failed to sync tracking:', err));
+            }
+          }
+        } catch (bostaErr) {
+          const bostaMsg = bostaErr instanceof Error ? bostaErr.message : 'خطأ غير متوقع';
+          console.error('[Bosta] Failed to create delivery:', bostaMsg);
+          await prisma.order.update({
+            where: { id },
+            data: { bostaStatus: 'failed', bostaError: bostaMsg },
+          });
+          // إشعار تحذيري
+          await prisma.notification.create({
+            data: {
+              userId,
+              title: 'فشل رفع الطلب لبوسطة',
+              body: `الطلب #${updated.number} اتأكد بنجاح لكن فشل يتسجل على بوسطة: ${bostaMsg}`,
+              type: 'bosta_delivery_failed',
+              entity: 'order',
+              entityId: id,
+            },
+          });
+        }
+      }
+    }
+
     res.json({ order: updated });
   } catch (err: unknown) {
     console.error('Order confirm/reject error:', err);
     res.status(500).json({ error: 'خطأ في تحديث الطلب' });
+  }
+});
+
+/**
+ * إعادة رفع الطلب لبوسطة (للطلبات الفاشلة أو اللي مترفعتش)
+ */
+router.post('/:id/push-to-bosta', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        orderItems: { include: { product: { select: { id: true, name: true } } } },
+      },
+    });
+    if (!order) {
+      res.status(404).json({ error: 'الطلب غير موجود' });
+      return;
+    }
+    if (order.bostaDeliveryId && order.bostaStatus !== 'failed') {
+      res.status(400).json({ error: 'الطلب مرفوع مسبقاً لبوسطة' });
+      return;
+    }
+    if (order.status !== 'accounts_confirmed') {
+      res.status(400).json({ error: 'يجب تأكيد الطلب من الحسابات أولاً' });
+      return;
+    }
+    if (!(await isBostaConfigured())) {
+      res.status(503).json({ error: 'تكامل بوسطة غير مفعّل. فعّله من صفحة الربط والتكامل.' });
+      return;
+    }
+    const result = await createBostaDelivery(order);
+    await prisma.order.update({
+      where: { id },
+      data: {
+        bostaDeliveryId: result.deliveryId,
+        trackingNumber: result.trackingNumber,
+        bostaStatus: 'Pickup requested',
+        bostaError: null,
+      },
+    });
+    // مزامنة رقم التتبع مع ووكومرس
+    if (order.wooCommerceId) {
+      const wooConfigured = await isWooConfigured();
+      if (wooConfigured) {
+        await addWooCommerceOrderNote(
+          order.wooCommerceId,
+          `بوسطة - رقم التتبع: ${result.trackingNumber}`,
+        ).catch((err) => console.error('[Bosta→WooCommerce] Failed to sync tracking:', err));
+      }
+    }
+    const updated = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        lead: { select: { id: true, name: true } },
+        customer: { select: { id: true, name: true, phone: true } },
+        orderItems: { include: { product: { select: { id: true, name: true } } } },
+      },
+    });
+    res.json({ order: updated, trackingNumber: result.trackingNumber });
+  } catch (err: unknown) {
+    console.error('Push to Bosta error:', err);
+    const message = err instanceof Error ? err.message : 'خطأ غير متوقع';
+    res.status(502).json({ error: `فشل رفع الطلب لبوسطة: ${message}` });
   }
 });
 

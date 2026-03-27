@@ -33,6 +33,10 @@ export const config = {
     consumerKey: process.env.WOOCOMMERCE_CONSUMER_KEY || '',
     consumerSecret: process.env.WOOCOMMERCE_CONSUMER_SECRET || '',
   },
+  bosta: {
+    apiKey: process.env.BOSTA_API_KEY || '',
+    baseUrl: (process.env.BOSTA_BASE_URL || 'https://app.bosta.co/api/v2').replace(/\/$/, ''),
+  },
   allowedOrigins: (process.env.ALLOWED_ORIGINS || '')
     .split(',')
     .map((o) => o.trim())
