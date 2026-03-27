@@ -192,7 +192,11 @@ router.post('/leads/:token', async (req: Request, res: Response) => {
       return;
     }
 
-    const assignedToId = await getNextAssignedUserId();
+    const assignment = await getNextAssignedUserId();
+    const assignedToId = assignment.userId;
+    if (!assignedToId && assignment.reason) {
+      console.log(`[webhook] لم يتم تعيين الليد: ${assignment.reason}`);
+    }
 
     // Wrap customer upsert + lead create + product interest in a transaction
     const lead = await prisma.$transaction(async (tx) => {

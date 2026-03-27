@@ -331,7 +331,11 @@ export async function createLeadFromRow(
     }
   }
   if (!assignedToId) {
-    assignedToId = await getNextAssignedUserId();
+    const assignment = await getNextAssignedUserId();
+    assignedToId = assignment.userId;
+    if (!assignedToId && assignment.reason) {
+      console.log(`[Sheet Import] لم يتم تعيين الليد: ${assignment.reason}`);
+    }
   }
 
   // Wrap customer + lead + product interest + task in a transaction

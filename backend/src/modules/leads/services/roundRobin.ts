@@ -19,10 +19,15 @@ function isTimeBetween(time: string, start: string, end: string): boolean {
   return time >= start && time <= end;
 }
 
+export type AssignmentResult = {
+  userId: string | null;
+  reason?: string;
+};
+
 /**
- * يُرجع userId للموظف التالي في التوزيع (الأقل عدد ليدز معيّنة له)، أو null إن لم يوجد شيفت نشط
+ * يُرجع userId للموظف التالي في التوزيع (الأقل عدد ليدز معيّنة له)، أو null مع السبب
  */
-export async function getNextAssignedUserId(): Promise<string | null> {
+export async function getNextAssignedUserId(): Promise<AssignmentResult> {
   const { dayOfWeek, time } = getCurrentDayAndTime();
   const shifts = await prisma.shift.findMany({
     where: {
@@ -37,6 +42,10 @@ export async function getNextAssignedUserId(): Promise<string | null> {
       },
     },
   });
+
+  if (shifts.length === 0) {
+    return { userId: null, reason: 'لا يوجد شيفتات نشطة بها توزيع تلقائي' };
+  }
 
   // جمع المرشحين مع إزالة التكرار لمنع تحيّز المستخدمين في شيفتات متعددة
   const seenUserIds = new Set<string>();
@@ -53,7 +62,10 @@ export async function getNextAssignedUserId(): Promise<string | null> {
     }
   }
 
-  if (candidateUserIds.length === 0) return null;
+  if (candidateUserIds.length === 0) {
+    const dayNames = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    return { userId: null, reason: `لا يوجد شيفت نشط الآن (${dayNames[dayOfWeek]} ${time} توقيت مصر)` };
+  }
 
   // عد الليدز المعيّنة لكل مستخدم
   const counts = await prisma.lead.groupBy({
@@ -78,5 +90,5 @@ export async function getNextAssignedUserId(): Promise<string | null> {
       chosen = uid;
     }
   }
-  return chosen;
+  return { userId: chosen };
 }

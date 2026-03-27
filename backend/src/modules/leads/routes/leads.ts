@@ -152,7 +152,11 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
-    const assignedToId = await getNextAssignedUserId();
+    const assignment = await getNextAssignedUserId();
+    const assignedToId = assignment.userId;
+    if (!assignedToId && assignment.reason) {
+      console.log(`[Manual Lead] لم يتم تعيين الليد: ${assignment.reason}`);
+    }
 
     const lead = await prisma.lead.create({
       data: {
