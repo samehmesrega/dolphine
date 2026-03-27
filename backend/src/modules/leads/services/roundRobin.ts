@@ -5,10 +5,12 @@
 import { prisma } from '../../../db';
 
 function getCurrentDayAndTime(): { dayOfWeek: number; time: string } {
+  // Use Egypt timezone (UTC+2) since shifts are configured in Egypt time
   const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 = الأحد
-  const h = now.getHours();
-  const m = now.getMinutes();
+  const egyptTime = new Date(now.getTime() + 2 * 60 * 60 * 1000); // UTC+2
+  const dayOfWeek = egyptTime.getUTCDay(); // 0 = الأحد
+  const h = egyptTime.getUTCHours();
+  const m = egyptTime.getUTCMinutes();
   const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
   return { dayOfWeek, time };
 }

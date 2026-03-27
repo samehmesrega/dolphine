@@ -135,7 +135,7 @@ async function wcFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export type WCLineItem =
-  | { product_id: number; quantity: number }
+  | { product_id: number; quantity: number; price?: string }
   | { name: string; quantity: number; price: string };
 
 export type WCOrderPayload = {

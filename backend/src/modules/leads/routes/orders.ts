@@ -425,7 +425,7 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
     const lineItems = order.orderItems.map((item) => {
       const wcId = item.product?.wooCommerceId;
       if (wcId) {
-        return { product_id: wcId, quantity: item.quantity };
+        return { product_id: wcId, quantity: item.quantity, price: String(item.price) };
       }
       return {
         name: item.productName || 'منتج',
