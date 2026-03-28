@@ -234,34 +234,12 @@ export async function createBostaDelivery(
     .join(', ');
   const itemsCount = order.orderItems.reduce((sum, it) => sum + it.quantity, 0);
 
-  // المحافظة والمدينة — طابق مع cities بوسطة للحصول على cityId
-  const govName = order.shippingGovernorate || order.shippingCity || '';
-  let cityId: string | undefined;
-  let cityName = govName;
-  try {
-    const cities = await getCities();
-    console.log(`[Bosta] Matching governorate "${govName}" against ${cities.length} cities`);
-    const match = cities.find(c =>
-      c.nameAr === govName || c.name.toLowerCase() === govName.toLowerCase() ||
-      c.nameAr.includes(govName) || govName.includes(c.nameAr) ||
-      c.name.toLowerCase().includes(govName.toLowerCase()) || govName.toLowerCase().includes(c.name.toLowerCase())
-    );
-    if (match) {
-      cityId = match._id;
-      cityName = match.name;
-      console.log(`[Bosta] Matched: ${match.nameAr} (${match.name}) → cityId: ${cityId}`);
-    } else {
-      // Fallback: use first city (Cairo) if no match
-      if (cities.length > 0) {
-        const cairo = cities.find(c => c.name.toLowerCase().includes('cairo')) || cities[0];
-        cityId = cairo._id;
-        cityName = cairo.name;
-        console.log(`[Bosta] No match for "${govName}", falling back to ${cairo.nameAr} (${cairo.name})`);
-      }
-    }
-  } catch (err) {
-    console.error('[Bosta] Failed to fetch cities:', err);
-  }
+  // Resolve Bosta address (city + district from Bosta API)
+  const bostaAddr = await resolveBostaAddress(
+    order.shippingGovernorate || '',
+    order.shippingCity || '',
+    order.shippingAddress || '',
+  );
 
   // السماح بفتح الشحنة (من إعدادات الربط)
   const allowOpen = await getAllowOpenPackage();
@@ -279,10 +257,10 @@ export async function createBostaDelivery(
     },
     dropOffAddress: {
       country: { _id: 'wJB7VzprQ', name: 'Egypt', nameAr: 'مصر', code: 'EG' },
-      city: cityName,
-      cityId: cityId || '',
-      districtName: order.shippingCity || govName || cityName || 'غير محدد',
-      firstLine: order.shippingAddress || govName || 'عنوان غير محدد',
+      city: bostaAddr.cityName,
+      cityId: bostaAddr.cityId,
+      districtId: bostaAddr.districtId,
+      firstLine: bostaAddr.firstLine,
     },
     businessReference: businessRef,
     notes: order.notes || undefined,
@@ -332,19 +310,95 @@ export async function terminateDelivery(trackingNumber: string): Promise<void> {
   });
 }
 
-// ===== Cities Cache =====
+// ===== Cities & Districts Cache =====
 
-let citiesCache: Array<{ _id: string; name: string; nameAr: string; code: string }> | null = null;
+type BostaCity = { _id: string; name: string; nameAr: string; code: string };
+type BostaDistrict = { _id: string; name: string; nameAr: string; cityId: string };
+
+let citiesCache: BostaCity[] | null = null;
 let citiesCacheTime = 0;
-const CITIES_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const districtsCache = new Map<string, { data: BostaDistrict[]; time: number }>();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
 
-export async function getCities(): Promise<Array<{ _id: string; name: string; nameAr: string; code: string }>> {
-  if (citiesCache && Date.now() - citiesCacheTime < CITIES_CACHE_TTL) {
+export async function getCities(): Promise<BostaCity[]> {
+  if (citiesCache && Date.now() - citiesCacheTime < CACHE_TTL) {
     return citiesCache;
   }
 
-  const result = await bostaFetch<{ success: boolean; data: { list: Array<{ _id: string; name: string; nameAr: string; code: string }> } }>('cities');
+  const result = await bostaFetch<{ success: boolean; data: { list: BostaCity[] } }>('cities');
   citiesCache = result.data?.list || [];
   citiesCacheTime = Date.now();
   return citiesCache;
+}
+
+export async function getDistricts(cityId: string): Promise<BostaDistrict[]> {
+  const cached = districtsCache.get(cityId);
+  if (cached && Date.now() - cached.time < CACHE_TTL) {
+    return cached.data;
+  }
+
+  try {
+    const result = await bostaFetch<{ success: boolean; data: { list: BostaDistrict[] } }>(`districts?cityId=${cityId}`);
+    const list = result.data?.list || [];
+    districtsCache.set(cityId, { data: list, time: Date.now() });
+    return list;
+  } catch {
+    return [];
+  }
+}
+
+function fuzzyMatch(input: string, target: string): boolean {
+  const a = input.trim().toLowerCase();
+  const b = target.trim().toLowerCase();
+  return a === b || a.includes(b) || b.includes(a);
+}
+
+/**
+ * Resolve Bosta address from order fields — always returns valid cityId + districtId
+ */
+export async function resolveBostaAddress(governorate: string, city: string, address: string): Promise<{
+  cityId: string;
+  cityName: string;
+  districtId: string;
+  districtName: string;
+  firstLine: string;
+}> {
+  const cities = await getCities();
+  const govInput = governorate || city || '';
+
+  // Match city (governorate)
+  let matchedCity = cities.find(c => fuzzyMatch(govInput, c.nameAr) || fuzzyMatch(govInput, c.name));
+  if (!matchedCity) {
+    matchedCity = cities.find(c => c.name.toLowerCase().includes('cairo')) || cities[0];
+    console.log(`[Bosta Address] No city match for "${govInput}", using fallback: ${matchedCity?.nameAr}`);
+  } else {
+    console.log(`[Bosta Address] City matched: "${govInput}" → ${matchedCity.nameAr} (${matchedCity._id})`);
+  }
+
+  // Fetch districts for matched city
+  const districts = await getDistricts(matchedCity._id);
+  const districtInput = city || address || govInput;
+
+  // Try matching district
+  let matchedDistrict = districts.find(d => fuzzyMatch(districtInput, d.nameAr) || fuzzyMatch(districtInput, d.name));
+  if (!matchedDistrict && address) {
+    // Try matching against address parts
+    matchedDistrict = districts.find(d =>
+      address.includes(d.nameAr) || address.includes(d.name)
+    );
+  }
+  if (!matchedDistrict) {
+    matchedDistrict = districts[0];
+    console.log(`[Bosta Address] No district match for "${districtInput}", using first: ${matchedDistrict?.nameAr || 'none'}`);
+  } else {
+    console.log(`[Bosta Address] District matched: "${districtInput}" → ${matchedDistrict.nameAr}`);
+  }
+
+  return {
+    cityId: matchedCity._id,
+    cityName: matchedCity.name,
+    districtId: matchedDistrict?._id || '',
+    districtName: matchedDistrict?.name || districtInput || 'غير محدد',
+    firstLine: address || govInput || 'عنوان غير محدد',
+  };
 }
