@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../../db';
-import { getBostaConfigForUI, isConfigured as isBostaConfigured } from '../services/bosta';
+import { getBostaConfigForUI, isConfigured as isBostaConfigured, getAllowOpenPackage, setAllowOpenPackage } from '../services/bosta';
 import { config } from '../../../shared/config';
 import { z } from 'zod';
 
@@ -82,6 +82,31 @@ router.post('/config', async (req: Request, res: Response) => {
         ? 'جدول إعدادات التكامل غير موجود. شغّل في مجلد الـ Backend: npx prisma db push'
         : 'فشل حفظ الإعدادات. تحقق من اتصال قاعدة البيانات.';
     res.status(500).json({ error: msg });
+  }
+});
+
+// جلب إعداد السماح بفتح الشحنة
+router.get('/allow-open-package', async (_req: Request, res: Response) => {
+  try {
+    const allowed = await getAllowOpenPackage();
+    res.json({ allowToOpenPackage: allowed });
+  } catch {
+    res.json({ allowToOpenPackage: true });
+  }
+});
+
+// تعديل إعداد السماح بفتح الشحنة
+router.post('/allow-open-package', async (req: Request, res: Response) => {
+  try {
+    const { allowToOpenPackage } = req.body;
+    if (typeof allowToOpenPackage !== 'boolean') {
+      res.status(400).json({ error: 'قيمة غير صحيحة' });
+      return;
+    }
+    await setAllowOpenPackage(allowToOpenPackage);
+    res.json({ success: true, allowToOpenPackage });
+  } catch {
+    res.status(500).json({ error: 'فشل حفظ الإعداد' });
   }
 });
 

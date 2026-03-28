@@ -36,6 +36,7 @@ export const config = {
   bosta: {
     apiKey: process.env.BOSTA_API_KEY || '',
     baseUrl: (process.env.BOSTA_BASE_URL || 'https://app.bosta.co/api/v2').replace(/\/$/, ''),
+    webhookSecret: process.env.BOSTA_WEBHOOK_SECRET || '',
   },
   allowedOrigins: (process.env.ALLOWED_ORIGINS || '')
     .split(',')

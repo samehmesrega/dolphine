@@ -1127,6 +1127,28 @@ export default function IntegrationsPage() {
   const [bostaBaseUrl, setBostaBaseUrl] = useState('https://app.bosta.co/api/v2');
   const [bostaEnabled, setBostaEnabled] = useState(false);
   const [bostaCopied, setBostaCopied] = useState(false);
+  const [bostaAllowOpen, setBostaAllowOpen] = useState(true);
+
+  // Fetch allow open package setting
+  const { data: allowOpenData } = useQuery({
+    queryKey: ['bosta-allow-open'],
+    queryFn: async () => {
+      const { data } = await api.get<{ allowToOpenPackage: boolean }>('/bosta/allow-open-package');
+      return data;
+    },
+  });
+  React.useEffect(() => {
+    if (allowOpenData) setBostaAllowOpen(allowOpenData.allowToOpenPackage);
+  }, [allowOpenData]);
+
+  const toggleAllowOpenMutation = useMutation({
+    mutationFn: async (allowToOpenPackage: boolean) => {
+      await api.post('/bosta/allow-open-package', { allowToOpenPackage });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bosta-allow-open'] });
+    },
+  });
 
   const saveBostaToggleMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
@@ -1475,6 +1497,27 @@ export default function IntegrationsPage() {
               )}
               {saveBostaMutation.isSuccess && <p className="text-green-600 text-sm">تم الحفظ.</p>}
             </form>
+
+            {/* السماح بفتح الشحنة */}
+            <div className="mt-5 pt-5 border-t border-slate-200">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newVal = !bostaAllowOpen;
+                    setBostaAllowOpen(newVal);
+                    toggleAllowOpenMutation.mutate(newVal);
+                  }}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${bostaAllowOpen ? 'bg-green-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${bostaAllowOpen ? 'right-0.5' : 'left-0.5'}`} />
+                </button>
+                <span className="text-sm text-slate-700 font-medium">
+                  السماح بفتح الشحنة {bostaAllowOpen ? '(مفعّل)' : '(معطّل)'}
+                </span>
+              </label>
+              <p className="text-xs text-slate-500 mt-1 mr-13">عند التفعيل، كل الشحنات الجديدة هيكون مسموح فيها فتح الطرد</p>
+            </div>
 
             {/* Webhook URL للنسخ */}
             {bostaConfig?.webhookUrl && (

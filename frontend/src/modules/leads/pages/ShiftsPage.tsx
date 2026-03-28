@@ -38,7 +38,12 @@ async function fetchUsers() {
 }
 
 async function createShift(payload: { name: string; startTime: string; endTime: string }) {
-  const { data } = await api.post('/shifts', { ...payload, daysOfWeek: [0, 1, 2, 3, 4, 5, 6] });
+  const { data } = await api.post('/shifts', { ...payload, daysOfWeek: [0, 1, 2, 3, 4, 5, 6], roundRobin: true });
+  return data.shift as Shift;
+}
+
+async function toggleRoundRobin(shiftId: string, roundRobin: boolean) {
+  const { data } = await api.patch(`/shifts/${shiftId}`, { roundRobin });
   return data.shift as Shift;
 }
 
@@ -90,6 +95,12 @@ export default function ShiftsPage() {
   const removeMemberMutation = useMutation({
     mutationFn: ({ shiftId, memberId }: { shiftId: string; memberId: string }) =>
       removeShiftMember(shiftId, memberId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
+  });
+
+  const toggleRoundRobinMutation = useMutation({
+    mutationFn: ({ shiftId, roundRobin }: { shiftId: string; roundRobin: boolean }) =>
+      toggleRoundRobin(shiftId, roundRobin),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['shifts'] }),
   });
 
@@ -161,14 +172,28 @@ export default function ShiftsPage() {
                   <h3 className="font-semibold text-slate-800">{shift.name}</h3>
                   <p className="text-sm text-slate-500">{shift.startTime} – {shift.endTime}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => deleteMutation.mutate(shift.id)}
-                  disabled={deleteMutation.isPending}
-                  className="text-red-600 text-sm hover:underline"
-                >
-                  حذف الشيفت
-                </button>
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className={`text-xs font-medium ${shift.roundRobin ? 'text-green-700' : 'text-slate-400'}`}>
+                      {shift.roundRobin ? 'توزيع تلقائي ✓' : 'توزيع تلقائي ✗'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleRoundRobinMutation.mutate({ shiftId: shift.id, roundRobin: !shift.roundRobin })}
+                      className={`relative w-10 h-5 rounded-full transition-colors ${shift.roundRobin ? 'bg-green-500' : 'bg-slate-300'}`}
+                    >
+                      <span className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${shift.roundRobin ? 'right-0.5' : 'left-0.5'}`} />
+                    </button>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => deleteMutation.mutate(shift.id)}
+                    disabled={deleteMutation.isPending}
+                    className="text-red-600 text-sm hover:underline"
+                  >
+                    حذف الشيفت
+                  </button>
+                </div>
               </div>
 
               {/* Weekly calendar table */}

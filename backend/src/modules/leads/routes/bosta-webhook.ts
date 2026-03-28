@@ -8,12 +8,23 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../../db';
 import { addWooCommerceOrderNote, isConfigured as isWooConfigured } from '../services/woocommerce';
 import { logger } from '../../../shared/config/logger';
+import { config } from '../../../shared/config';
 
 const router = Router();
 
 router.post('/', async (req: Request, res: Response) => {
   // دايماً نرد 200 عشان بوسطة ما تعيدش المحاولة
   try {
+    // Verify webhook authentication
+    if (config.bosta.webhookSecret) {
+      const apiKey = req.headers['x-api-key'] as string;
+      if (apiKey !== config.bosta.webhookSecret) {
+        logger.warn('[Bosta Webhook] Invalid or missing x-api-key');
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      }
+    }
+
     const body = req.body;
     if (!body) {
       res.status(200).json({ received: true });
