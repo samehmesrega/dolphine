@@ -223,6 +223,7 @@ export async function createBostaDelivery(
   let cityName = govName;
   try {
     const cities = await getCities();
+    console.log(`[Bosta] Matching governorate "${govName}" against ${cities.length} cities`);
     const match = cities.find(c =>
       c.nameAr === govName || c.name.toLowerCase() === govName.toLowerCase() ||
       c.nameAr.includes(govName) || govName.includes(c.nameAr) ||
@@ -231,8 +232,19 @@ export async function createBostaDelivery(
     if (match) {
       cityId = match._id;
       cityName = match.name;
+      console.log(`[Bosta] Matched: ${match.nameAr} (${match.name}) → cityId: ${cityId}`);
+    } else {
+      // Fallback: use first city (Cairo) if no match
+      if (cities.length > 0) {
+        const cairo = cities.find(c => c.name.toLowerCase().includes('cairo')) || cities[0];
+        cityId = cairo._id;
+        cityName = cairo.name;
+        console.log(`[Bosta] No match for "${govName}", falling back to ${cairo.nameAr} (${cairo.name})`);
+      }
     }
-  } catch { /* fallback to name only */ }
+  } catch (err) {
+    console.error('[Bosta] Failed to fetch cities:', err);
+  }
 
   // السماح بفتح الشحنة (من إعدادات الربط)
   const allowOpen = await getAllowOpenPackage();
@@ -251,8 +263,8 @@ export async function createBostaDelivery(
     dropOffAddress: {
       country: { _id: 'wJB7VzprQ', name: 'Egypt', nameAr: 'مصر', code: 'EG' },
       city: cityName,
-      ...(cityId ? { cityId } : {}),
-      districtName: order.shippingCity || govName || 'غير محدد',
+      cityId: cityId || '',
+      districtName: order.shippingCity || govName || cityName || 'غير محدد',
       firstLine: order.shippingAddress || govName || 'عنوان غير محدد',
     },
     businessReference: businessRef,
