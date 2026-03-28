@@ -176,6 +176,7 @@ type OrderWithItems = {
 
 // DB setting for allowToOpenPackage
 const DB_KEY_ALLOW_OPEN = 'bosta_allow_open_package' as const;
+const DB_KEY_DESCRIPTION = 'bosta_package_description' as const;
 
 export async function getAllowOpenPackage(): Promise<boolean> {
   const row = await prisma.integrationSetting.findUnique({ where: { key: DB_KEY_ALLOW_OPEN } });
@@ -187,6 +188,19 @@ export async function setAllowOpenPackage(value: boolean): Promise<void> {
     where: { key: DB_KEY_ALLOW_OPEN },
     update: { value: String(value) },
     create: { key: DB_KEY_ALLOW_OPEN, value: String(value) },
+  });
+}
+
+export async function getPackageDescription(): Promise<string> {
+  const row = await prisma.integrationSetting.findUnique({ where: { key: DB_KEY_DESCRIPTION } });
+  return row?.value || '';
+}
+
+export async function setPackageDescription(value: string): Promise<void> {
+  await prisma.integrationSetting.upsert({
+    where: { key: DB_KEY_DESCRIPTION },
+    update: { value: value.trim() },
+    create: { key: DB_KEY_DESCRIPTION, value: value.trim() },
   });
 }
 
@@ -206,13 +220,16 @@ export async function createBostaDelivery(
   const paidAmount = order.paymentType === 'full' ? finalTotal : Number(order.partialAmount || 0);
   const cod = Math.max(0, finalTotal - paidAmount);
 
+  console.log(`[Bosta] Order #${order.number}: total=${totalPrice} discount=${discount} final=${finalTotal} paymentType=${order.paymentType} paid=${paidAmount} COD=${cod}`);
+
   // تقسيم الاسم
   const nameParts = (order.shippingName || '').trim().split(/\s+/);
   const firstName = nameParts[0] || '';
   const lastName = nameParts.slice(1).join(' ') || '';
 
-  // وصف المنتجات
-  const itemNames = order.orderItems
+  // وصف المنتجات — من الإعدادات أو أسماء المنتجات
+  const customDesc = await getPackageDescription();
+  const itemNames = customDesc || order.orderItems
     .map((it) => it.product?.name || it.productName || 'منتج')
     .join(', ');
   const itemsCount = order.orderItems.reduce((sum, it) => sum + it.quantity, 0);
@@ -275,6 +292,7 @@ export async function createBostaDelivery(
       packageDetails: {
         itemsCount,
         description: itemNames,
+        itemsValue: finalTotal,
       },
     },
     allowToOpenPackage: allowOpen,

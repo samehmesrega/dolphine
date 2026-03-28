@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../../db';
-import { getBostaConfigForUI, isConfigured as isBostaConfigured, getAllowOpenPackage, setAllowOpenPackage } from '../services/bosta';
+import { getBostaConfigForUI, isConfigured as isBostaConfigured, getAllowOpenPackage, setAllowOpenPackage, getPackageDescription, setPackageDescription } from '../services/bosta';
 import { config } from '../../../shared/config';
 import { z } from 'zod';
 
@@ -105,6 +105,30 @@ router.post('/allow-open-package', async (req: Request, res: Response) => {
     }
     await setAllowOpenPackage(allowToOpenPackage);
     res.json({ success: true, allowToOpenPackage });
+  } catch {
+    res.status(500).json({ error: 'فشل حفظ الإعداد' });
+  }
+});
+
+// وصف الشحنة الافتراضي
+router.get('/package-description', async (_req: Request, res: Response) => {
+  try {
+    const description = await getPackageDescription();
+    res.json({ description });
+  } catch {
+    res.json({ description: '' });
+  }
+});
+
+router.post('/package-description', async (req: Request, res: Response) => {
+  try {
+    const { description } = req.body;
+    if (typeof description !== 'string') {
+      res.status(400).json({ error: 'قيمة غير صحيحة' });
+      return;
+    }
+    await setPackageDescription(description);
+    res.json({ success: true, description: description.trim() });
   } catch {
     res.status(500).json({ error: 'فشل حفظ الإعداد' });
   }

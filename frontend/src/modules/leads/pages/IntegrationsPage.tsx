@@ -1127,6 +1127,7 @@ export default function IntegrationsPage() {
   const [bostaEnabled, setBostaEnabled] = useState(false);
   const [bostaCopied, setBostaCopied] = useState(false);
   const [bostaAllowOpen, setBostaAllowOpen] = useState(true);
+  const [bostaDescription, setBostaDescription] = useState('');
 
   // Fetch allow open package setting
   const { data: allowOpenData } = useQuery({
@@ -1139,6 +1140,27 @@ export default function IntegrationsPage() {
   React.useEffect(() => {
     if (allowOpenData) setBostaAllowOpen(allowOpenData.allowToOpenPackage);
   }, [allowOpenData]);
+
+  // Fetch package description
+  const { data: descData } = useQuery({
+    queryKey: ['bosta-description'],
+    queryFn: async () => {
+      const { data } = await api.get<{ description: string }>('/bosta/package-description');
+      return data;
+    },
+  });
+  React.useEffect(() => {
+    if (descData) setBostaDescription(descData.description);
+  }, [descData]);
+
+  const saveDescriptionMutation = useMutation({
+    mutationFn: async (description: string) => {
+      await api.post('/bosta/package-description', { description });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bosta-description'] });
+    },
+  });
 
   const toggleAllowOpenMutation = useMutation({
     mutationFn: async (allowToOpenPackage: boolean) => {
@@ -1528,6 +1550,29 @@ export default function IntegrationsPage() {
                 </span>
               </label>
               <p className="text-xs text-slate-500 mt-1 mr-13">عند التفعيل، كل الشحنات الجديدة هيكون مسموح فيها فتح الطرد</p>
+            </div>
+
+            {/* وصف الشحنة */}
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <label className="block text-sm text-slate-700 font-medium mb-1">وصف الشحنة الافتراضي</label>
+              <p className="text-xs text-slate-500 mb-2">يظهر في وصف المنتج على بوسطة. اتركه فارغاً لاستخدام أسماء المنتجات تلقائياً.</p>
+              <div className="flex gap-2">
+                <input
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+                  placeholder="مثال: هدية مغلفة — يُرجى التعامل بحرص"
+                  value={bostaDescription}
+                  onChange={(e) => setBostaDescription(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => saveDescriptionMutation.mutate(bostaDescription)}
+                  disabled={saveDescriptionMutation.isPending}
+                  className="px-4 py-2 bg-slate-700 text-white rounded-lg text-sm hover:bg-slate-800 disabled:opacity-50"
+                >
+                  {saveDescriptionMutation.isPending ? '...' : 'حفظ'}
+                </button>
+              </div>
+              {saveDescriptionMutation.isSuccess && <p className="text-xs text-green-600 mt-1">تم الحفظ</p>}
             </div>
 
             {/* Webhook URL للنسخ */}
