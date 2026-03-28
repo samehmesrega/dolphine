@@ -156,6 +156,7 @@ type BostaDeliveryResponse = {
 type OrderWithItems = {
   id: string;
   number: number;
+  wooCommerceId: number | null;
   shippingName: string;
   shippingPhone: string;
   shippingGovernorate: string | null;
@@ -164,6 +165,7 @@ type OrderWithItems = {
   notes: string | null;
   discount: Decimal | null;
   partialAmount: Decimal | null;
+  paymentType: string;
   orderItems: Array<{
     productName: string | null;
     quantity: number;
@@ -172,18 +174,37 @@ type OrderWithItems = {
   }>;
 };
 
+// DB setting for allowToOpenPackage
+const DB_KEY_ALLOW_OPEN = 'bosta_allow_open_package' as const;
+
+export async function getAllowOpenPackage(): Promise<boolean> {
+  const row = await prisma.integrationSetting.findUnique({ where: { key: DB_KEY_ALLOW_OPEN } });
+  return row?.value !== 'false'; // default true
+}
+
+export async function setAllowOpenPackage(value: boolean): Promise<void> {
+  await prisma.integrationSetting.upsert({
+    where: { key: DB_KEY_ALLOW_OPEN },
+    update: { value: String(value) },
+    create: { key: DB_KEY_ALLOW_OPEN, value: String(value) },
+  });
+}
+
 /**
  * إنشاء شحنة على بوسطة
  */
 export async function createBostaDelivery(
   order: OrderWithItems,
 ): Promise<{ deliveryId: string; trackingNumber: string }> {
-  // حساب مبلغ الدفع عند الاستلام (المبلغ المتبقي فقط)
+  // حساب مبلغ التحصيل = المبلغ المتبقي
   const totalPrice = order.orderItems.reduce(
     (sum, item) => sum + Number(item.price) * item.quantity,
     0,
   );
-  const cod = Math.max(0, totalPrice - Number(order.discount || 0) - Number(order.partialAmount || 0));
+  const discount = Number(order.discount || 0);
+  const finalTotal = totalPrice - discount;
+  const paidAmount = order.paymentType === 'full' ? finalTotal : Number(order.partialAmount || 0);
+  const cod = Math.max(0, finalTotal - paidAmount);
 
   // تقسيم الاسم
   const nameParts = (order.shippingName || '').trim().split(/\s+/);
@@ -196,8 +217,14 @@ export async function createBostaDelivery(
     .join(', ');
   const itemsCount = order.orderItems.reduce((sum, it) => sum + it.quantity, 0);
 
-  // المدينة
-  const city = order.shippingCity || order.shippingGovernorate || '';
+  // المحافظة والمدينة
+  const city = order.shippingGovernorate || order.shippingCity || '';
+
+  // السماح بفتح الشحنة (من إعدادات الربط)
+  const allowOpen = await getAllowOpenPackage();
+
+  // مرجع الطلب = رقم WooCommerce أو رقم دولفين
+  const businessRef = order.wooCommerceId ? String(order.wooCommerceId) : String(order.number);
 
   const payload = {
     type: 10, // Package Delivery
@@ -208,10 +235,11 @@ export async function createBostaDelivery(
       phone: order.shippingPhone,
     },
     dropOffAddress: {
+      country: 'EG',
       city,
       firstLine: order.shippingAddress || city || 'عنوان غير محدد',
     },
-    businessReference: String(order.number),
+    businessReference: businessRef,
     notes: order.notes || undefined,
     specs: {
       packageType: 'Parcel',
@@ -221,7 +249,7 @@ export async function createBostaDelivery(
         description: itemNames,
       },
     },
-    allowToOpenPackage: true,
+    allowToOpenPackage: allowOpen,
   };
 
   const result = await bostaFetch<BostaDeliveryResponse>('deliveries?apiVersion=1', {
