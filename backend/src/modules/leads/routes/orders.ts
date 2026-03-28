@@ -399,8 +399,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
             const wooLastName = nameParts.slice(1).join(' ') || '';
             const wooLineItems = currentOrder.orderItems.map((item: { product?: { wooCommerceId?: number | null } | null; productName: string | null; quantity: number; price: unknown }) => {
               const wcId = item.product?.wooCommerceId;
-              if (wcId) return { product_id: wcId, quantity: item.quantity, price: String(item.price) };
-              return { name: item.productName || 'منتج', quantity: item.quantity, price: String(item.price) };
+              const itemTotal = String(Number(item.price) * item.quantity);
+              const unitPrice = String(item.price);
+              if (wcId) return { product_id: wcId, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
+              return { name: item.productName || 'منتج', quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
             });
 
             // Customer note
@@ -598,14 +600,18 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
     const lastName = nameParts.slice(1).join(' ') || '';
     const lineItems = order.orderItems.map((item) => {
       const wcId = item.product?.wooCommerceId;
+      const itemTotal = String(Number(item.price) * item.quantity);
+      const unitPrice = String(item.price);
       if (wcId) {
-        return { product_id: wcId, quantity: item.quantity, price: String(item.price) };
+        return { product_id: wcId, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
       }
       return {
         name: item.productName || 'منتج',
         quantity: item.quantity,
-        price: String(item.price),
-      } as { name: string; quantity: number; price: string };
+        subtotal: itemTotal,
+        total: itemTotal,
+        price: unitPrice,
+      } as { name: string; quantity: number; subtotal: string; total: string; price: string };
     });
     if (lineItems.length === 0) {
       res.status(400).json({ error: 'الطلب لا يحتوي عناصر' });
