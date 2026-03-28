@@ -1248,7 +1248,6 @@ export default function IntegrationsPage() {
         </button>
         {openSections['woo'] && <div className="px-6 pb-6">
         <p className="text-slate-600 text-sm mb-4">
-        <p className="text-slate-600 text-sm mb-4">
           أدخل رابط الموقع وبيانات ووكومرس (من ووكومرس → الإعدادات → متقدّم → REST API). يمكنك أيضاً ضبطها عبر متغيرات البيئة على السيرفر.
         </p>
         {(loadingWoo || loadingWooConfig) ? (
