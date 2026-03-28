@@ -25,6 +25,9 @@ type Order = {
   accountsConfirmed: boolean;
   rejectedReason?: string | null;
   createdAt: string;
+  trackingNumber?: string | null;
+  bostaStatus?: string | null;
+  bostaError?: string | null;
   lead?: { id: string; name: string; phone: string };
   customer?: { id: string; name: string; phone: string };
   orderItems: OrderItem[];
@@ -62,6 +65,11 @@ async function pushOrderToWooCommerce(id: string) {
   return data.order as Order;
 }
 
+async function pushOrderToBosta(id: string) {
+  const { data } = await api.post(`/orders/${id}/push-to-bosta`);
+  return data.order as Order;
+}
+
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
@@ -96,6 +104,14 @@ export default function OrderDetailPage() {
 
   const pushToWooMutation = useMutation({
     mutationFn: () => pushOrderToWooCommerce(id!),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order', id] });
+      qc.invalidateQueries({ queryKey: ['orders'] });
+    },
+  });
+
+  const pushToBostaMutation = useMutation({
+    mutationFn: () => pushOrderToBosta(id!),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['order', id] });
       qc.invalidateQueries({ queryKey: ['orders'] });
@@ -195,22 +211,46 @@ export default function OrderDetailPage() {
           )}
 
           {order.status === 'accounts_confirmed' && (
-            <div className="mt-4">
-              {order.wooCommerceId ? (
-                <p className="text-sm text-green-700">مرفوع إلى ووكومرس (طلب # {order.wooCommerceId})</p>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => pushToWooMutation.mutate()}
-                  disabled={pushToWooMutation.isPending}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {pushToWooMutation.isPending ? 'جاري الرفع...' : 'رفع إلى ووكومرس'}
-                </button>
-              )}
-              {pushToWooMutation.isError && (
-                <p className="mt-2 text-sm text-red-600">{(pushToWooMutation.error as any)?.response?.data?.error || 'فشل الرفع'}</p>
-              )}
+            <div className="mt-4 flex flex-wrap gap-3 items-start">
+              {/* WooCommerce */}
+              <div>
+                {order.wooCommerceId ? (
+                  <p className="text-sm text-green-700">مرفوع إلى ووكومرس (طلب # {order.wooCommerceId})</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => pushToWooMutation.mutate()}
+                    disabled={pushToWooMutation.isPending}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
+                  >
+                    {pushToWooMutation.isPending ? 'جاري الرفع...' : 'رفع إلى ووكومرس'}
+                  </button>
+                )}
+                {pushToWooMutation.isError && (
+                  <p className="mt-1 text-sm text-red-600">{(pushToWooMutation.error as any)?.response?.data?.error || 'فشل الرفع'}</p>
+                )}
+              </div>
+              {/* Bosta */}
+              <div>
+                {order.trackingNumber ? (
+                  <p className="text-sm text-green-700">بوسطة: {order.trackingNumber} ({order.bostaStatus || '—'})</p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => pushToBostaMutation.mutate()}
+                    disabled={pushToBostaMutation.isPending}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm"
+                  >
+                    {pushToBostaMutation.isPending ? 'جاري الرفع...' : 'رفع إلى بوسطة'}
+                  </button>
+                )}
+                {order.bostaError && !order.trackingNumber && (
+                  <p className="mt-1 text-sm text-red-600">خطأ سابق: {order.bostaError}</p>
+                )}
+                {pushToBostaMutation.isError && (
+                  <p className="mt-1 text-sm text-red-600">{(pushToBostaMutation.error as any)?.response?.data?.error || 'فشل الرفع'}</p>
+                )}
+              </div>
             </div>
           )}
         </div>
