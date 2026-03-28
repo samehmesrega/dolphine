@@ -247,6 +247,26 @@ export async function createBostaDelivery(
   // مرجع الطلب = رقم WooCommerce أو رقم دولفين
   const businessRef = order.wooCommerceId ? String(order.wooCommerceId) : String(order.number);
 
+  // Build dropOffAddress per Bosta API schema:
+  //   Required: city (string), firstLine (string)
+  //   OneOf: districtId  OR  (districtName + cityId)
+  //   NO country field — Bosta rejects it
+  const dropOffAddress: Record<string, string> = {
+    city: bostaAddr.cityName,
+    firstLine: bostaAddr.firstLine,
+  };
+
+  if (bostaAddr.districtId) {
+    // Preferred: use districtId directly
+    dropOffAddress.districtId = bostaAddr.districtId;
+  } else {
+    // Fallback: use districtName + cityId
+    dropOffAddress.cityId = bostaAddr.cityId;
+    dropOffAddress.districtName = bostaAddr.districtName || bostaAddr.cityName;
+  }
+
+  console.log(`[Bosta] dropOffAddress:`, JSON.stringify(dropOffAddress));
+
   const payload = {
     type: 10, // Package Delivery
     cod,
@@ -255,13 +275,7 @@ export async function createBostaDelivery(
       lastName,
       phone: order.shippingPhone,
     },
-    dropOffAddress: {
-      country: { _id: 'wJB7VzprQ', name: 'Egypt', nameAr: 'مصر', code: 'EG' },
-      city: bostaAddr.cityName,
-      cityId: bostaAddr.cityId,
-      districtId: bostaAddr.districtId,
-      firstLine: bostaAddr.firstLine,
-    },
+    dropOffAddress,
     businessReference: businessRef,
     notes: order.notes || undefined,
     specs: {
@@ -313,7 +327,21 @@ export async function terminateDelivery(trackingNumber: string): Promise<void> {
 // ===== Cities & Districts Cache =====
 
 type BostaCity = { _id: string; name: string; nameAr: string; code: string };
-type BostaDistrict = { _id: string; name: string; nameAr: string; cityId: string };
+
+/**
+ * Bosta districts API (GET /cities/{cityId}/districts) returns flat objects:
+ *   { districtId, districtName, districtOtherName, zoneId, zoneName, zoneOtherName, ... }
+ * NOT { _id, name, nameAr } as the old code assumed.
+ */
+type BostaDistrict = {
+  districtId: string;
+  districtName: string;
+  districtOtherName: string;
+  zoneId: string;
+  zoneName: string;
+  zoneOtherName: string;
+  dropOffAvailability?: boolean;
+};
 
 let citiesCache: BostaCity[] | null = null;
 let citiesCacheTime = 0;
@@ -331,74 +359,156 @@ export async function getCities(): Promise<BostaCity[]> {
   return citiesCache;
 }
 
+/**
+ * Fetch districts for a city using the correct endpoint: GET /cities/{cityId}/districts
+ * Returns a flat array (not { list: [...] }).
+ */
 export async function getDistricts(cityId: string): Promise<BostaDistrict[]> {
+  if (!cityId) return [];
+
   const cached = districtsCache.get(cityId);
   if (cached && Date.now() - cached.time < CACHE_TTL) {
     return cached.data;
   }
 
   try {
-    const result = await bostaFetch<{ success: boolean; data: { list: BostaDistrict[] } }>(`districts?cityId=${cityId}`);
-    const list = result.data?.list || [];
+    // The API returns { success, message, data: [ { districtId, districtName, ... } ] }
+    const result = await bostaFetch<{ success: boolean; data: BostaDistrict[] | { list: BostaDistrict[] } }>(
+      `cities/${cityId}/districts`,
+    );
+    // Handle both possible response shapes
+    const list = Array.isArray(result.data) ? result.data : (result.data?.list || []);
     districtsCache.set(cityId, { data: list, time: Date.now() });
     return list;
-  } catch {
+  } catch (err) {
+    console.log(`[Bosta] Failed to fetch districts for cityId=${cityId}:`, err);
     return [];
   }
 }
 
+function normalize(s: string): string {
+  return s
+    .trim()
+    .toLowerCase()
+    // Normalize Arabic alef variants
+    .replace(/[أإآ]/g, 'ا')
+    // Remove common Arabic prefixes like "ال"
+    .replace(/^ال/, '');
+}
+
 function fuzzyMatch(input: string, target: string): boolean {
-  const a = input.trim().toLowerCase();
-  const b = target.trim().toLowerCase();
+  const a = normalize(input);
+  const b = normalize(target);
+  if (!a || !b) return false;
   return a === b || a.includes(b) || b.includes(a);
 }
 
 /**
- * Resolve Bosta address from order fields — always returns valid cityId + districtId
+ * Resolve Bosta address from order fields.
+ *
+ * According to the Bosta API (AddressCreateDelivery schema):
+ *   - Required: firstLine, city (string)
+ *   - OneOf: districtId  OR  (districtName + cityId)
+ *   - NO country field
+ *
+ * Strategy:
+ *   1. Match the governorate/city to a Bosta city
+ *   2. Fetch districts for that city
+ *   3. Try to match a district; if found, use districtId
+ *   4. If no district match, use districtName + cityId as fallback
+ *      (districtName = the city/area text from the order, which Bosta will fuzzy-resolve)
+ *   5. NEVER send an empty districtId — omit it and use districtName+cityId instead
  */
 export async function resolveBostaAddress(governorate: string, city: string, address: string): Promise<{
   cityId: string;
   cityName: string;
-  districtId: string;
-  districtName: string;
+  districtId: string | null;
+  districtName: string | null;
   firstLine: string;
 }> {
   const cities = await getCities();
   const govInput = governorate || city || '';
 
-  // Match city (governorate)
+  // ---- Match city (governorate-level in Egypt = Bosta "city") ----
   let matchedCity = cities.find(c => fuzzyMatch(govInput, c.nameAr) || fuzzyMatch(govInput, c.name));
-  if (!matchedCity) {
-    matchedCity = cities.find(c => c.name.toLowerCase().includes('cairo')) || cities[0];
-    console.log(`[Bosta Address] No city match for "${govInput}", using fallback: ${matchedCity?.nameAr}`);
-  } else {
-    console.log(`[Bosta Address] City matched: "${govInput}" → ${matchedCity.nameAr} (${matchedCity._id})`);
+
+  // Also try matching on the city field if governorate didn't match
+  if (!matchedCity && city && city !== governorate) {
+    matchedCity = cities.find(c => fuzzyMatch(city, c.nameAr) || fuzzyMatch(city, c.name));
   }
 
-  // Fetch districts for matched city
+  if (!matchedCity) {
+    matchedCity = cities.find(c => c.name.toLowerCase() === 'cairo')
+      || cities.find(c => c.name.toLowerCase().includes('cairo'))
+      || cities[0];
+    console.log(`[Bosta Address] No city match for "${govInput}", using fallback: ${matchedCity?.name} (${matchedCity?._id})`);
+  } else {
+    console.log(`[Bosta Address] City matched: "${govInput}" → ${matchedCity.name} (${matchedCity._id})`);
+  }
+
+  // ---- Fetch districts for matched city ----
   const districts = await getDistricts(matchedCity._id);
   const districtInput = city || address || govInput;
 
-  // Try matching district
-  let matchedDistrict = districts.find(d => fuzzyMatch(districtInput, d.nameAr) || fuzzyMatch(districtInput, d.name));
-  if (!matchedDistrict && address) {
-    // Try matching against address parts
-    matchedDistrict = districts.find(d =>
-      address.includes(d.nameAr) || address.includes(d.name)
+  // Try matching district by name (Arabic or English)
+  let matchedDistrict: BostaDistrict | undefined;
+
+  if (districts.length > 0) {
+    // Try exact/fuzzy match on district input
+    matchedDistrict = districts.find(
+      d => fuzzyMatch(districtInput, d.districtOtherName) || fuzzyMatch(districtInput, d.districtName),
     );
-  }
-  if (!matchedDistrict) {
-    matchedDistrict = districts[0];
-    console.log(`[Bosta Address] No district match for "${districtInput}", using first: ${matchedDistrict?.nameAr || 'none'}`);
+
+    // Try matching against address text
+    if (!matchedDistrict && address) {
+      matchedDistrict = districts.find(
+        d => address.includes(d.districtOtherName) || address.includes(d.districtName),
+      );
+    }
+
+    // Try matching against zone names
+    if (!matchedDistrict) {
+      matchedDistrict = districts.find(
+        d => fuzzyMatch(districtInput, d.zoneOtherName) || fuzzyMatch(districtInput, d.zoneName),
+      );
+    }
+
+    // Last resort: pick the first available district
+    if (!matchedDistrict) {
+      matchedDistrict = districts.find(d => d.dropOffAvailability !== false) || districts[0];
+      console.log(`[Bosta Address] No district match for "${districtInput}", using first: ${matchedDistrict?.districtName || 'none'}`);
+    } else {
+      console.log(`[Bosta Address] District matched: "${districtInput}" → ${matchedDistrict.districtName} (${matchedDistrict.districtId})`);
+    }
   } else {
-    console.log(`[Bosta Address] District matched: "${districtInput}" → ${matchedDistrict.nameAr}`);
+    console.log(`[Bosta Address] No districts returned for city ${matchedCity.name} (${matchedCity._id})`);
   }
 
+  // Build firstLine — must be > 5 characters per Bosta docs
+  let firstLine = address || districtInput || govInput || 'عنوان غير محدد';
+  if (firstLine.length <= 5) {
+    firstLine = `${firstLine} - ${matchedCity.name}`;
+  }
+
+  // If we found a district, return its districtId (never empty string)
+  if (matchedDistrict?.districtId) {
+    return {
+      cityId: matchedCity._id,
+      cityName: matchedCity.name,
+      districtId: matchedDistrict.districtId,
+      districtName: null, // not needed when districtId is present
+      firstLine,
+    };
+  }
+
+  // Fallback: use districtName + cityId (the other OneOf branch)
+  const fallbackDistrictName = districtInput || matchedCity.name;
+  console.log(`[Bosta Address] Using districtName fallback: "${fallbackDistrictName}" + cityId=${matchedCity._id}`);
   return {
     cityId: matchedCity._id,
     cityName: matchedCity.name,
-    districtId: matchedDistrict?._id || '',
-    districtName: matchedDistrict?.name || districtInput || 'غير محدد',
-    firstLine: address || govInput || 'عنوان غير محدد',
+    districtId: null,
+    districtName: fallbackDistrictName,
+    firstLine,
   };
 }
