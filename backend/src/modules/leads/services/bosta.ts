@@ -237,6 +237,7 @@ export async function createBostaDelivery(
     dropOffAddress: {
       country: { _id: 'wJB7VzprQ', name: 'Egypt', nameAr: 'مصر', code: 'EG' },
       city,
+      districtName: order.shippingCity || order.shippingGovernorate || city,
       firstLine: order.shippingAddress || city || 'عنوان غير محدد',
     },
     businessReference: businessRef,
