@@ -217,8 +217,22 @@ export async function createBostaDelivery(
     .join(', ');
   const itemsCount = order.orderItems.reduce((sum, it) => sum + it.quantity, 0);
 
-  // المحافظة والمدينة
-  const city = order.shippingGovernorate || order.shippingCity || '';
+  // المحافظة والمدينة — طابق مع cities بوسطة للحصول على cityId
+  const govName = order.shippingGovernorate || order.shippingCity || '';
+  let cityId: string | undefined;
+  let cityName = govName;
+  try {
+    const cities = await getCities();
+    const match = cities.find(c =>
+      c.nameAr === govName || c.name.toLowerCase() === govName.toLowerCase() ||
+      c.nameAr.includes(govName) || govName.includes(c.nameAr) ||
+      c.name.toLowerCase().includes(govName.toLowerCase()) || govName.toLowerCase().includes(c.name.toLowerCase())
+    );
+    if (match) {
+      cityId = match._id;
+      cityName = match.name;
+    }
+  } catch { /* fallback to name only */ }
 
   // السماح بفتح الشحنة (من إعدادات الربط)
   const allowOpen = await getAllowOpenPackage();
@@ -236,9 +250,10 @@ export async function createBostaDelivery(
     },
     dropOffAddress: {
       country: { _id: 'wJB7VzprQ', name: 'Egypt', nameAr: 'مصر', code: 'EG' },
-      city,
-      districtName: order.shippingCity || order.shippingGovernorate || city,
-      firstLine: order.shippingAddress || city || 'عنوان غير محدد',
+      city: cityName,
+      ...(cityId ? { cityId } : {}),
+      districtName: order.shippingCity || govName || 'غير محدد',
+      firstLine: order.shippingAddress || govName || 'عنوان غير محدد',
     },
     businessReference: businessRef,
     notes: order.notes || undefined,
