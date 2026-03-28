@@ -8,7 +8,7 @@ router.get('/stats', async (_req: Request, res: Response) => {
     const [totalLeads, totalOrders, pendingOrders] = await prisma.$transaction([
       prisma.lead.count(),
       prisma.order.count(),
-      prisma.order.count({ where: { status: 'pending_accounts' } }),
+      prisma.order.count({ where: { accountsStatus: 'pending' } }),
     ]);
     res.json({ totalLeads, totalOrders, pendingOrders });
   } catch (err: unknown) {

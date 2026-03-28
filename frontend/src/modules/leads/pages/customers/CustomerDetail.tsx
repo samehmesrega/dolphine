@@ -27,6 +27,7 @@ type Order = {
   number: number;
   wooCommerceId?: number | null;
   status: string;
+  accountsStatus?: string;
   paymentType: string;
   shippingName: string;
   shippingPhone: string;
@@ -54,14 +55,20 @@ async function fetchCustomer(id: string) {
 }
 
 const ORDER_STATUS_STYLE: Record<string, string> = {
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  confirmed: 'bg-green-50 text-green-700 border-green-200',
+  rejected: 'bg-red-50 text-red-700 border-red-200',
+  // Backwards compatibility
   pending_accounts: 'bg-amber-50 text-amber-700 border-amber-200',
   accounts_confirmed: 'bg-green-50 text-green-700 border-green-200',
-  rejected: 'bg-red-50 text-red-700 border-red-200',
 };
 const ORDER_STATUS_LABELS: Record<string, string> = {
+  pending: 'بانتظار الحسابات',
+  confirmed: 'مؤكد',
+  rejected: 'مرفوض',
+  // Backwards compatibility
   pending_accounts: 'بانتظار الحسابات',
   accounts_confirmed: 'مؤكد',
-  rejected: 'مرفوض',
 };
 
 export default function CustomerDetail() {
@@ -209,8 +216,8 @@ export default function CustomerDetail() {
                       {new Date(order.createdAt).toLocaleDateString('ar-EG')}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${ORDER_STATUS_STYLE[order.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                        {ORDER_STATUS_LABELS[order.status] ?? order.status}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${ORDER_STATUS_STYLE[order.accountsStatus ?? order.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                        {ORDER_STATUS_LABELS[order.accountsStatus ?? order.status] ?? order.accountsStatus ?? order.status}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-700">

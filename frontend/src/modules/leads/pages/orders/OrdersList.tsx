@@ -9,6 +9,7 @@ type Order = {
   number: number;
   wooCommerceId?: number | null;
   status: string;
+  accountsStatus: string;
   paymentType: string;
   shippingName: string;
   shippingPhone: string;
@@ -18,40 +19,41 @@ type Order = {
   orderItems: { quantity: number; price: number; product?: { name: string }; productName?: string | null }[];
 };
 
-async function fetchOrders(params: { status?: string; page: number; pageSize: number }) {
+async function fetchOrders(params: { status?: string; accountsStatus?: string; page: number; pageSize: number }) {
   const { data } = await api.get('/orders', { params });
   return data as { total: number; page: number; pageSize: number; orders: Order[] };
 }
 
-const STATUS_LABELS: Record<string, string> = {
-  pending_accounts: 'بانتظار الحسابات',
-  accounts_confirmed: 'مؤكد من الحسابات',
+const ACCOUNTS_STATUS_LABELS: Record<string, string> = {
+  pending: 'بانتظار الحسابات',
+  confirmed: 'مؤكد من الحسابات',
   rejected: 'مرفوض',
 };
 
-const ORDER_STATUS_STYLE: Record<string, string> = {
-  pending_accounts: 'bg-amber-50 text-amber-700 border-amber-200',
-  accounts_confirmed: 'bg-green-50 text-green-700 border-green-200',
+const ACCOUNTS_STATUS_STYLE: Record<string, string> = {
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  confirmed: 'bg-green-50 text-green-700 border-green-200',
   rejected: 'bg-red-50 text-red-700 border-red-200',
 };
 
-export default function OrdersList({ defaultStatus }: { defaultStatus?: string }) {
+export default function OrdersList({ defaultStatus, defaultAccountsStatus }: { defaultStatus?: string; defaultAccountsStatus?: string }) {
   const qc = useQueryClient();
   const { user: currentUser } = useAuth();
   const canBulkDelete = ['super_admin', 'admin', 'sales_manager'].includes(currentUser?.role?.slug ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [status, setStatus] = useState(defaultStatus ?? '');
+  const [accountsStatus, setAccountsStatus] = useState(defaultAccountsStatus ?? '');
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [deleteError, setDeleteError] = useState('');
 
   const queryParams = useMemo(
     () => ({
-      status: status || undefined,
+      status: defaultStatus || undefined,
+      accountsStatus: accountsStatus || undefined,
       page,
       pageSize,
     }),
-    [status, page]
+    [defaultStatus, accountsStatus, page]
   );
 
   const { data, isLoading } = useQuery({
@@ -103,24 +105,24 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
     <div>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-slate-800">
-          {defaultStatus === 'pending_accounts' ? 'طلبات بانتظار الحسابات' : 'طلبات'}
+          {defaultAccountsStatus === 'pending' ? 'طلبات بانتظار الحسابات' : 'طلبات'}
         </h1>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
         <div className="flex flex-wrap gap-3 items-center">
-          {!defaultStatus && (
+          {!defaultAccountsStatus && (
             <select
               className="border rounded-lg px-3 py-2"
-              value={status}
+              value={accountsStatus}
               onChange={(e) => {
-                setStatus(e.target.value);
+                setAccountsStatus(e.target.value);
                 setPage(1);
               }}
             >
               <option value="">كل الحالات</option>
-              <option value="pending_accounts">بانتظار الحسابات</option>
-              <option value="accounts_confirmed">مؤكد من الحسابات</option>
+              <option value="pending">بانتظار الحسابات</option>
+              <option value="confirmed">مؤكد من الحسابات</option>
               <option value="rejected">مرفوض</option>
             </select>
           )}
@@ -193,8 +195,8 @@ export default function OrdersList({ defaultStatus }: { defaultStatus?: string }
                         <span className="text-slate-500 text-xs block">{o.shippingPhone}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${ORDER_STATUS_STYLE[o.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-                          {STATUS_LABELS[o.status] ?? o.status}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${ACCOUNTS_STATUS_STYLE[o.accountsStatus] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+                          {ACCOUNTS_STATUS_LABELS[o.accountsStatus] ?? o.accountsStatus ?? o.status}
                         </span>
                       </td>
                       <td className="py-3 px-4 hidden md:table-cell">{o.paymentType === 'full' ? 'كامل' : 'جزئي'}</td>

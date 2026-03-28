@@ -15,6 +15,7 @@ type Order = {
   id: string;
   number: number;
   status: string;
+  accountsStatus: string;
   wooCommerceId?: number | null;
   paymentType: string;
   transferImage?: string | null;
@@ -28,18 +29,37 @@ type Order = {
   trackingNumber?: string | null;
   bostaStatus?: string | null;
   bostaError?: string | null;
+  senderPhone?: string | null;
+  noTransferImage?: boolean;
+  noImageReason?: string | null;
   lead?: { id: string; name: string; phone: string };
   customer?: { id: string; name: string; phone: string };
   orderItems: OrderItem[];
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  active: 'نشط',
+  cancelled: 'ملغي',
+  // Backwards compatibility
   pending_accounts: 'بانتظار الحسابات',
   accounts_confirmed: 'مؤكد من الحسابات',
+};
+
+const ACCOUNTS_STATUS_LABELS: Record<string, string> = {
+  pending: 'بانتظار الحسابات',
+  confirmed: 'مؤكد من الحسابات',
   rejected: 'مرفوض',
 };
 
+const ACCOUNTS_STATUS_STYLE: Record<string, string> = {
+  pending: 'bg-amber-50 text-amber-700 border border-amber-200',
+  confirmed: 'bg-green-50 text-green-700 border border-green-200',
+  rejected: 'bg-red-50 text-red-700 border border-red-200',
+};
+
 const ORDER_STATUS_STYLE: Record<string, string> = {
+  active: 'bg-blue-50 text-blue-700 border border-blue-200',
+  cancelled: 'bg-slate-100 text-slate-600 border border-slate-200',
   pending_accounts: 'bg-amber-50 text-amber-700 border border-amber-200',
   accounts_confirmed: 'bg-green-50 text-green-700 border border-green-200',
   rejected: 'bg-red-50 text-red-700 border border-red-200',
@@ -132,7 +152,7 @@ export default function OrderDetailPage() {
   }
 
   const totalAmount = order.orderItems.reduce((s, i) => s + i.quantity * i.price, 0);
-  const canConfirmReject = order.status === 'pending_accounts';
+  const canConfirmReject = order.accountsStatus === 'pending';
 
   return (
     <div>
@@ -150,9 +170,11 @@ export default function OrderDetailPage() {
             )}
           </h1>
         </div>
-        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${ORDER_STATUS_STYLE[order.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
-          {STATUS_LABELS[order.status] ?? order.status}
-        </span>
+        <div className="flex gap-2">
+          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${ACCOUNTS_STATUS_STYLE[order.accountsStatus] ?? ORDER_STATUS_STYLE[order.status] ?? 'bg-slate-100 text-slate-600 border-slate-200'}`}>
+            {ACCOUNTS_STATUS_LABELS[order.accountsStatus] ?? STATUS_LABELS[order.status] ?? order.status}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -210,49 +232,47 @@ export default function OrderDetailPage() {
             </div>
           )}
 
-          {order.status === 'accounts_confirmed' && (
-            <div className="mt-4 flex flex-wrap gap-3 items-start">
-              {/* WooCommerce */}
-              <div>
-                {order.wooCommerceId ? (
-                  <p className="text-sm text-green-700">مرفوع إلى ووكومرس (طلب # {order.wooCommerceId})</p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => pushToWooMutation.mutate()}
-                    disabled={pushToWooMutation.isPending}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
-                  >
-                    {pushToWooMutation.isPending ? 'جاري الرفع...' : 'رفع إلى ووكومرس'}
-                  </button>
-                )}
-                {pushToWooMutation.isError && (
-                  <p className="mt-1 text-sm text-red-600">{(pushToWooMutation.error as any)?.response?.data?.error || 'فشل الرفع'}</p>
-                )}
-              </div>
-              {/* Bosta */}
-              <div>
-                {order.trackingNumber ? (
-                  <p className="text-sm text-green-700">بوسطة: {order.trackingNumber} ({order.bostaStatus || '—'})</p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => pushToBostaMutation.mutate()}
-                    disabled={pushToBostaMutation.isPending}
-                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm"
-                  >
-                    {pushToBostaMutation.isPending ? 'جاري الرفع...' : 'رفع إلى بوسطة'}
-                  </button>
-                )}
-                {order.bostaError && !order.trackingNumber && (
-                  <p className="mt-1 text-sm text-red-600">خطأ سابق: {order.bostaError}</p>
-                )}
-                {pushToBostaMutation.isError && (
-                  <p className="mt-1 text-sm text-red-600">{(pushToBostaMutation.error as any)?.response?.data?.error || 'فشل الرفع'}</p>
-                )}
-              </div>
+          <div className="mt-4 flex flex-wrap gap-3 items-start">
+            {/* WooCommerce */}
+            <div>
+              {order.wooCommerceId ? (
+                <p className="text-sm text-green-700">مرفوع إلى ووكومرس (طلب # {order.wooCommerceId})</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => pushToWooMutation.mutate()}
+                  disabled={pushToWooMutation.isPending}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
+                >
+                  {pushToWooMutation.isPending ? 'جاري الرفع...' : 'إعادة الرفع إلى ووكومرس'}
+                </button>
+              )}
+              {pushToWooMutation.isError && (
+                <p className="mt-1 text-sm text-red-600">{(pushToWooMutation.error as any)?.response?.data?.error || 'فشل الرفع'}</p>
+              )}
             </div>
-          )}
+            {/* Bosta */}
+            <div>
+              {order.trackingNumber ? (
+                <p className="text-sm text-green-700">بوسطة: {order.trackingNumber} ({order.bostaStatus || '—'})</p>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => pushToBostaMutation.mutate()}
+                  disabled={pushToBostaMutation.isPending}
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 disabled:opacity-50 text-sm"
+                >
+                  {pushToBostaMutation.isPending ? 'جاري الرفع...' : 'إعادة الرفع إلى بوسطة'}
+                </button>
+              )}
+              {order.bostaError && !order.trackingNumber && (
+                <p className="mt-1 text-sm text-red-600">خطأ سابق: {order.bostaError}</p>
+              )}
+              {pushToBostaMutation.isError && (
+                <p className="mt-1 text-sm text-red-600">{(pushToBostaMutation.error as any)?.response?.data?.error || 'فشل الرفع'}</p>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">

@@ -19,9 +19,14 @@ import api from '../../../shared/services/api';
 type Stats = { totalLeads: number; totalOrders: number; pendingOrders: number };
 
 const STATUS_LABELS: Record<string, string> = {
+  pending: 'بانتظار الحسابات',
+  confirmed: 'مؤكد من الحسابات',
+  rejected: 'مرفوض',
+  active: 'نشط',
+  cancelled: 'ملغي',
+  // Backwards compatibility
   pending_accounts: 'بانتظار الحسابات',
   accounts_confirmed: 'مؤكد من الحسابات',
-  rejected: 'مرفوض',
 };
 
 const CHART_COLORS = ['#0d9488', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];

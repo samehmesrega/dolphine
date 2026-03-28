@@ -67,7 +67,7 @@ export default function NotificationBell() {
   const linkFor = (n: Notification) => {
     if (n.entity === 'lead' && n.entityId) return `/leads/${n.entityId}`;
     if (n.entity === 'order' && n.entityId) return `/orders/${n.entityId}`;
-    if (n.type === 'order_pending_accounts') return '/orders-pending';
+    if (n.type === 'order_review_needed' || n.type === 'order_pending_accounts') return '/orders-pending';
     // Marketing module links
     if (n.entity === 'creative' && n.entityId) return `/marketing/creatives/${n.entityId}`;
     if (n.entity === 'creative_request') return `/marketing/requests`;

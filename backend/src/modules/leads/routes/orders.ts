@@ -5,8 +5,8 @@ import { z } from 'zod';
 import { uploadSingle } from '../../../shared/middleware/upload';
 import { normalizePhone } from '../../../shared/utils/phone';
 import { AuthRequest } from '../../../shared/middleware/auth';
-import { createWooCommerceOrder, isConfigured as isWooConfigured, addWooCommerceOrderNote } from '../services/woocommerce';
-import { createBostaDelivery, isConfigured as isBostaConfigured } from '../services/bosta';
+import { createWooCommerceOrder, isConfigured as isWooConfigured, addWooCommerceOrderNote, updateWooCommerceOrderStatus } from '../services/woocommerce';
+import { createBostaDelivery, isConfigured as isBostaConfigured, terminateDelivery } from '../services/bosta';
 import { auditLog } from '../services/audit';
 
 const router = Router();
@@ -38,12 +38,14 @@ const createOrderSchema = z.object({
 router.get('/', async (req: Request, res: Response) => {
   try {
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const accountsStatus = typeof req.query.accountsStatus === 'string' ? req.query.accountsStatus : undefined;
     const leadId = typeof req.query.leadId === 'string' ? req.query.leadId : undefined;
     const page = Math.max(1, parseInt(String(req.query.page), 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize), 10) || 20));
 
     const where: Record<string, unknown> = { deletedAt: null };
     if (status) where.status = status;
+    if (accountsStatus) where.accountsStatus = accountsStatus;
     if (leadId) where.leadId = leadId;
     const [total, orders] = await prisma.$transaction([
       prisma.order.count({ where }),
@@ -137,14 +139,23 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
 
     const transferImage = (req as Request & { file?: { filename: string } }).file?.filename ?? undefined;
 
+    // New fields from body
+    const senderPhone = typeof body.senderPhone === 'string' ? body.senderPhone.trim() || undefined : undefined;
+    const noTransferImage = body.noTransferImage === 'true' || body.noTransferImage === true;
+    const noImageReason = typeof body.noImageReason === 'string' ? body.noImageReason.trim() || undefined : undefined;
+
     const order = await prisma.$transaction(async (tx) => {
       const ord = await tx.order.create({
         data: {
           leadId,
           customerId: leadCustomerId!,
-          status: 'pending_accounts',
+          status: 'active',
+          accountsStatus: 'pending',
           paymentType,
           transferImage,
+          senderPhone,
+          noTransferImage,
+          noImageReason,
           shippingName,
           shippingPhone,
           shippingGovernorate: shippingGovernorate || undefined,
@@ -180,7 +191,7 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
       return tx.order.findUnique({
         where: { id: ord.id },
         include: {
-          lead: true,
+          lead: { include: { assignedTo: { select: { name: true } } } },
           customer: true,
           orderItems: { include: { product: true } },
         },
@@ -192,7 +203,103 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
       return;
     }
 
-    // إشعار موظفي الحسابات بطلب جديد بانتظار التأكيد
+    // Push to WooCommerce + Bosta IMMEDIATELY after order creation
+    let currentOrder = order;
+
+    // 1) Push to WooCommerce
+    const wooConfigured = await isWooConfigured();
+    if (wooConfigured) {
+      try {
+        const nameParts = currentOrder.shippingName.trim().split(/\s+/);
+        const wooFirstName = nameParts[0] || currentOrder.shippingName;
+        const wooLastName = nameParts.slice(1).join(' ') || '';
+        const wooLineItems = currentOrder.orderItems.map((item: { product?: { wooCommerceId?: number | null } | null; productName: string | null; quantity: number; price: unknown }) => {
+          const wcId = item.product?.wooCommerceId;
+          const itemTotal = String(Number(item.price) * item.quantity);
+          const unitPrice = String(item.price);
+          if (wcId) return { product_id: wcId, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
+          return { name: item.productName || 'منتج', quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
+        });
+
+        // Customer note
+        const customerNoteLines: string[] = [];
+        for (const item of currentOrder.orderItems) {
+          const productLabel = (item as { productName?: string | null; product?: { name?: string } | null }).productName || (item as { product?: { name?: string } | null }).product?.name || 'منتج';
+          customerNoteLines.push(`📦 ${productLabel}`);
+          if ((item as { notes?: string | null }).notes?.trim()) {
+            customerNoteLines.push(`   ملاحظة: ${(item as { notes?: string | null }).notes!.trim()}`);
+          }
+        }
+
+        // Internal note
+        const salesName = currentOrder.lead?.assignedTo?.name || '—';
+        const totalPrice = currentOrder.orderItems.reduce((sum: number, i: { price: unknown; quantity: number }) => sum + Number(i.price) * i.quantity, 0);
+        const discountVal = Number(currentOrder.discount) || 0;
+        const finalTotal = totalPrice - discountVal;
+        const paidAmount = currentOrder.paymentType === 'full' ? finalTotal : (Number(currentOrder.partialAmount) || 0);
+        const remaining = finalTotal - paidAmount;
+        const internalNoteLines = [
+          `🔹 السيلز: ${salesName}`,
+          `🔹 المبلغ المدفوع: ${paidAmount} EGP`,
+          `🔹 المبلغ المتبقي: ${remaining} EGP`,
+        ];
+        if (currentOrder.notes?.trim()) internalNoteLines.push(`🔹 ملاحظات: ${currentOrder.notes.trim()}`);
+        internalNoteLines.push('', 'تم الرفع من خلال دولفين ليدز — بانتظار مراجعة الحسابات');
+
+        const wooId = await createWooCommerceOrder({
+          billing: { first_name: wooFirstName, last_name: wooLastName, address_1: currentOrder.shippingAddress || undefined, phone: currentOrder.shippingPhone },
+          shipping: { first_name: wooFirstName, last_name: wooLastName, address_1: currentOrder.shippingAddress || undefined },
+          line_items: wooLineItems,
+          payment_method: 'cod',
+          payment_method_title: currentOrder.paymentType === 'full' ? 'دفع كامل' : 'دفع جزئي',
+          set_paid: false,
+          status: 'processing',
+          customer_note: customerNoteLines.length > 0 ? customerNoteLines.join('\n') : undefined,
+        }, internalNoteLines.join('\n'));
+
+        await prisma.order.update({ where: { id: order.id }, data: { wooCommerceId: wooId } });
+        currentOrder = { ...currentOrder, wooCommerceId: wooId } as typeof currentOrder;
+        console.log(`[Auto WooCommerce] Order #${currentOrder.number} → WC #${wooId}`);
+      } catch (wooErr) {
+        console.error('[Auto WooCommerce] Failed:', wooErr instanceof Error ? wooErr.message : wooErr);
+      }
+    }
+
+    // 2) Push to Bosta
+    const bostaEnabled = await isBostaConfigured();
+    if (bostaEnabled) {
+      try {
+        const bostaResult = await createBostaDelivery(currentOrder);
+        await prisma.order.update({
+          where: { id: order.id },
+          data: {
+            bostaDeliveryId: bostaResult.deliveryId,
+            trackingNumber: bostaResult.trackingNumber,
+            bostaStatus: 'Pickup requested',
+          },
+        });
+
+        // Sync tracking number to WooCommerce
+        if (currentOrder.wooCommerceId) {
+          const wooStillConfigured = await isWooConfigured();
+          if (wooStillConfigured) {
+            await addWooCommerceOrderNote(
+              currentOrder.wooCommerceId,
+              `بوسطة - رقم التتبع: ${bostaResult.trackingNumber}`,
+            ).catch((err) => console.error('[Bosta→WooCommerce] Failed to sync tracking:', err));
+          }
+        }
+      } catch (bostaErr) {
+        const bostaMsg = bostaErr instanceof Error ? bostaErr.message : 'خطأ غير متوقع';
+        console.error('[Bosta] Failed to create delivery:', bostaMsg);
+        await prisma.order.update({
+          where: { id: order.id },
+          data: { bostaStatus: 'failed', bostaError: bostaMsg },
+        });
+      }
+    }
+
+    // إشعار موظفي الحسابات بطلب جديد للمراجعة
     const accountsRole = await prisma.role.findUnique({ where: { slug: 'accounts' } });
     if (accountsRole) {
       const accountsUsers = await prisma.user.findMany({
@@ -204,9 +311,9 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
         await prisma.notification.create({
           data: {
             userId: u.id,
-            title: 'طلب بانتظار الحسابات',
+            title: 'طلب يحتاج مراجعة الحسابات',
             body: `طلب جديد من الليد: ${leadName}`,
-            type: 'order_pending_accounts',
+            type: 'order_review_needed',
             entity: 'order',
             entityId: order.id,
           },
@@ -265,6 +372,34 @@ router.post('/bulk-delete', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'يجب تحديد طلب واحد على الأقل' });
       return;
     }
+
+    // Cancel Bosta + WC for each order before deletion
+    const ordersToDelete = await prisma.order.findMany({
+      where: { id: { in: orderIds } },
+      select: { id: true, number: true, trackingNumber: true, wooCommerceId: true },
+    });
+    for (const ord of ordersToDelete) {
+      if (ord.trackingNumber) {
+        try {
+          await terminateDelivery(ord.trackingNumber);
+          console.log(`[Bosta] Terminated delivery ${ord.trackingNumber} for bulk-deleted order #${ord.number}`);
+        } catch (bostaErr) {
+          console.error('[Bosta] Failed to terminate on bulk-delete:', bostaErr instanceof Error ? bostaErr.message : bostaErr);
+        }
+      }
+      if (ord.wooCommerceId) {
+        try {
+          const wooConfigured = await isWooConfigured();
+          if (wooConfigured) {
+            await updateWooCommerceOrderStatus(ord.wooCommerceId, 'cancelled');
+            console.log(`[WC] Cancelled WC order #${ord.wooCommerceId} for bulk-deleted order #${ord.number}`);
+          }
+        } catch (wcErr) {
+          console.error('[WC] Failed to cancel on bulk-delete:', wcErr instanceof Error ? wcErr.message : wcErr);
+        }
+      }
+    }
+
     const result = await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
     res.json({ deleted: result.count });
   } catch (err: unknown) {
@@ -291,6 +426,30 @@ router.delete('/:id', async (req: Request, res: Response) => {
     const id = String(req.params.id);
     const order = await prisma.order.findUnique({ where: { id } });
     if (!order) { res.status(404).json({ error: 'الطلب غير موجود' }); return; }
+
+    // Cancel Bosta delivery if exists
+    if (order.trackingNumber) {
+      try {
+        await terminateDelivery(order.trackingNumber);
+        console.log(`[Bosta] Terminated delivery ${order.trackingNumber} for deleted order #${order.number}`);
+      } catch (bostaErr) {
+        console.error('[Bosta] Failed to terminate on delete:', bostaErr instanceof Error ? bostaErr.message : bostaErr);
+      }
+    }
+
+    // Cancel WC order if exists
+    if (order.wooCommerceId) {
+      try {
+        const wooConfigured = await isWooConfigured();
+        if (wooConfigured) {
+          await updateWooCommerceOrderStatus(order.wooCommerceId, 'cancelled');
+          console.log(`[WC] Cancelled WC order #${order.wooCommerceId} for deleted order #${order.number}`);
+        }
+      } catch (wcErr) {
+        console.error('[WC] Failed to cancel on delete:', wcErr instanceof Error ? wcErr.message : wcErr);
+      }
+    }
+
     await prisma.order.delete({ where: { id } });
     res.status(204).send();
   } catch (err: unknown) {
@@ -335,17 +494,34 @@ router.patch('/:id', async (req: Request, res: Response) => {
       res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
       return;
     }
+
+    // Permission check: only accounts, admin, super_admin can confirm/reject
+    const callerUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { role: true },
+    });
+    const allowedSlugs = ['super_admin', 'admin', 'accounts'];
+    if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+      res.status(403).json({ error: 'ليس لديك صلاحية تأكيد أو رفض الطلبات' });
+      return;
+    }
+
     const parsed = confirmRejectSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: 'بيانات غير صحيحة', details: parsed.error.flatten() });
       return;
     }
-    const order = await prisma.order.findUnique({ where: { id } });
+    const order = await prisma.order.findUnique({
+      where: { id },
+      include: {
+        lead: { select: { id: true, name: true, assignedToId: true, assignedTo: { select: { name: true } } } },
+      },
+    });
     if (!order) {
       res.status(404).json({ error: 'الطلب غير موجود' });
       return;
     }
-    if (order.status !== 'pending_accounts') {
+    if (order.accountsStatus !== 'pending') {
       res.status(400).json({ error: 'الطلب ليس بانتظار تأكيد الحسابات' });
       return;
     }
@@ -354,148 +530,110 @@ router.patch('/:id', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'أدخل سبب الرفض' });
       return;
     }
-    const updated = await prisma.order.update({
-      where: { id },
-      data:
-        action === 'confirm'
-          ? {
-              status: 'accounts_confirmed',
-              accountsConfirmed: true,
-              accountsConfirmedAt: new Date(),
-              accountsConfirmedBy: userId,
-              rejectedReason: undefined,
-            }
-          : {
-              status: 'rejected',
-              rejectedReason: rejectedReason?.trim(),
-              accountsConfirmed: false,
-            },
-      include: {
-        lead: { select: { id: true, name: true, assignedTo: { select: { name: true } } } },
-        customer: { select: { id: true, name: true, phone: true } },
-        orderItems: { include: { product: { select: { id: true, name: true, wooCommerceId: true } } } },
-      },
-    });
-    await auditLog(prisma, {
-      userId,
-      action: action === 'confirm' ? 'order_confirm' : 'order_reject',
-      entity: 'order',
-      entityId: id,
-      oldData: { status: order.status },
-      newData: { status: updated.status, ...(action === 'reject' ? { rejectedReason: rejectedReason?.trim() } : {}) },
-    });
 
-    // بعد تأكيد الحسابات: WooCommerce أولاً → بوسطة ثانياً
     if (action === 'confirm') {
-      let currentOrder = updated;
+      const updated = await prisma.order.update({
+        where: { id },
+        data: {
+          accountsStatus: 'confirmed',
+          accountsConfirmed: true,
+          accountsConfirmedAt: new Date(),
+          accountsConfirmedBy: userId,
+          rejectedReason: null,
+        },
+        include: {
+          lead: { select: { id: true, name: true, assignedTo: { select: { name: true } } } },
+          customer: { select: { id: true, name: true, phone: true } },
+          orderItems: { include: { product: { select: { id: true, name: true, wooCommerceId: true } } } },
+        },
+      });
 
-      // 1) رفع إلى WooCommerce أولاً (عشان ناخد رقم الأوردر)
-      if (!currentOrder.wooCommerceId) {
+      // Add WC note
+      if (updated.wooCommerceId) {
         const wooConfigured = await isWooConfigured();
         if (wooConfigured) {
-          try {
-            const nameParts = currentOrder.shippingName.trim().split(/\s+/);
-            const wooFirstName = nameParts[0] || currentOrder.shippingName;
-            const wooLastName = nameParts.slice(1).join(' ') || '';
-            const wooLineItems = currentOrder.orderItems.map((item: { product?: { wooCommerceId?: number | null } | null; productName: string | null; quantity: number; price: unknown }) => {
-              const wcId = item.product?.wooCommerceId;
-              const itemTotal = String(Number(item.price) * item.quantity);
-              const unitPrice = String(item.price);
-              if (wcId) return { product_id: wcId, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
-              return { name: item.productName || 'منتج', quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
-            });
-
-            // Customer note
-            const customerNoteLines: string[] = [];
-            for (const item of currentOrder.orderItems) {
-              const productLabel = (item as { productName?: string | null; product?: { name?: string } | null }).productName || (item as { product?: { name?: string } | null }).product?.name || 'منتج';
-              customerNoteLines.push(`📦 ${productLabel}`);
-              if ((item as { notes?: string | null }).notes?.trim()) {
-                customerNoteLines.push(`   ملاحظة: ${(item as { notes?: string | null }).notes!.trim()}`);
-              }
-            }
-
-            // Internal note
-            const salesName = currentOrder.lead?.assignedTo?.name || '—';
-            const totalPrice = currentOrder.orderItems.reduce((sum: number, i: { price: unknown; quantity: number }) => sum + Number(i.price) * i.quantity, 0);
-            const discount = Number(currentOrder.discount) || 0;
-            const finalTotal = totalPrice - discount;
-            const paidAmount = currentOrder.paymentType === 'full' ? finalTotal : (Number(currentOrder.partialAmount) || 0);
-            const remaining = finalTotal - paidAmount;
-            const internalNoteLines = [
-              `🔹 السيلز: ${salesName}`,
-              `🔹 المبلغ المدفوع: ${paidAmount} EGP`,
-              `🔹 المبلغ المتبقي: ${remaining} EGP`,
-            ];
-            if (currentOrder.notes?.trim()) internalNoteLines.push(`🔹 ملاحظات: ${currentOrder.notes.trim()}`);
-            internalNoteLines.push('', 'تم الرفع من خلال دولفين ليدز — تم المراجعة من قسم الحسابات');
-
-            const wooId = await createWooCommerceOrder({
-              billing: { first_name: wooFirstName, last_name: wooLastName, address_1: currentOrder.shippingAddress || undefined, phone: currentOrder.shippingPhone },
-              shipping: { first_name: wooFirstName, last_name: wooLastName, address_1: currentOrder.shippingAddress || undefined },
-              line_items: wooLineItems,
-              payment_method: 'cod',
-              payment_method_title: currentOrder.paymentType === 'full' ? 'دفع كامل' : 'دفع جزئي',
-              set_paid: false,
-              status: 'processing',
-              customer_note: customerNoteLines.length > 0 ? customerNoteLines.join('\n') : undefined,
-            }, internalNoteLines.join('\n'));
-
-            await prisma.order.update({ where: { id }, data: { wooCommerceId: wooId } });
-            currentOrder = { ...currentOrder, wooCommerceId: wooId };
-            console.log(`[Auto WooCommerce] Order #${currentOrder.number} → WC #${wooId}`);
-          } catch (wooErr) {
-            console.error('[Auto WooCommerce] Failed:', wooErr instanceof Error ? wooErr.message : wooErr);
-          }
+          await addWooCommerceOrderNote(updated.wooCommerceId, 'تم التأكيد من الحسابات').catch((err) =>
+            console.error('[WC Note] Failed:', err instanceof Error ? err.message : err),
+          );
         }
       }
 
-      // 2) رفع إلى بوسطة (بعد WooCommerce عشان يكون عنده wooCommerceId)
-      const bostaEnabled = await isBostaConfigured();
-      if (bostaEnabled) {
+      await auditLog(prisma, {
+        userId,
+        action: 'order_confirm',
+        entity: 'order',
+        entityId: id,
+        oldData: { accountsStatus: 'pending' },
+        newData: { accountsStatus: 'confirmed' },
+      });
+
+      res.json({ order: updated });
+    } else {
+      // Reject
+      const updated = await prisma.order.update({
+        where: { id },
+        data: {
+          accountsStatus: 'rejected',
+          rejectedReason: rejectedReason?.trim(),
+          accountsConfirmed: false,
+        },
+        include: {
+          lead: { select: { id: true, name: true, assignedTo: { select: { name: true } } } },
+          customer: { select: { id: true, name: true, phone: true } },
+          orderItems: { include: { product: { select: { id: true, name: true, wooCommerceId: true } } } },
+        },
+      });
+
+      // Cancel Bosta delivery if exists
+      if (order.trackingNumber) {
         try {
-          const bostaResult = await createBostaDelivery(currentOrder);
+          await terminateDelivery(order.trackingNumber);
           await prisma.order.update({
             where: { id },
-            data: {
-              bostaDeliveryId: bostaResult.deliveryId,
-              trackingNumber: bostaResult.trackingNumber,
-              bostaStatus: 'Pickup requested',
-            },
+            data: { bostaStatus: 'Terminated' },
           });
-
-          // 3) تسجيل رقم التتبع في WooCommerce
-          if (currentOrder.wooCommerceId) {
-            const wooConfigured = await isWooConfigured();
-            if (wooConfigured) {
-              await addWooCommerceOrderNote(
-                currentOrder.wooCommerceId,
-                `بوسطة - رقم التتبع: ${bostaResult.trackingNumber}`,
-              ).catch((err) => console.error('[Bosta→WooCommerce] Failed to sync tracking:', err));
-            }
-          }
+          console.log(`[Bosta] Terminated delivery ${order.trackingNumber} for rejected order #${order.number}`);
         } catch (bostaErr) {
-          const bostaMsg = bostaErr instanceof Error ? bostaErr.message : 'خطأ غير متوقع';
-          console.error('[Bosta] Failed to create delivery:', bostaMsg);
-          await prisma.order.update({
-            where: { id },
-            data: { bostaStatus: 'failed', bostaError: bostaMsg },
-          });
-          await prisma.notification.create({
-            data: {
-              userId,
-              title: 'فشل رفع الطلب لبوسطة',
-              body: `الطلب #${currentOrder.number} اتأكد بنجاح لكن فشل يتسجل على بوسطة: ${bostaMsg}`,
-              type: 'bosta_delivery_failed',
-              entity: 'order',
-              entityId: id,
-            },
-          });
+          console.error('[Bosta] Failed to terminate delivery:', bostaErr instanceof Error ? bostaErr.message : bostaErr);
         }
       }
-    }
 
-    res.json({ order: updated });
+      // Add WC note for rejection
+      if (updated.wooCommerceId) {
+        const wooConfigured = await isWooConfigured();
+        if (wooConfigured) {
+          await addWooCommerceOrderNote(updated.wooCommerceId, `مرفوض من الحسابات: ${rejectedReason?.trim() || '—'}`).catch((err) =>
+            console.error('[WC Note] Failed:', err instanceof Error ? err.message : err),
+          );
+        }
+      }
+
+      // Notify sales agent about rejection
+      const salesAgentId = order.lead?.assignedToId;
+      if (salesAgentId) {
+        await prisma.notification.create({
+          data: {
+            userId: salesAgentId,
+            title: 'تم رفض الطلب من الحسابات',
+            body: `الطلب #${order.number} اترفض. السبب: ${rejectedReason?.trim() || '—'}`,
+            type: 'order_rejected',
+            entity: 'order',
+            entityId: id,
+          },
+        });
+      }
+
+      await auditLog(prisma, {
+        userId,
+        action: 'order_reject',
+        entity: 'order',
+        entityId: id,
+        oldData: { accountsStatus: 'pending' },
+        newData: { accountsStatus: 'rejected', rejectedReason: rejectedReason?.trim() },
+      });
+
+      res.json({ order: updated });
+    }
   } catch (err: unknown) {
     console.error('Order confirm/reject error:', err);
     res.status(500).json({ error: 'خطأ في تحديث الطلب' });
@@ -520,10 +658,6 @@ router.post('/:id/push-to-bosta', async (req: Request, res: Response) => {
     }
     if (order.bostaDeliveryId && order.bostaStatus !== 'failed') {
       res.status(400).json({ error: 'الطلب مرفوع مسبقاً لبوسطة' });
-      return;
-    }
-    if (order.status !== 'accounts_confirmed') {
-      res.status(400).json({ error: 'يجب تأكيد الطلب من الحسابات أولاً' });
       return;
     }
     if (!(await isBostaConfigured())) {
@@ -567,7 +701,7 @@ router.post('/:id/push-to-bosta', async (req: Request, res: Response) => {
 });
 
 /**
- * رفع الطلب إلى ووكومرس (للطلبات المؤكدة من الحسابات فقط)
+ * إعادة رفع الطلب إلى ووكومرس (retry — لو الرفع التلقائي فشل)
  */
 router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
   try {
@@ -585,10 +719,6 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
     }
     if (order.wooCommerceId) {
       res.status(400).json({ error: 'الطلب مرفوع مسبقاً إلى ووكومرس' });
-      return;
-    }
-    if (order.status !== 'accounts_confirmed') {
-      res.status(400).json({ error: 'يجب تأكيد الطلب من الحسابات قبل الرفع إلى ووكومرس' });
       return;
     }
     if (!(await isWooConfigured())) {
@@ -647,7 +777,7 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
       internalNoteLines.push(`🔹 ملاحظات: ${order.notes.trim()}`);
     }
     internalNoteLines.push('');
-    internalNoteLines.push('تم الرفع من خلال دولفين ليدز — تم المراجعة من قسم الحسابات');
+    internalNoteLines.push('تم الرفع من خلال دولفين ليدز — بانتظار مراجعة الحسابات');
     const internalNote = internalNoteLines.join('\n');
 
     const wooId = await createWooCommerceOrder({

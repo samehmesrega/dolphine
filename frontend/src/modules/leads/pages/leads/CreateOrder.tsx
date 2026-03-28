@@ -107,6 +107,9 @@ export default function CreateOrderPage() {
     { productId: '', productName: '', quantity: 1, price: 0, notes: '' },
   ]);
   const [transferFile, setTransferFile] = useState<File | null>(null);
+  const [senderPhone, setSenderPhone] = useState('');
+  const [noTransferImage, setNoTransferImage] = useState(false);
+  const [noImageReason, setNoImageReason] = useState('');
 
   const [discount, setDiscount] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
@@ -213,8 +216,20 @@ export default function CreateOrderPage() {
       setError('أضف صنف واحد على الأقل');
       return;
     }
+    // Validation: either transferImage OR (noTransferImage + noImageReason) required
+    if (!transferFile && !noTransferImage) {
+      setError('أرفق صورة التحويل أو اختر "العميل ماوفرش صورة التحويل" مع كتابة السبب');
+      return;
+    }
+    if (noTransferImage && !noImageReason.trim()) {
+      setError('اكتب سبب عدم وجود صورة التحويل');
+      return;
+    }
     fd.append('items', JSON.stringify(validItems));
     if (transferFile) fd.append('transferImage', transferFile);
+    if (senderPhone.trim()) fd.append('senderPhone', senderPhone.trim());
+    if (noTransferImage) fd.append('noTransferImage', 'true');
+    if (noImageReason.trim()) fd.append('noImageReason', noImageReason.trim());
     fd.append('discount', String(discount));
     if (discountReason.trim()) fd.append('discountReason', discountReason.trim());
     if (paymentType === 'partial' && typeof partialAmount === 'number') {
@@ -525,14 +540,52 @@ export default function CreateOrderPage() {
             )}
 
             <div>
-              <label className="block text-sm text-slate-600 mb-1">صورة التحويل (اختياري)</label>
+              <label className="block text-sm text-slate-600 mb-1">رقم المحوّل (رقم اللي حوّل)</label>
+              <input
+                className="w-full border rounded-lg px-3 py-2"
+                value={senderPhone}
+                onChange={(e) => setSenderPhone(e.target.value)}
+                placeholder="مثال: 01012345678"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">صورة التحويل</label>
               <input
                 type="file"
                 accept="image/*"
                 className="w-full border rounded-lg px-3 py-2"
                 onChange={(e) => setTransferFile(e.target.files?.[0] ?? null)}
+                disabled={noTransferImage}
               />
             </div>
+
+            <div className="flex items-start gap-2 mt-2">
+              <input
+                type="checkbox"
+                id="noTransferImage"
+                checked={noTransferImage}
+                onChange={(e) => {
+                  setNoTransferImage(e.target.checked);
+                  if (e.target.checked) setTransferFile(null);
+                }}
+                className="mt-1 rounded border-slate-300"
+              />
+              <label htmlFor="noTransferImage" className="text-sm text-slate-600">
+                العميل ماوفرش صورة التحويل
+              </label>
+            </div>
+            {noTransferImage && (
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">سبب عدم وجود صورة التحويل (مطلوب)</label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2"
+                  value={noImageReason}
+                  onChange={(e) => setNoImageReason(e.target.value)}
+                  placeholder="مثال: العميل هيحوّل بعد الاستلام"
+                />
+              </div>
+            )}
             <div>
               <label className="block text-sm text-slate-600 mb-1">ملاحظات خاصة بالطلب</label>
               <textarea
@@ -562,8 +615,8 @@ export default function CreateOrderPage() {
 
       {createMutation.isSuccess && (
         <div className="mt-6 p-4 bg-green-50 text-green-800 rounded-xl">
-          تم إنشاء الطلب بنجاح. الطلب سيظهر في قسم «طلبات» وبانتظار تأكيد الحسابات.
-          <Link to="/orders" className="mr-2 text-green-700 underline">عرض الطلبات</Link>
+          تم إنشاء الطلب وتم رفعه لووكومرس وبوسطة. الحسابات هتراجعه.
+          <Link to="/leads/orders" className="mr-2 text-green-700 underline">عرض الطلبات</Link>
         </div>
       )}
     </div>

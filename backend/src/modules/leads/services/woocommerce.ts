@@ -197,6 +197,16 @@ export async function addWooCommerceOrderNote(wooId: number, note: string): Prom
   });
 }
 
+/**
+ * تحديث حالة طلب ووكومرس (مثلاً cancelled)
+ */
+export async function updateWooCommerceOrderStatus(wooId: number, status: string): Promise<void> {
+  await wcFetch(`/orders/${wooId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ status }),
+  });
+}
+
 export async function fetchWooCommerceProducts(page = 1, perPage = 100): Promise<
   Array<{
     id: number;

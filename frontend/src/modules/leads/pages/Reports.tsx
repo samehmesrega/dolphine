@@ -55,9 +55,14 @@ type SourceStat = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
+  pending: 'بانتظار الحسابات',
+  confirmed: 'مؤكد من الحسابات',
+  rejected: 'مرفوض',
+  active: 'نشط',
+  cancelled: 'ملغي',
+  // Backwards compatibility
   pending_accounts: 'بانتظار الحسابات',
   accounts_confirmed: 'مؤكد من الحسابات',
-  rejected: 'مرفوض',
 };
 
 const CHART_COLORS = ['#0d9488', '#22c55e', '#eab308', '#ef4444', '#8b5cf6'];
@@ -323,7 +328,7 @@ export default function ReportsPage() {
               إجمالي الطلبات: <strong>{fmt(stats?.totalOrders ?? 0)}</strong>
             </li>
             <li>
-              طلبات بانتظار تأكيد الحسابات: <strong>{fmt(stats?.pendingOrders ?? 0)}</strong>
+              طلبات بانتظار مراجعة الحسابات: <strong>{fmt(stats?.pendingOrders ?? 0)}</strong>
             </li>
           </ul>
         )}

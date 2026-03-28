@@ -130,17 +130,17 @@ router.post('/sync-products', async (_req: Request, res: Response) => {
 
 // ==================== استيراد طلبات ووكومرس ====================
 
-function mapWcStatus(wcStatus: string): string {
+function mapWcStatus(wcStatus: string): { status: string; accountsStatus: string } {
   switch (wcStatus) {
     case 'completed':
     case 'processing':
-      return 'accounts_confirmed';
+      return { status: 'active', accountsStatus: 'confirmed' };
     case 'cancelled':
     case 'refunded':
     case 'failed':
-      return 'rejected';
+      return { status: 'cancelled', accountsStatus: 'rejected' };
     default:
-      return 'pending_accounts';
+      return { status: 'active', accountsStatus: 'confirmed' };
   }
 }
 
@@ -215,7 +215,7 @@ router.post('/import-orders', async (_req: Request, res: Response) => {
           [wc.billing.first_name, wc.billing.last_name].filter(Boolean).join(' ') ||
           lead.name;
 
-        const dolphinStatus = mapWcStatus(wc.status);
+        const { status: dolphinStatus, accountsStatus: dolphinAccountsStatus } = mapWcStatus(wc.status);
 
         // Skip orders with no line items
         if (!wc.line_items || wc.line_items.length === 0) {
@@ -231,6 +231,7 @@ router.post('/import-orders', async (_req: Request, res: Response) => {
               customerId: customerId!,
               wooCommerceId: wc.id,
               status: dolphinStatus,
+              accountsStatus: dolphinAccountsStatus,
               paymentType: 'full',
               shippingName,
               shippingPhone: rawPhone,

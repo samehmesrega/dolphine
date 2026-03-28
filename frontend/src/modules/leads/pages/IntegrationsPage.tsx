@@ -1420,7 +1420,7 @@ export default function IntegrationsPage() {
         </button>
         {openSections['bosta'] && <div className="px-6 pb-6">
         <p className="text-slate-600 text-sm mb-4">
-          ربط الطلبات مع شركة بوسطة للشحن. عند تأكيد الطلب من الحسابات، يتم رفع الشحنة تلقائياً لبوسطة.
+          ربط الطلبات مع شركة بوسطة للشحن. يتم رفع الشحنة تلقائياً عند إنشاء الطلب.
         </p>
         {loadingBosta ? (
           <p className="text-slate-500">جاري التحميل...</p>
