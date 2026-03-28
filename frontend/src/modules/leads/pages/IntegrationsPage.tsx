@@ -883,8 +883,7 @@ function GoogleSheetsSection() {
   };
 
   return (
-    <section className="bg-white rounded-xl shadow p-6">
-      <h2 className="text-lg font-semibold text-slate-800 mb-2">Google Sheets → ليدز</h2>
+    <div>
       <p className="text-slate-600 text-sm mb-4">
         اربط شيت جوجل لاستيراد الليدز. اعمل الشيت "أي شخص لديه الرابط يمكنه العرض"، حدد أعمدة الماپنج، واستورد الليدز يدوياً أو تلقائياً.
       </p>
@@ -1104,7 +1103,7 @@ function GoogleSheetsSection() {
           </div>
         </div>
       )}
-    </section>
+    </div>
   );
 }
 
@@ -1234,13 +1233,21 @@ export default function IntegrationsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
+  const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <h1 className="text-2xl font-bold text-slate-800">الربط والتكامل</h1>
 
       {/* ووكومرس */}
-      <section className="bg-white rounded-xl shadow p-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-2">ووكومرس</h2>
+      <section className="bg-white rounded-xl shadow">
+        <button type="button" onClick={() => toggleSection('woo')} className="w-full flex items-center justify-between p-6 text-right">
+          <h2 className="text-lg font-semibold text-slate-800">ووكومرس</h2>
+          <svg className={`w-5 h-5 text-slate-400 transition-transform ${openSections['woo'] ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {openSections['woo'] && <div className="px-6 pb-6">
+        <p className="text-slate-600 text-sm mb-4">
         <p className="text-slate-600 text-sm mb-4">
           أدخل رابط الموقع وبيانات ووكومرس (من ووكومرس → الإعدادات → متقدّم → REST API). يمكنك أيضاً ضبطها عبر متغيرات البيئة على السيرفر.
         </p>
@@ -1381,11 +1388,16 @@ export default function IntegrationsPage() {
             )}
           </>
         )}
+        </div>}
       </section>
 
       {/* بوسطة للشحن */}
-      <section className="bg-white rounded-xl shadow p-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-2">بوسطة للشحن</h2>
+      <section className="bg-white rounded-xl shadow">
+        <button type="button" onClick={() => toggleSection('bosta')} className="w-full flex items-center justify-between p-6 text-right">
+          <h2 className="text-lg font-semibold text-slate-800">بوسطة للشحن</h2>
+          <svg className={`w-5 h-5 text-slate-400 transition-transform ${openSections['bosta'] ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {openSections['bosta'] && <div className="px-6 pb-6">
         <p className="text-slate-600 text-sm mb-4">
           ربط الطلبات مع شركة بوسطة للشحن. عند تأكيد الطلب من الحسابات، يتم رفع الشحنة تلقائياً لبوسطة.
         </p>
@@ -1546,11 +1558,16 @@ export default function IntegrationsPage() {
             )}
           </>
         )}
+        </div>}
       </section>
 
       {/* نماذج ووردبريس → ليدز */}
-      <section className="bg-white rounded-xl shadow p-6">
-        <h2 className="text-lg font-semibold text-slate-800 mb-2">نماذج ووردبريس → ليدز</h2>
+      <section className="bg-white rounded-xl shadow">
+        <button type="button" onClick={() => toggleSection('forms')} className="w-full flex items-center justify-between p-6 text-right">
+          <h2 className="text-lg font-semibold text-slate-800">نماذج ووردبريس → ليدز</h2>
+          <svg className={`w-5 h-5 text-slate-400 transition-transform ${openSections['forms'] ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {openSections['forms'] && <div className="px-6 pb-6">
         <p className="text-slate-600 text-sm mb-4">
           أنشئ اتصالاً لكل نموذج، انسخ رابط الويب هوك وضعه في Forminator، ثم اضبط تعيين الحقول لتحديد أي حقل يقابل أي معلومة في الليد.
         </p>
@@ -1625,10 +1642,19 @@ export default function IntegrationsPage() {
             ))}
           </ul>
         )}
+        </div>}
       </section>
 
       {/* Google Sheets */}
-      <GoogleSheetsSection />
+      <section className="bg-white rounded-xl shadow">
+        <button type="button" onClick={() => toggleSection('sheets')} className="w-full flex items-center justify-between p-6 text-right">
+          <h2 className="text-lg font-semibold text-slate-800">Google Sheets → ليدز</h2>
+          <svg className={`w-5 h-5 text-slate-400 transition-transform ${openSections['sheets'] ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {openSections['sheets'] && <div className="px-6 pb-6">
+          <GoogleSheetsSection />
+        </div>}
+      </section>
     </div>
   );
 }
