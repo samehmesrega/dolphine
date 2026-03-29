@@ -155,7 +155,7 @@ export async function getOverviewMetrics(filters: DashboardFilters) {
   });
 
   // Dolphin confirmed orders (leads with accounts_confirmed status)
-  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'accounts_confirmed' } });
+  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'confirmed' } });
   const confirmedOrders = confirmedStatus ? await prisma.lead.count({
     where: { ...dateWhere, statusId: confirmedStatus.id, deletedAt: null },
   }) : 0;
@@ -298,7 +298,7 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
   ]);
 
   // Get confirmed orders per campaign from Dolphin Leads (via utm_campaign = ad set name)
-  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'accounts_confirmed' } });
+  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'confirmed' } });
   const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
   const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
 
