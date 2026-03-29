@@ -303,15 +303,17 @@ model LeadSource {
 }
 
 model Shift {
-  id         String   @id @default(uuid())
-  name       String
-  startTime  String   @map("start_time")
-  endTime    String   @map("end_time")
-  daysOfWeek Json     @map("days_of_week")
-  roundRobin Boolean  @default(false) @map("round_robin")
-  isActive   Boolean  @default(true) @map("is_active")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
+  id                String   @id @default(uuid())
+  name              String
+  startTime         String   @map("start_time")
+  endTime           String   @map("end_time")
+  daysOfWeek        Json     @map("days_of_week")
+  roundRobin        Boolean  @default(false) @map("round_robin")
+  isActive          Boolean  @default(true) @map("is_active")
+  lastAssignedIndex Int      @default(-1) @map("last_assigned_index")
+  lastAssignedDate  String?  @map("last_assigned_date") // YYYY-MM-DD — reset يومي
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   shiftMembers ShiftMember[]
 
