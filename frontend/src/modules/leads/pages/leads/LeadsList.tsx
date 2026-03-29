@@ -492,11 +492,13 @@ export default function LeadsList() {
                       {l.status?.name}
                     </span>
                     {l.communications?.[0] && (
-                      <span
-                        className="mr-1 cursor-help text-slate-400 hover:text-slate-600"
-                        title={`${l.communications[0].user?.name || '—'}: ${l.communications[0].notes || '(بدون ملاحظات)'} — ${new Date(l.communications[0].createdAt).toLocaleString('ar-EG')}`}
-                      >
-                        💬
+                      <span className="mr-1 relative group">
+                        <span className="cursor-help text-slate-400 hover:text-slate-600 text-xs">💬</span>
+                        <span className="absolute hidden group-hover:block z-50 bottom-full right-0 mb-1 w-64 p-2 bg-slate-800 text-white text-xs rounded-lg shadow-lg leading-relaxed whitespace-pre-wrap">
+                          {l.communications[0].user?.name || '—'}: {l.communications[0].notes || '(بدون ملاحظات)'}
+                          <br />
+                          <span className="text-slate-400">{new Date(l.communications[0].createdAt).toLocaleString('ar-EG')}</span>
+                        </span>
                       </span>
                     )}
                   </td>
