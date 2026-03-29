@@ -23,6 +23,7 @@ type Lead = {
   createdAt: string;
   status: LeadStatus;
   assignedTo?: { id: string; name: string } | null;
+  communications?: Array<{ type: string; notes: string | null; createdAt: string; user: { name: string } }>;
 };
 
 type User = { id: string; name: string };
@@ -490,6 +491,14 @@ export default function LeadsList() {
                     >
                       {l.status?.name}
                     </span>
+                    {l.communications?.[0] && (
+                      <span
+                        className="mr-1 cursor-help text-slate-400 hover:text-slate-600"
+                        title={`${l.communications[0].user?.name || '—'}: ${l.communications[0].notes || '(بدون ملاحظات)'} — ${new Date(l.communications[0].createdAt).toLocaleString('ar-EG')}`}
+                      >
+                        💬
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-700 hidden lg:table-cell">{l.assignedTo?.name ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-700 hidden md:table-cell">{l.source}</td>

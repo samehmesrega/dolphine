@@ -94,6 +94,11 @@ router.get('/', async (req: Request, res: Response) => {
           status: true,
           assignedTo: { select: { id: true, name: true } },
           customer: { select: { id: true, phone: true, name: true } },
+          communications: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { type: true, notes: true, createdAt: true, user: { select: { name: true } } },
+          },
         },
       }),
     ]);

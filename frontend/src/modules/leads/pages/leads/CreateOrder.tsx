@@ -248,14 +248,18 @@ export default function CreateOrderPage() {
       setError('أضف صنف واحد على الأقل');
       return;
     }
-    // Validation: either transferImage OR (noTransferImage + noImageReason) required
-    if (!transferFile && !noTransferImage) {
-      setError('أرفق صورة التحويل أو اختر "العميل ماوفرش صورة التحويل" مع كتابة السبب');
-      return;
-    }
-    if (noTransferImage && !noImageReason.trim()) {
-      setError('اكتب سبب عدم وجود صورة التحويل');
-      return;
+    // Validation: either (transferImage + senderPhone) OR (noTransferImage + noImageReason) required
+    const hasImage = !!transferFile;
+    const hasPhone = !!senderPhone.trim();
+    if (!hasImage || !hasPhone) {
+      if (!noTransferImage) {
+        setError('أرفق صورة التحويل وأدخل رقم المحوّل — أو اختر "العميل ماوفرش صورة/رقم التحويل" مع كتابة السبب');
+        return;
+      }
+      if (!noImageReason.trim()) {
+        setError('اكتب سبب عدم وجود صورة أو رقم التحويل');
+        return;
+      }
     }
     fd.append('items', JSON.stringify(validItems));
     if (transferFile) fd.append('transferImage', transferFile);
@@ -619,12 +623,12 @@ export default function CreateOrderPage() {
                 className="mt-1 rounded border-slate-300"
               />
               <label htmlFor="noTransferImage" className="text-sm text-slate-600">
-                العميل ماوفرش صورة التحويل
+                العميل ماوفرش صورة/رقم التحويل
               </label>
             </div>
             {noTransferImage && (
               <div>
-                <label className="block text-sm text-slate-600 mb-1">سبب عدم وجود صورة التحويل (مطلوب)</label>
+                <label className="block text-sm text-slate-600 mb-1">سبب عدم وجود صورة التحويل أو رقم التحويل (مطلوب)</label>
                 <input
                   className="w-full border rounded-lg px-3 py-2"
                   value={noImageReason}
