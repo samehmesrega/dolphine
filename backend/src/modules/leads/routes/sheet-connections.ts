@@ -285,6 +285,7 @@ export async function createLeadFromRow(
   const productCustomFields: Record<string, unknown> = {};
 
   // استخراج UTMs تلقائياً من أعمدة الشيت
+  // يدعم أسماء مختلفة: utm_source, UTM Source, utm source, Utm_Source, إلخ
   const utmLabels: Record<string, string> = {
     utm_source:   'مصدر الزيارة',
     utm_medium:   'وسيلة الزيارة',
@@ -294,8 +295,11 @@ export async function createLeadFromRow(
   };
   const utmValues: Record<string, string> = {};
   for (const [utmKey, label] of Object.entries(utmLabels)) {
+    // حوّل utm_source لـ pattern يطابق: utm_source, UTM Source, utm source, utmsource
+    const normalized = utmKey.replace(/_/g, '').toLowerCase(); // "utmsource"
     for (const [col, val] of Object.entries(rowData)) {
-      if (col.toLowerCase() === utmKey.toLowerCase() && val.trim()) {
+      const colNorm = col.replace(/[_\s-]/g, '').toLowerCase(); // "utmsource" من أي صيغة
+      if (colNorm === normalized && val.trim()) {
         leadCustomFields[label] = val.trim();
         utmValues[utmKey] = val.trim();
         break;
