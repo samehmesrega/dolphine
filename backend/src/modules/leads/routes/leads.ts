@@ -50,7 +50,15 @@ router.get('/', async (req: Request, res: Response) => {
 
     const where: LeadWhere = {};
     if (statusId) where.statusId = statusId;
-    if (assignedToId !== undefined) where.assignedToId = assignedToId;
+
+    // موظف السيلز يشوف بس الليدز المعيّنة ليه
+    const authUser = (req as AuthRequest).user;
+    const isSalesAgent = authUser?.roleSlug === 'sales' || authUser?.roleSlug === 'sales_agent';
+    if (isSalesAgent && !assignedToId) {
+      where.assignedToId = authUser!.userId;
+    } else if (assignedToId !== undefined) {
+      where.assignedToId = assignedToId;
+    }
     if (from || to) {
       where.createdAt = {};
       // Egypt timezone (UTC+2) — midnight in Egypt = 10:00 PM previous day in UTC
