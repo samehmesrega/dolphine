@@ -610,4 +610,84 @@ function installDolphinSync() {
   }
 });
 
+// POST /api/sheet-connections/:id/backfill-utms — تحديث UTMs للليدز الموجودة (مرة واحدة)
+router.post('/:id/backfill-utms', async (req: Request, res: Response) => {
+  try {
+    const conn = await prisma.sheetConnection.findUnique({ where: { id: String(req.params.id) } });
+    if (!conn) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
+
+    const mapping = (conn.fieldMapping ?? {}) as FieldMapping;
+    const { headers, rows } = await readRows(conn.spreadsheetId, conn.sheetName, 2);
+
+    // UTM column matching (same logic as createLeadFromRow)
+    const utmKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+    const utmDbFields: Record<string, string> = {
+      utm_source: 'utmSource',
+      utm_medium: 'utmMedium',
+      utm_campaign: 'utmCampaign',
+      utm_content: 'utmContent',
+    };
+
+    let updated = 0, skipped = 0, notFound = 0;
+
+    for (const row of rows) {
+      if (!row || row.every((cell) => !cell?.trim())) { skipped++; continue; }
+
+      const rowData: Record<string, string> = {};
+      for (let j = 0; j < headers.length; j++) {
+        if (headers[j]) rowData[headers[j]] = row[j] ? String(row[j]) : '';
+      }
+
+      // Extract phone
+      const phoneCol = mapping.phone;
+      const phoneRaw = phoneCol ? (rowData[phoneCol] ?? '').trim() : '';
+      if (!phoneRaw) { skipped++; continue; }
+      const phoneNormalized = normalizePhone(phoneRaw);
+      if (!phoneNormalized) { skipped++; continue; }
+
+      // Extract UTMs
+      const utmValues: Record<string, string> = {};
+      for (const utmKey of utmKeys) {
+        const normalized = utmKey.replace(/_/g, '').toLowerCase();
+        for (const [col, val] of Object.entries(rowData)) {
+          const colNorm = col.replace(/[_\s-]/g, '').toLowerCase();
+          if (colNorm === normalized && val.trim()) {
+            utmValues[utmKey] = val.trim();
+            break;
+          }
+        }
+      }
+
+      if (!utmValues.utm_source && !utmValues.utm_campaign) { skipped++; continue; }
+
+      // Find lead by phone
+      const lead = await prisma.lead.findFirst({
+        where: { phoneNormalized, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, utmSource: true, utmCampaign: true },
+      });
+
+      if (!lead) { notFound++; continue; }
+
+      // Update only UTM fields
+      const updateData: Record<string, string> = {};
+      for (const [utmKey, dbField] of Object.entries(utmDbFields)) {
+        if (utmValues[utmKey]) updateData[dbField] = utmValues[utmKey];
+      }
+
+      if (Object.keys(updateData).length > 0) {
+        await prisma.lead.update({ where: { id: lead.id }, data: updateData });
+        updated++;
+      } else {
+        skipped++;
+      }
+    }
+
+    res.json({ success: true, updated, skipped, notFound, total: rows.length });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'خطأ';
+    res.status(500).json({ error: msg });
+  }
+});
+
 export default router;
