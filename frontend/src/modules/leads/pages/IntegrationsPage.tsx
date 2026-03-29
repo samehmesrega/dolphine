@@ -1255,6 +1255,37 @@ export default function IntegrationsPage() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
+  // Wallet settings
+  const [walletPhone, setWalletPhone] = useState('');
+  const [walletName, setWalletName] = useState('');
+  const { data: walletData } = useQuery({
+    queryKey: ['wallet-settings'],
+    queryFn: async () => {
+      const [phoneRes, nameRes] = await Promise.all([
+        api.get<{ value: string | null }>('/integrations/setting/wallet_phone').catch(() => ({ data: { value: null } })),
+        api.get<{ value: string | null }>('/integrations/setting/wallet_name').catch(() => ({ data: { value: null } })),
+      ]);
+      return { phone: phoneRes.data.value || '', name: nameRes.data.value || '' };
+    },
+  });
+  React.useEffect(() => {
+    if (walletData) {
+      setWalletPhone(walletData.phone);
+      setWalletName(walletData.name);
+    }
+  }, [walletData]);
+  const saveWalletMutation = useMutation({
+    mutationFn: async () => {
+      await Promise.all([
+        api.put('/integrations/setting/wallet_phone', { value: walletPhone }),
+        api.put('/integrations/setting/wallet_name', { value: walletName }),
+      ]);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['wallet-settings'] });
+    },
+  });
+
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
   const toggleSection = (key: string) => setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
 
@@ -1602,6 +1633,52 @@ export default function IntegrationsPage() {
             )}
           </>
         )}
+        </div>}
+      </section>
+
+      {/* المحفظة */}
+      <section className="bg-white rounded-xl shadow">
+        <button type="button" onClick={() => toggleSection('wallet')} className="w-full flex items-center justify-between p-6 text-right">
+          <h2 className="text-lg font-semibold text-slate-800">المحفظة (بيانات الاستقبال)</h2>
+          <svg className={`w-5 h-5 text-slate-400 transition-transform ${openSections['wallet'] ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </button>
+        {openSections['wallet'] && <div className="px-6 pb-6">
+          <p className="text-slate-600 text-sm mb-4">
+            بيانات محفظة الاستقبال. تُستخدم لاحقاً للتحقق التلقائي من صور التحويل (OCR).
+          </p>
+          <div className="space-y-4 max-w-md">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">رقم المحفظة</label>
+              <input
+                type="text"
+                value={walletPhone}
+                onChange={(e) => setWalletPhone(e.target.value)}
+                placeholder="01xxxxxxxxx"
+                className="border border-slate-300 rounded-lg px-3 py-2 w-full"
+                dir="ltr"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">اسم صاحب المحفظة</label>
+              <input
+                type="text"
+                value={walletName}
+                onChange={(e) => setWalletName(e.target.value)}
+                placeholder="الاسم كما يظهر في المحفظة"
+                className="border border-slate-300 rounded-lg px-3 py-2 w-full"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => saveWalletMutation.mutate()}
+              disabled={saveWalletMutation.isPending}
+              className="bg-slate-700 text-white px-4 py-2 rounded-lg hover:bg-slate-600 disabled:opacity-50"
+            >
+              {saveWalletMutation.isPending ? 'جاري الحفظ...' : 'حفظ بيانات المحفظة'}
+            </button>
+            {saveWalletMutation.isSuccess && <p className="text-green-600 text-sm">تم الحفظ.</p>}
+            {saveWalletMutation.isError && <p className="text-red-600 text-sm">حدث خطأ في الحفظ.</p>}
+          </div>
         </div>}
       </section>
 

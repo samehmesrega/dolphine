@@ -222,6 +222,8 @@ app.use('/api/audit-logs', authMiddleware, require('./modules/leads/routes/audit
 app.use('/api/reports', authMiddleware, requirePermission('reports.view'), require('./modules/leads/routes/reports').default);
 app.use('/api/tasks', authMiddleware, require('./modules/leads/routes/tasks').default);
 app.use('/api/task-rules', authMiddleware, require('./modules/leads/routes/task-rules').default);
+app.use('/api/blacklist', authMiddleware, require('./modules/leads/routes/blacklist').default);
+app.use('/api/integrations', authMiddleware, require('./modules/leads/routes/integration-settings').default);
 
 // ===== Frontend Static Files (Production) =====
 if (process.env.NODE_ENV === 'production') {

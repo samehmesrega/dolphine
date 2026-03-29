@@ -75,6 +75,7 @@ const NAV: NavEntry[] = [
     children: [
       { to: '/leads/users', label: 'المستخدمين', permission: 'users.manage', allowRoleSlugs: ['sales_manager'] },
       { to: '/leads/roles', label: 'الأدوار والصلاحيات', permission: 'users.manage' },
+      { to: '/leads/blacklist', label: 'الأرقام المحظورة', allowRoleSlugs: ['accounts', 'admin', 'super_admin', 'sales_manager'] },
     ],
   },
   { type: 'item', to: '/leads/dual-name', label: 'Dual Name', icon: 'dualName' },

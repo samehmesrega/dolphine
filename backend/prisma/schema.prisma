@@ -62,6 +62,7 @@ model User {
   assignedScripts       Script[]            @relation("ScriptAssignee")
   createdPosts          ScheduledPost[]     @relation("PostCreator")
   createdLandingPages   LandingPage[]       @relation("LandingPageCreator")
+  blacklistedPhones     BlacklistedPhone[]  @relation("BlacklistCreator")
 
   @@map("users")
 }
@@ -424,6 +425,17 @@ model IntegrationSetting {
   value String
 
   @@map("integration_settings")
+}
+
+model BlacklistedPhone {
+  id        String   @id @default(uuid())
+  phone     String   @unique
+  reason    String?
+  addedBy   String   @map("added_by")
+  creator   User     @relation("BlacklistCreator", fields: [addedBy], references: [id])
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("blacklisted_phones")
 }
 
 model SheetConnection {

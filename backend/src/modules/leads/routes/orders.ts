@@ -8,6 +8,7 @@ import { AuthRequest } from '../../../shared/middleware/auth';
 import { createWooCommerceOrder, isConfigured as isWooConfigured, addWooCommerceOrderNote, updateWooCommerceOrderStatus } from '../services/woocommerce';
 import { createBostaDelivery, isConfigured as isBostaConfigured, terminateDelivery } from '../services/bosta';
 import { auditLog } from '../services/audit';
+import { verifyTransfer } from '../services/transfer-verification';
 
 const router = Router();
 
@@ -299,6 +300,41 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
       }
     }
 
+    // 3) Transfer verification — Trust Score
+    const authUserId = (req as AuthRequest).user?.userId || '';
+    try {
+      const verification = await verifyTransfer({
+        id: order.id,
+        transferImage: order.transferImage,
+        noTransferImage: order.noTransferImage,
+        senderPhone: order.senderPhone,
+        imageHash: null,
+        customerId: order.customerId,
+        leadId: order.leadId,
+        partialAmount: order.partialAmount ? Number(order.partialAmount) : null,
+        discount: order.discount ? Number(order.discount) : null,
+        paymentType: order.paymentType,
+        orderItems: order.orderItems.map((i: { price: unknown; quantity: number }) => ({
+          price: Number(i.price),
+          quantity: i.quantity,
+        })),
+      }, authUserId);
+
+      await prisma.order.update({
+        where: { id: order.id },
+        data: {
+          trustScore: verification.trustScore,
+          imageHash: verification.imageHash,
+          transferVerification: verification.checks as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      currentOrder = { ...currentOrder, trustScore: verification.trustScore } as typeof currentOrder;
+      console.log(`[TransferVerification] Order #${order.number} → Trust Score: ${verification.trustScore}`);
+    } catch (verifyErr) {
+      console.error('[TransferVerification] Failed:', verifyErr instanceof Error ? verifyErr.message : verifyErr);
+    }
+
     // إشعار موظفي الحسابات بطلب جديد للمراجعة
     const accountsRole = await prisma.role.findUnique({ where: { slug: 'accounts' } });
     if (accountsRole) {
@@ -307,12 +343,15 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
         select: { id: true },
       });
       const leadName = order.lead?.name ?? 'طلب جديد';
+      const trustScoreVal = (currentOrder as { trustScore?: number | null }).trustScore;
+      const trustWarning = (trustScoreVal !== null && trustScoreVal !== undefined && trustScoreVal < 50)
+        ? ' [Trust Score منخفض]' : '';
       for (const u of accountsUsers) {
         await prisma.notification.create({
           data: {
             userId: u.id,
-            title: 'طلب يحتاج مراجعة الحسابات',
-            body: `طلب جديد من الليد: ${leadName}`,
+            title: `طلب يحتاج مراجعة الحسابات${trustWarning}`,
+            body: `طلب جديد من الليد: ${leadName}${trustWarning}`,
             type: 'order_review_needed',
             entity: 'order',
             entityId: order.id,

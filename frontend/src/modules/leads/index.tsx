@@ -24,6 +24,7 @@ import LeadStatusesPage from './pages/LeadStatusesPage';
 import TasksPage from './pages/TasksPage';
 import TaskRulesPage from './pages/TaskRulesPage';
 import DualNamePage from './pages/DualNamePage';
+import BlacklistPage from './pages/BlacklistPage';
 
 export default function LeadsModule() {
   return (
@@ -54,6 +55,7 @@ export default function LeadsModule() {
       <Route path="tasks" element={<TasksPage />} />
       <Route path="task-rules" element={<TaskRulesPage />} />
       <Route path="dual-name" element={<DualNamePage />} />
+      <Route path="blacklist" element={<BlacklistPage />} />
     </Routes>
   );
 }

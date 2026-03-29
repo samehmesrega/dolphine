@@ -20,6 +20,8 @@ import auditLogsRoutes from './audit-logs';
 import reportsRoutes from './reports';
 import tasksRoutes from './tasks';
 import taskRulesRoutes from './task-rules';
+import blacklistRoutes from './blacklist';
+import integrationSettingsRoutes from './integration-settings';
 
 const router = Router();
 
@@ -64,5 +66,7 @@ router.use('/audit-logs', auditLogsRoutes);
 router.use('/reports', requirePermission('reports.view'), reportsRoutes);
 router.use('/tasks', tasksRoutes);
 router.use('/task-rules', taskRulesRoutes);
+router.use('/blacklist', blacklistRoutes);
+router.use('/integrations', integrationSettingsRoutes);
 
 export default router;

@@ -11,6 +11,15 @@ type OrderItem = {
   product?: { id: string; name: string } | null;
 };
 
+type TransferCheck = {
+  name: string;
+  label: string;
+  passed: boolean;
+  warning: boolean;
+  detail: string;
+  score: number;
+};
+
 type Order = {
   id: string;
   number: number;
@@ -32,6 +41,10 @@ type Order = {
   senderPhone?: string | null;
   noTransferImage?: boolean;
   noImageReason?: string | null;
+  trustScore?: number | null;
+  transferVerification?: TransferCheck[] | null;
+  discount?: number | null;
+  partialAmount?: number | null;
   lead?: { id: string; name: string; phone: string };
   customer?: { id: string; name: string; phone: string };
   orderItems: OrderItem[];
@@ -95,6 +108,7 @@ export default function OrderDetailPage() {
   const qc = useQueryClient();
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showChecks, setShowChecks] = useState(false);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', id],
@@ -288,6 +302,75 @@ export default function OrderDetailPage() {
           <p className="mt-4 font-semibold text-slate-800">الإجمالي: {totalAmount.toFixed(2)}</p>
         </div>
       </div>
+
+      {/* Trust Score + Verification Checks */}
+      {order.trustScore != null && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mt-6">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <div className="flex items-center gap-3">
+              <h2 className="font-semibold text-slate-700">Trust Score</h2>
+              <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold border ${
+                order.trustScore >= 80
+                  ? 'bg-green-50 text-green-700 border-green-200'
+                  : order.trustScore >= 50
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-red-50 text-red-700 border-red-200'
+              }`}>
+                {order.trustScore >= 80 ? '\uD83D\uDFE2' : order.trustScore >= 50 ? '\uD83D\uDFE1' : '\uD83D\uDD34'} {order.trustScore}/100
+              </span>
+            </div>
+            {(order.trustScore < 50 || totalAmount > 2000) && (
+              <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
+                لازم مراجعة قبل الخروج
+              </span>
+            )}
+          </div>
+
+          {order.transferVerification && order.transferVerification.length > 0 && (
+            <>
+              <button
+                type="button"
+                onClick={() => setShowChecks(!showChecks)}
+                className="text-sm text-blue-600 hover:text-blue-700 mb-3"
+              >
+                {showChecks ? 'إخفاء تفاصيل الفحوصات' : 'عرض تفاصيل الفحوصات'} ({order.transferVerification.length})
+              </button>
+
+              {showChecks && (
+                <div className="space-y-2 mt-2">
+                  {order.transferVerification.map((check, idx) => (
+                    <div
+                      key={idx}
+                      className={`flex items-start gap-3 p-3 rounded-lg text-sm ${
+                        check.warning
+                          ? 'bg-red-50 border border-red-100'
+                          : check.passed
+                            ? 'bg-green-50 border border-green-100'
+                            : 'bg-slate-50 border border-slate-100'
+                      }`}
+                    >
+                      <span className="text-lg shrink-0">
+                        {check.warning ? '\u26A0\uFE0F' : check.passed ? '\u2705' : '\u2139\uFE0F'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="font-medium text-slate-800">{check.label}</span>
+                          <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
+                            check.score > 0 ? 'bg-green-100 text-green-700' : check.score < 0 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {check.score > 0 ? `+${check.score}` : check.score}
+                          </span>
+                        </div>
+                        <p className="text-slate-600 mt-0.5">{check.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
 
       {showRejectModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
