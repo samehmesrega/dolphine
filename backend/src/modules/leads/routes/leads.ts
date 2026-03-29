@@ -33,6 +33,7 @@ type LeadWhere = {
     | { phone: { contains: string } }
     | { email: { contains: string; mode: 'insensitive' } }
     | { phoneNormalized: { equals: string } }
+    | { number: number }
   >;
 };
 
