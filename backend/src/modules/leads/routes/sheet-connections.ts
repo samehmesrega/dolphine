@@ -690,4 +690,78 @@ router.post('/:id/backfill-utms', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/sheet-connections/:id/backfill-statuses — تحديث حالات الليدز من الشيت (مرة واحدة)
+router.post('/:id/backfill-statuses', async (req: Request, res: Response) => {
+  try {
+    const maxRow = req.body?.maxRow ? Number(req.body.maxRow) : undefined; // optional: آخر صف يتسحب
+    const conn = await prisma.sheetConnection.findUnique({ where: { id: String(req.params.id) } });
+    if (!conn) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
+
+    const mapping = (conn.fieldMapping ?? {}) as FieldMapping;
+    if (!mapping.statusColumn) {
+      res.status(400).json({ error: 'عمود الحالة (statusColumn) غير محدد في الماپنج' });
+      return;
+    }
+    const statusMapping = mapping.statusMapping ?? {};
+
+    const { headers, rows } = await readRows(conn.spreadsheetId, conn.sheetName, 2);
+
+    // Limit rows if maxRow specified (maxRow is 1-indexed, row 1 = headers, data starts row 2)
+    const dataRows = maxRow ? rows.slice(0, maxRow - 1) : rows;
+
+    // Pre-fetch all lead statuses
+    const allStatuses = await prisma.leadStatus.findMany();
+    const statusBySlug = new Map(allStatuses.map(s => [s.slug, s.id]));
+
+    const phoneColIndex = headers.indexOf(mapping.phone ?? '');
+    const statusColIndex = headers.indexOf(mapping.statusColumn);
+
+    if (phoneColIndex === -1) { res.status(400).json({ error: 'عمود الموبايل غير موجود في الشيت' }); return; }
+    if (statusColIndex === -1) { res.status(400).json({ error: 'عمود الحالة غير موجود في الشيت' }); return; }
+
+    let updated = 0, skipped = 0, notFound = 0;
+
+    for (const row of dataRows) {
+      if (!row || row.every((cell) => !cell?.trim())) { skipped++; continue; }
+
+      const phoneRaw = (row[phoneColIndex] ?? '').trim();
+      if (!phoneRaw) { skipped++; continue; }
+      const phoneNormalized = normalizePhone(phoneRaw);
+      if (!phoneNormalized) { skipped++; continue; }
+
+      const sheetStatus = (row[statusColIndex] ?? '').trim();
+      if (!sheetStatus) { skipped++; continue; }
+
+      // Map sheet status → dolphin slug
+      const dolphinSlug = statusMapping[sheetStatus];
+      if (!dolphinSlug) { skipped++; continue; }
+
+      const statusId = statusBySlug.get(dolphinSlug);
+      if (!statusId) { skipped++; continue; }
+
+      // Find lead by phone
+      const lead = await prisma.lead.findFirst({
+        where: { phoneNormalized, deletedAt: null },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, statusId: true },
+      });
+
+      if (!lead) { notFound++; continue; }
+
+      // Update only if status is different
+      if (lead.statusId !== statusId) {
+        await prisma.lead.update({ where: { id: lead.id }, data: { statusId } });
+        updated++;
+      } else {
+        skipped++;
+      }
+    }
+
+    res.json({ success: true, updated, skipped, notFound, total: dataRows.length });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'خطأ';
+    res.status(500).json({ error: msg });
+  }
+});
+
 export default router;
