@@ -6,6 +6,7 @@ import { normalizePhone } from '../../../shared/utils/phone';
 import { AuthRequest } from '../../../shared/middleware/auth';
 import { getNextAssignedUserId } from '../services/roundRobin';
 import { auditLog } from '../services/audit';
+import { syncCommunicationToSheet } from '../services/googleSheetsWrite';
 
 const router = Router();
 
@@ -56,13 +57,15 @@ router.get('/', async (req: Request, res: Response) => {
       if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999+02:00');
     }
     if (search && search.trim()) {
-      const s = search.trim();
+      const s = search.trim().replace(/^#/, ''); // شيل # لو موجود
       const normalized = normalizePhone(s) || undefined;
+      const asNumber = /^\d+$/.test(s) ? parseInt(s, 10) : undefined;
       where.OR = [
         { name: { contains: s, mode: 'insensitive' } },
         { phone: { contains: s } },
         { email: { contains: s, mode: 'insensitive' } },
         ...(normalized ? [{ phoneNormalized: { equals: normalized } }] : []),
+        ...(asNumber ? [{ number: asNumber }] : []),
       ];
     }
 
@@ -504,6 +507,12 @@ router.post('/:id/communications', async (req: Request, res: Response) => {
         communications: { orderBy: { createdAt: 'desc' }, include: { user: { select: { id: true, name: true } } } },
         responseRequests: { include: { requestedFrom: { select: { id: true, name: true } } } },
       },
+    });
+
+    // Sync communication to Google Sheets (async, non-blocking)
+    const salesUser = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+    syncCommunicationToSheet(id, type, notes ?? null, salesUser?.name || '—').catch((err) => {
+      console.error('[Sheets Sync] Communication sync failed:', err);
     });
 
     res.status(201).json({ communication, lead: updatedLead });

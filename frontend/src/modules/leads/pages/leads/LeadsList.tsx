@@ -195,6 +195,7 @@ export default function LeadsList() {
   const { data, isLoading, isFetching, isError, error: listError } = useQuery({
     queryKey: ['leads', queryParams],
     queryFn: () => fetchLeads(queryParams),
+    refetchInterval: 30000, // تحديث تلقائي كل 30 ثانية
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -231,6 +232,14 @@ export default function LeadsList() {
         <h1 className="text-2xl font-bold text-slate-800">ليدز</h1>
         <div className="flex items-center gap-3">
           {isFetching && <span className="text-sm text-slate-500">جاري التحديث...</span>}
+          <button
+            type="button"
+            onClick={() => qc.invalidateQueries({ queryKey: ['leads'] })}
+            className="border border-slate-300 text-slate-600 rounded-lg px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+            title="مزامنة الليدز"
+          >
+            🔄 مزامنة
+          </button>
           <button
             type="button"
             onClick={() => setShowAddForm(v => !v)}
@@ -336,7 +345,7 @@ export default function LeadsList() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           <input
             className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
-            placeholder="بحث: اسم / فون / إيميل"
+            placeholder="بحث: اسم / فون / إيميل / رقم الليد"
             value={search}
             onChange={(e) => {
               setPage(1);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../../shared/services/api';
@@ -107,9 +107,41 @@ export default function CreateOrderPage() {
     { productId: '', productName: '', quantity: 1, price: 0, notes: '' },
   ]);
   const [transferFile, setTransferFile] = useState<File | null>(null);
+  const [transferPreview, setTransferPreview] = useState<string | null>(null);
   const [senderPhone, setSenderPhone] = useState('');
   const [noTransferImage, setNoTransferImage] = useState(false);
   const [noImageReason, setNoImageReason] = useState('');
+
+  // Ctrl+V paste handler
+  const handlePaste = useCallback((e: ClipboardEvent) => {
+    if (noTransferImage) return;
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) {
+          setTransferFile(file);
+          setTransferPreview(URL.createObjectURL(file));
+        }
+        break;
+      }
+    }
+  }, [noTransferImage]);
+
+  useEffect(() => {
+    document.addEventListener('paste', handlePaste);
+    return () => document.removeEventListener('paste', handlePaste);
+  }, [handlePaste]);
+
+  // Update preview when file changes via input
+  useEffect(() => {
+    if (transferFile && !transferPreview) {
+      setTransferPreview(URL.createObjectURL(transferFile));
+    }
+    if (!transferFile) setTransferPreview(null);
+  }, [transferFile]);
 
   const [discount, setDiscount] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
@@ -555,9 +587,24 @@ export default function CreateOrderPage() {
                 type="file"
                 accept="image/*"
                 className="w-full border rounded-lg px-3 py-2"
-                onChange={(e) => setTransferFile(e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  const f = e.target.files?.[0] ?? null;
+                  setTransferFile(f);
+                  setTransferPreview(f ? URL.createObjectURL(f) : null);
+                }}
                 disabled={noTransferImage}
               />
+              <p className="text-xs text-slate-400 mt-1">أو اضغط <kbd className="px-1 py-0.5 bg-slate-100 border rounded text-xs">Ctrl+V</kbd> للصق من الحافظة</p>
+              {transferPreview && (
+                <div className="mt-2 relative inline-block">
+                  <img src={transferPreview} alt="معاينة" className="max-h-32 rounded-lg border border-slate-200" />
+                  <button
+                    type="button"
+                    onClick={() => { setTransferFile(null); setTransferPreview(null); }}
+                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                  >✕</button>
+                </div>
+              )}
             </div>
 
             <div className="flex items-start gap-2 mt-2">
