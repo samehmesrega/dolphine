@@ -1,5 +1,26 @@
 import { prisma } from '../../../db';
 
+// === Exchange Rate (EGP → USD) ===
+
+let rateCache: { rate: number; time: number } | null = null;
+const RATE_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+export async function getEgpToUsd(): Promise<number> {
+  if (rateCache && Date.now() - rateCache.time < RATE_CACHE_TTL) return rateCache.rate;
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/EGP');
+    const data = await res.json() as { result: string; rates?: { USD?: number } };
+    if (data.result === 'success' && data.rates?.USD) {
+      rateCache = { rate: data.rates.USD, time: Date.now() };
+      return data.rates.USD;
+    }
+  } catch (err) {
+    console.warn('[ExchangeRate] Failed to fetch EGP→USD rate:', err);
+  }
+  // Fallback
+  return rateCache?.rate || 0.02; // ~1 USD = 50 EGP
+}
+
 // === Ad Accounts ===
 
 export async function listAdAccounts() {
@@ -183,6 +204,10 @@ export async function getOverviewMetrics(filters: DashboardFilters) {
     }
   }
 
+  // Convert order values from EGP to USD
+  const egpToUsd = await getEgpToUsd();
+  const confirmedValueUsd = confirmedOrderValue * egpToUsd;
+
   return {
     totalSpend: spend,
     dolphinLeads,                    // Actual leads in Dolphin CRM
@@ -193,9 +218,11 @@ export async function getOverviewMetrics(filters: DashboardFilters) {
     totalClicks: clicks,
     cpl: dolphinLeads > 0 ? spend / dolphinLeads : 0,             // CPL = spend / Dolphin leads
     confirmedCost: confirmedOrders > 0 ? spend / confirmedOrders : 0,  // Cost per confirmed
-    estAov: confirmedOrderCount > 0 ? confirmedOrderValue / confirmedOrderCount : 0,  // Est. AOV
-    estRoas: spend > 0 ? confirmedOrderValue / spend : 0,          // Est. ROAS = confirmed value / spend
+    estAov: confirmedOrderCount > 0 ? confirmedValueUsd / confirmedOrderCount : 0,  // Est. AOV (USD)
+    estAovEgp: confirmedOrderCount > 0 ? confirmedOrderValue / confirmedOrderCount : 0,  // Est. AOV (EGP)
+    estRoas: spend > 0 ? confirmedValueUsd / spend : 0,            // Est. ROAS = confirmed value USD / spend USD
     confirmedRate: dolphinLeads > 0 ? (confirmedOrders / dolphinLeads) * 100 : 0,  // Conversion %
+    egpToUsdRate: egpToUsd,
     overallCTR: impressions > 0 ? (clicks / impressions) * 100 : 0,
   };
 }
