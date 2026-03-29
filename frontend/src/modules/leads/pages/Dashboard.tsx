@@ -18,6 +18,34 @@ import api from '../../../shared/services/api';
 
 type Stats = { totalLeads: number; totalOrders: number; pendingOrders: number };
 
+type PeriodStats = {
+  totalOrders: number;
+  avgTrustScore: number;
+  lowTrustCount: number;
+  mediumTrustCount: number;
+  highTrustCount: number;
+  blacklistHits: number;
+  duplicateImages: number;
+  duplicatePhones: number;
+};
+
+type FraudStats = {
+  today: PeriodStats;
+  thisWeek: PeriodStats;
+  thisMonth: PeriodStats;
+  topSuspiciousAgents: Array<{
+    name: string;
+    orderCount: number;
+    rejectionRate: number;
+    avgTrustScore: number;
+  }>;
+  topSuspiciousPhones: Array<{
+    phone: string;
+    count: number;
+    lastUsed: string | null;
+  }>;
+};
+
 const STATUS_LABELS: Record<string, string> = {
   pending: 'بانتظار الحسابات',
   confirmed: 'مؤكد من الحسابات',
@@ -46,8 +74,14 @@ async function fetchOrdersByStatus() {
   return data as { data: { status: string; count: number }[] };
 }
 
+async function fetchFraudStats() {
+  const { data } = await api.get('/orders/fraud-stats');
+  return data as FraudStats;
+}
+
 export default function Dashboard() {
   const [leadsDays, setLeadsDays] = useState(30);
+  const [fraudPeriod, setFraudPeriod] = useState<'today' | 'thisWeek' | 'thisMonth'>('today');
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboard', 'stats'],
@@ -62,6 +96,11 @@ export default function Dashboard() {
   const { data: ordersByStatus, isLoading: loadingOrders } = useQuery({
     queryKey: ['dashboard', 'orders-by-status'],
     queryFn: fetchOrdersByStatus,
+  });
+
+  const { data: fraudStats, isLoading: loadingFraud } = useQuery({
+    queryKey: ['dashboard', 'fraud-stats'],
+    queryFn: fetchFraudStats,
   });
 
   const leadsData = leadsOverTime?.data ?? [];
@@ -170,6 +209,148 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* إحصائيات الحماية */}
+      <div className="bg-white rounded-xl shadow p-6">
+        <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <h2 className="text-lg font-semibold text-slate-800">إحصائيات الحماية</h2>
+          <div className="flex gap-2">
+            {([['today', 'اليوم'], ['thisWeek', 'هذا الأسبوع'], ['thisMonth', 'هذا الشهر']] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setFraudPeriod(key)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
+                  fraudPeriod === key ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {loadingFraud ? (
+          <div className="h-32 flex items-center justify-center text-slate-500">جاري التحميل...</div>
+        ) : !fraudStats ? (
+          <div className="h-32 flex items-center justify-center text-slate-500">لا توجد بيانات</div>
+        ) : (() => {
+          const period = fraudStats[fraudPeriod];
+          return (
+            <div className="space-y-6">
+              {/* Trust Score Distribution Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-slate-50 p-4 rounded-lg text-center">
+                  <p className="text-sm text-slate-500">إجمالي الطلبات</p>
+                  <p className="text-xl font-bold text-slate-800 mt-1">{period.totalOrders}</p>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <p className="text-sm text-green-600">ثقة عالية (80+)</p>
+                  <p className="text-xl font-bold text-green-700 mt-1">{period.highTrustCount}</p>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded-lg text-center">
+                  <p className="text-sm text-yellow-600">ثقة متوسطة (50-79)</p>
+                  <p className="text-xl font-bold text-yellow-700 mt-1">{period.mediumTrustCount}</p>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg text-center">
+                  <p className="text-sm text-red-600">ثقة منخفضة (&lt;50)</p>
+                  <p className="text-xl font-bold text-red-700 mt-1">{period.lowTrustCount}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg text-center">
+                  <p className="text-sm text-blue-600">متوسط Trust Score</p>
+                  <p className="text-xl font-bold text-blue-700 mt-1">{period.avgTrustScore}%</p>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg text-center">
+                  <p className="text-sm text-red-600">أرقام محظورة</p>
+                  <p className="text-xl font-bold text-red-700 mt-1">{period.blacklistHits}</p>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg text-center">
+                  <p className="text-sm text-orange-600">صور مكررة</p>
+                  <p className="text-xl font-bold text-orange-700 mt-1">{period.duplicateImages}</p>
+                </div>
+                <div className="bg-purple-50 p-4 rounded-lg text-center">
+                  <p className="text-sm text-purple-600">أرقام محوّل مكررة</p>
+                  <p className="text-xl font-bold text-purple-700 mt-1">{period.duplicatePhones}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+
+      {/* Top Suspicious Agents */}
+      {!loadingFraud && fraudStats && fraudStats.topSuspiciousAgents.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">سيلز مشتبه بهم (هذا الشهر)</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-slate-500">
+                  <th className="text-right py-2 pr-2">الاسم</th>
+                  <th className="text-center py-2">عدد الطلبات</th>
+                  <th className="text-center py-2">نسبة الرفض</th>
+                  <th className="text-center py-2">متوسط Trust Score</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fraudStats.topSuspiciousAgents.map((agent, idx) => (
+                  <tr key={idx} className="border-b last:border-0 hover:bg-slate-50">
+                    <td className="py-2 pr-2 font-medium">{agent.name}</td>
+                    <td className="py-2 text-center">{agent.orderCount}</td>
+                    <td className="py-2 text-center">
+                      <span className={agent.rejectionRate > 30 ? 'text-red-600 font-bold' : 'text-yellow-600'}>
+                        {agent.rejectionRate}%
+                      </span>
+                    </td>
+                    <td className="py-2 text-center">
+                      <span className={
+                        agent.avgTrustScore >= 80 ? 'text-green-600' :
+                        agent.avgTrustScore >= 50 ? 'text-yellow-600' : 'text-red-600 font-bold'
+                      }>
+                        {agent.avgTrustScore}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Top Suspicious Phones */}
+      {!loadingFraud && fraudStats && fraudStats.topSuspiciousPhones.length > 0 && (
+        <div className="bg-white rounded-xl shadow p-6">
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">أرقام محوّل متكررة (هذا الشهر)</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-slate-500">
+                  <th className="text-right py-2 pr-2">رقم المحوّل</th>
+                  <th className="text-center py-2">عدد الاستخدامات</th>
+                  <th className="text-center py-2">آخر استخدام</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fraudStats.topSuspiciousPhones.map((phone, idx) => (
+                  <tr key={idx} className="border-b last:border-0 hover:bg-slate-50">
+                    <td className="py-2 pr-2 font-mono" dir="ltr">{phone.phone}</td>
+                    <td className="py-2 text-center">
+                      <span className={phone.count >= 5 ? 'text-red-600 font-bold' : 'text-yellow-600'}>
+                        {phone.count}
+                      </span>
+                    </td>
+                    <td className="py-2 text-center text-slate-600">{phone.lastUsed || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       <p className="text-slate-500">
         مرحباً بك في دولفين. استخدم القائمة الجانبية للتنقل بين الأقسام.

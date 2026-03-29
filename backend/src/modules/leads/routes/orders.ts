@@ -36,6 +36,164 @@ const createOrderSchema = z.object({
   items: z.array(orderItemSchema).min(1),
 });
 
+// ==========================================
+// Fraud Statistics Dashboard endpoint
+// ==========================================
+router.get('/fraud-stats', async (_req: Request, res: Response) => {
+  try {
+    const now = new Date();
+
+    // Today: midnight to now
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+
+    // This week: Monday midnight to now
+    const weekStart = new Date(now);
+    const dayOfWeek = weekStart.getDay() || 7; // Sunday=0 → 7
+    weekStart.setDate(weekStart.getDate() - dayOfWeek + 1);
+    weekStart.setHours(0, 0, 0, 0);
+
+    // This month: first day of month
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+
+    async function getStats(since: Date) {
+      const orders = await prisma.order.findMany({
+        where: {
+          deletedAt: null,
+          createdAt: { gte: since },
+        },
+        select: {
+          trustScore: true,
+          imageHash: true,
+          senderPhone: true,
+          transferVerification: true,
+        },
+      });
+
+      const totalOrders = orders.length;
+      const scoresArray = orders.filter(o => o.trustScore !== null).map(o => o.trustScore!);
+      const avgTrustScore = scoresArray.length > 0
+        ? Math.round(scoresArray.reduce((s, v) => s + v, 0) / scoresArray.length)
+        : 0;
+      const lowTrustCount = scoresArray.filter(s => s < 50).length;
+      const mediumTrustCount = scoresArray.filter(s => s >= 50 && s < 80).length;
+      const highTrustCount = scoresArray.filter(s => s >= 80).length;
+
+      // Count blacklist hits from verification checks
+      let blacklistHits = 0;
+      let duplicateImages = 0;
+      let duplicatePhones = 0;
+
+      for (const order of orders) {
+        const checks = order.transferVerification as Array<{ name: string; passed: boolean }> | null;
+        if (Array.isArray(checks)) {
+          for (const check of checks) {
+            if (check.name === 'blacklist' && !check.passed) blacklistHits++;
+            if (check.name === 'image_hash' && !check.passed) duplicateImages++;
+            if (check.name === 'sender_phone_repeat' && !check.passed) duplicatePhones++;
+          }
+        }
+      }
+
+      return {
+        totalOrders,
+        avgTrustScore,
+        lowTrustCount,
+        mediumTrustCount,
+        highTrustCount,
+        blacklistHits,
+        duplicateImages,
+        duplicatePhones,
+      };
+    }
+
+    const [today, thisWeek, thisMonth] = await Promise.all([
+      getStats(todayStart),
+      getStats(weekStart),
+      getStats(monthStart),
+    ]);
+
+    // Top suspicious agents: agents with highest rejection rate (min 5 orders this month)
+    const agentOrders = await prisma.order.findMany({
+      where: {
+        deletedAt: null,
+        createdAt: { gte: monthStart },
+      },
+      select: {
+        accountsStatus: true,
+        trustScore: true,
+        lead: {
+          select: {
+            assignedTo: {
+              select: { id: true, name: true },
+            },
+          },
+        },
+      },
+    });
+
+    const agentMap = new Map<string, { name: string; total: number; rejected: number; scores: number[] }>();
+    for (const o of agentOrders) {
+      const agent = o.lead?.assignedTo;
+      if (!agent) continue;
+      if (!agentMap.has(agent.id)) {
+        agentMap.set(agent.id, { name: agent.name, total: 0, rejected: 0, scores: [] });
+      }
+      const entry = agentMap.get(agent.id)!;
+      entry.total++;
+      if (o.accountsStatus === 'rejected') entry.rejected++;
+      if (o.trustScore !== null) entry.scores.push(o.trustScore);
+    }
+
+    const topSuspiciousAgents = Array.from(agentMap.values())
+      .filter(a => a.total >= 5)
+      .map(a => ({
+        name: a.name,
+        orderCount: a.total,
+        rejectionRate: Math.round((a.rejected / a.total) * 100),
+        avgTrustScore: a.scores.length > 0
+          ? Math.round(a.scores.reduce((s, v) => s + v, 0) / a.scores.length)
+          : 0,
+      }))
+      .sort((a, b) => b.rejectionRate - a.rejectionRate)
+      .slice(0, 10);
+
+    // Top repeated sender phones this month
+    const phoneOrders = await prisma.order.groupBy({
+      by: ['senderPhone'],
+      where: {
+        deletedAt: null,
+        createdAt: { gte: monthStart },
+        senderPhone: { not: null },
+      },
+      _count: { id: true },
+      _max: { createdAt: true },
+      having: {
+        id: { _count: { gt: 1 } },
+      },
+      orderBy: { _count: { id: 'desc' } },
+      take: 10,
+    });
+
+    const topSuspiciousPhones = phoneOrders.map(p => ({
+      phone: p.senderPhone!,
+      count: p._count.id,
+      lastUsed: p._max.createdAt ? p._max.createdAt.toISOString().slice(0, 10) : null,
+    }));
+
+    res.json({
+      today,
+      thisWeek,
+      thisMonth,
+      topSuspiciousAgents,
+      topSuspiciousPhones,
+    });
+  } catch (err: unknown) {
+    console.error('Fraud stats error:', err);
+    res.status(500).json({ error: 'خطأ في تحميل إحصائيات الحماية' });
+  }
+});
+
 router.get('/', async (req: Request, res: Response) => {
   try {
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
@@ -325,6 +483,7 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
         data: {
           trustScore: verification.trustScore,
           imageHash: verification.imageHash,
+          transactionRef: verification.transactionRef || undefined,
           transferVerification: verification.checks as unknown as Prisma.InputJsonValue,
         },
       });

@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { prisma } from '../../../db';
 import { config } from '../../../shared/config';
+import { extractTextFromImage, parseTransferReceipt } from './ocr';
 
 export type TransferCheck = {
   name: string;
@@ -81,7 +82,7 @@ export async function verifyTransfer(order: {
   discount?: number | null;
   paymentType: string;
   orderItems: Array<{ price: number; quantity: number }>;
-}, userId: string): Promise<{ trustScore: number; checks: TransferCheck[]; imageHash: string | null }> {
+}, userId: string): Promise<{ trustScore: number; checks: TransferCheck[]; imageHash: string | null; transactionRef: string | null }> {
   const checks: TransferCheck[] = [];
   let imageHash: string | null = null;
 
@@ -345,6 +346,148 @@ export async function verifyTransfer(order: {
   }
 
   // ==========================================
+  // 10. OCR — Google Vision checks (only if image exists and API is configured)
+  // ==========================================
+  let transactionRef: string | null = null;
+
+  if (order.transferImage && !order.noTransferImage) {
+    try {
+      const filePath = path.resolve(config.upload.dir, order.transferImage);
+      if (fs.existsSync(filePath)) {
+        const buffer = fs.readFileSync(filePath);
+        const fullText = await extractTextFromImage(buffer);
+
+        if (fullText) {
+          const parsed = parseTransferReceipt(fullText);
+          console.log('[OCR] Parsed receipt:', JSON.stringify(parsed));
+
+          // 10a. Amount match (+20)
+          if (parsed.amount !== null) {
+            const amountMatch = Math.abs(parsed.amount - paidAmount) < 1; // allow 1 EGP tolerance
+            checks.push({
+              name: 'ocr_amount',
+              label: 'مطابقة المبلغ (OCR)',
+              passed: amountMatch,
+              warning: !amountMatch,
+              detail: amountMatch
+                ? `المبلغ في الصورة (${parsed.amount}) يطابق المبلغ المدفوع`
+                : `المبلغ في الصورة (${parsed.amount}) يختلف عن المبلغ المدفوع (${paidAmount})`,
+              score: amountMatch ? +20 : 0,
+            });
+          }
+
+          // 10b. Date match (+10) — OCR date same day as order creation
+          if (parsed.date) {
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            // Try to parse the date from OCR
+            const dateNormalized = parsed.date.replace(/[/\\.]/g, '-');
+            const dateParts = dateNormalized.split('-');
+            let ocrDateStr = '';
+            if (dateParts.length === 3) {
+              const [a, b, c] = dateParts.map(Number);
+              // Determine format: YYYY-MM-DD or DD-MM-YYYY or MM-DD-YYYY
+              if (a > 31) {
+                ocrDateStr = `${a}-${String(b).padStart(2, '0')}-${String(c).padStart(2, '0')}`;
+              } else if (c > 31) {
+                // Could be DD/MM/YYYY or MM/DD/YYYY — assume DD/MM/YYYY for Egyptian context
+                ocrDateStr = `${c}-${String(b).padStart(2, '0')}-${String(a).padStart(2, '0')}`;
+              }
+            }
+            const dateMatch = ocrDateStr === todayStr;
+            checks.push({
+              name: 'ocr_date',
+              label: 'مطابقة التاريخ (OCR)',
+              passed: dateMatch,
+              warning: !dateMatch,
+              detail: dateMatch
+                ? `تاريخ التحويل (${parsed.date}) يطابق اليوم`
+                : `تاريخ التحويل (${parsed.date}) لا يطابق اليوم (${todayStr})`,
+              score: dateMatch ? +10 : 0,
+            });
+          }
+
+          // 10c. Recipient phone match (+15) — matches wallet_phone from settings
+          if (parsed.recipientPhone) {
+            const walletPhoneSetting = await prisma.integrationSetting.findUnique({
+              where: { key: 'wallet_phone' },
+            });
+            const walletPhone = walletPhoneSetting?.value || null;
+
+            if (walletPhone) {
+              const phoneMatch = parsed.recipientPhone === walletPhone
+                || parsed.recipientPhone.replace(/^0/, '') === walletPhone.replace(/^0/, '');
+              checks.push({
+                name: 'ocr_recipient_phone',
+                label: 'مطابقة رقم المحفظة (OCR)',
+                passed: phoneMatch,
+                warning: !phoneMatch,
+                detail: phoneMatch
+                  ? `رقم المستلم في الصورة يطابق رقم المحفظة المسجل`
+                  : `رقم المستلم (${parsed.recipientPhone}) لا يطابق رقم المحفظة المسجل`,
+                score: phoneMatch ? +15 : 0,
+              });
+            }
+          }
+
+          // 10d. Recipient name match (+10)
+          if (parsed.recipientName) {
+            const walletNameSetting = await prisma.integrationSetting.findUnique({
+              where: { key: 'wallet_name' },
+            });
+            const walletName = walletNameSetting?.value || null;
+
+            if (walletName) {
+              const nameMatch = parsed.recipientName.includes(walletName)
+                || walletName.includes(parsed.recipientName)
+                || parsed.recipientName.toLowerCase() === walletName.toLowerCase();
+              checks.push({
+                name: 'ocr_recipient_name',
+                label: 'مطابقة اسم المستلم (OCR)',
+                passed: nameMatch,
+                warning: !nameMatch,
+                detail: nameMatch
+                  ? `اسم المستلم في الصورة يطابق الاسم المسجل`
+                  : `اسم المستلم (${parsed.recipientName}) لا يطابق الاسم المسجل (${walletName})`,
+                score: nameMatch ? +10 : 0,
+              });
+            }
+          }
+
+          // 10e. Transaction ref duplicate check (-50)
+          if (parsed.reference) {
+            transactionRef = parsed.reference;
+
+            const existingRefOrder = await prisma.order.findFirst({
+              where: {
+                transactionRef: parsed.reference,
+                id: { not: order.id },
+                deletedAt: null,
+              },
+              select: { id: true, number: true },
+            });
+
+            const isDuplicateRef = !!existingRefOrder;
+            checks.push({
+              name: 'ocr_ref_duplicate',
+              label: 'تكرار رقم المعاملة (OCR)',
+              passed: !isDuplicateRef,
+              warning: isDuplicateRef,
+              detail: isDuplicateRef
+                ? `رقم المعاملة ${parsed.reference} مستخدم سابقاً في طلب #${existingRefOrder!.number}`
+                : `رقم المعاملة ${parsed.reference} فريد`,
+              score: isDuplicateRef ? -50 : 0,
+            });
+          }
+        }
+      }
+    } catch (ocrErr) {
+      console.warn('[OCR] OCR checks failed (non-fatal):', ocrErr instanceof Error ? ocrErr.message : ocrErr);
+      // Non-OCR checks still apply — do not crash
+    }
+  }
+
+  // ==========================================
   // Calculate Trust Score
   // ==========================================
   let trustScore = 100;
@@ -354,5 +497,5 @@ export async function verifyTransfer(order: {
   // Clamp to 0-100
   trustScore = Math.max(0, Math.min(100, trustScore));
 
-  return { trustScore, checks, imageHash };
+  return { trustScore, checks, imageHash, transactionRef };
 }
