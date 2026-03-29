@@ -160,19 +160,28 @@ export async function getOverviewMetrics(filters: DashboardFilters) {
     where: { ...dateWhere, statusId: confirmedStatus.id, deletedAt: null },
   }) : 0;
 
-  // Order values for confirmed orders (Est. AOV)
-  const confirmedOrderAgg = confirmedStatus ? await prisma.order.aggregate({
-    where: {
-      ...dateWhere,
-      deletedAt: null,
-      lead: { statusId: confirmedStatus.id },
-    },
-    _sum: { partialAmount: true },
-    _count: true,
-  }) : { _sum: { partialAmount: null }, _count: 0 };
-
-  const confirmedOrderCount = confirmedOrderAgg._count || 0;
-  const confirmedOrderValue = Number(confirmedOrderAgg._sum.partialAmount || 0);
+  // Order values for confirmed orders — صافي الطلب = (إجمالي المنتجات - الخصم)
+  let confirmedOrderCount = 0;
+  let confirmedOrderValue = 0;
+  if (confirmedStatus) {
+    const orders = await prisma.order.findMany({
+      where: {
+        ...dateWhere,
+        deletedAt: null,
+        lead: { statusId: confirmedStatus.id },
+      },
+      select: {
+        discount: true,
+        orderItems: { select: { price: true, quantity: true } },
+      },
+    });
+    confirmedOrderCount = orders.length;
+    for (const o of orders) {
+      const itemsTotal = o.orderItems.reduce((sum, i) => sum + Number(i.price) * i.quantity, 0);
+      const discount = Number(o.discount || 0);
+      confirmedOrderValue += itemsTotal - discount;
+    }
+  }
 
   return {
     totalSpend: spend,
