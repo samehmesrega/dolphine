@@ -106,6 +106,12 @@ export default function ModuleSwitcher() {
               <span className="text-sm text-slate-300 hidden md:inline">
                 مرحباً، {user?.name || 'مستخدم'}
               </span>
+              <Link to="/settings/profile" className="bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-xl transition-colors text-sm">
+                ملفي
+              </Link>
+              <Link to="/settings" className="bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-xl transition-colors text-sm">
+                ⚙ الإعدادات
+              </Link>
               <button
                 onClick={() => { logout(); navigate('/login'); }}
                 className="bg-white/10 hover:bg-white/20 text-white font-medium px-5 py-2 rounded-xl transition-colors text-sm"

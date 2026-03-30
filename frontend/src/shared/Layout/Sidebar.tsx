@@ -293,23 +293,33 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
         <div className="border-t border-slate-800 my-2" />
 
         {collapsed ? (
-          <NavLink
-            to="/knowledge-base"
-            title="بنك المعلومات"
-            onClick={onNavigate}
-            className="flex items-center justify-center p-2.5 rounded-lg mb-1 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-          >
-            <NavIcon name="book" />
-          </NavLink>
+          <>
+            <NavLink to="/knowledge-base" title="بنك المعلومات" onClick={onNavigate}
+              className="flex items-center justify-center p-2.5 rounded-lg mb-1 text-slate-400 hover:bg-slate-800 hover:text-white transition">
+              <NavIcon name="book" />
+            </NavLink>
+            <NavLink to="/" title="المنصة الرئيسية" onClick={onNavigate}
+              className="flex items-center justify-center p-2.5 rounded-lg mb-1 text-slate-400 hover:bg-slate-800 hover:text-white transition">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+              </svg>
+            </NavLink>
+          </>
         ) : (
-          <NavLink
-            to="/knowledge-base"
-            onClick={onNavigate}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
-          >
-            <NavIcon name="book" />
-            <span>بنك المعلومات</span>
-          </NavLink>
+          <>
+            <NavLink to="/knowledge-base" onClick={onNavigate}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm text-slate-400 hover:bg-slate-800 hover:text-white">
+              <NavIcon name="book" />
+              <span>بنك المعلومات</span>
+            </NavLink>
+            <NavLink to="/" onClick={onNavigate}
+              className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm text-slate-400 hover:bg-slate-800 hover:text-white">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+              </svg>
+              <span>العودة للمنصة</span>
+            </NavLink>
+          </>
         )}
       </nav>
 
@@ -317,21 +327,18 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
       <div className={`border-t border-slate-800 shrink-0 ${collapsed ? 'p-2' : 'p-4'}`}>
         {collapsed ? (
           <div className="flex flex-col items-center gap-2">
-            <NavLink
-              to="/profile"
-              title="ملفي الشخصي"
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                `p-2 rounded-lg transition ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`
-              }
-            >
+            <NavLink to="/settings/profile" title="ملفي الشخصي" onClick={onNavigate}
+              className={({ isActive }) => `p-2 rounded-lg transition ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
               <NavIcon name="userCircle" />
             </NavLink>
-            <button
-              onClick={handleLogout}
-              title="تسجيل الخروج"
-              className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-slate-800 transition"
-            >
+            {(hasPermission('users.manage') || hasPermission('*') || ['admin', 'super_admin', 'sales_manager'].includes(roleSlug ?? '')) && (
+              <NavLink to="/settings" title="الإعدادات" onClick={onNavigate}
+                className={({ isActive }) => `p-2 rounded-lg transition ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
+                <NavIcon name="cog" />
+              </NavLink>
+            )}
+            <button onClick={handleLogout} title="تسجيل الخروج"
+              className="p-2 rounded-lg text-red-400 hover:text-red-300 hover:bg-slate-800 transition">
               <NavIcon name="logout" />
             </button>
           </div>
@@ -339,20 +346,22 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
           <>
             <p className="text-sm text-slate-300 font-medium truncate">{user?.name}</p>
             <p className="text-xs text-slate-500 mt-0.5 truncate">{user?.role?.name}</p>
-            <div className="mt-2 flex items-center gap-3">
-              <NavLink
-                to="/profile"
-                className={({ isActive }) =>
-                  `text-sm ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'}`
-                }
-              >
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <NavLink to="/settings/profile" onClick={onNavigate}
+                className={({ isActive }) => `text-sm ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'}`}>
                 ملفي الشخصي
               </NavLink>
+              {(hasPermission('users.manage') || hasPermission('*') || ['admin', 'super_admin', 'sales_manager'].includes(roleSlug ?? '')) && (
+                <>
+                  <span className="text-slate-700">·</span>
+                  <NavLink to="/settings" onClick={onNavigate}
+                    className={({ isActive }) => `text-sm ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'}`}>
+                    الإعدادات
+                  </NavLink>
+                </>
+              )}
               <span className="text-slate-700">·</span>
-              <button
-                onClick={handleLogout}
-                className="text-sm text-red-400 hover:text-red-300"
-              >
+              <button onClick={handleLogout} className="text-sm text-red-400 hover:text-red-300">
                 تسجيل الخروج
               </button>
             </div>
