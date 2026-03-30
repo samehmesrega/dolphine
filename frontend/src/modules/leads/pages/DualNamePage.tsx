@@ -50,7 +50,7 @@ export default function DualNamePage() {
       const group = await buildAmbigram({
         textA: textA.trim(),
         textB: textB.trim(),
-        fontUrl: '/fonts/Kanit-Bold.ttf',
+        fontUrl: '/fonts/OverpassMono-Bold.ttf',
         fontSize: 72,
       });
 
