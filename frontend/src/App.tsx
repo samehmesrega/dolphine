@@ -116,7 +116,6 @@ function AppRoutes() {
         <Route path="/lead-statuses" element={<Navigate to="/leads/lead-statuses" replace />} />
         <Route path="/tasks" element={<Navigate to="/leads/tasks" replace />} />
         <Route path="/task-rules" element={<Navigate to="/leads/task-rules" replace />} />
-        <Route path="/dual-name" element={<Navigate to="/leads/dual-name" replace />} />
       </Route>
     </Routes>
   );
