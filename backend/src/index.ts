@@ -233,6 +233,9 @@ app.use('/api/integrations', authMiddleware, require('./modules/leads/routes/int
 // ===== Dual Name Static Files =====
 const dualNameDist = path.join(process.cwd(), 'dual-name', 'dist');
 if (fs.existsSync(dualNameDist)) {
+  app.get('/dual-name', (_req: Request, res: Response) => {
+    res.sendFile(path.join(dualNameDist, 'index.html'));
+  });
   app.use('/dual-name', express.static(dualNameDist));
   app.get('/dual-name/*', (_req: Request, res: Response) => {
     res.sendFile(path.join(dualNameDist, 'index.html'));
