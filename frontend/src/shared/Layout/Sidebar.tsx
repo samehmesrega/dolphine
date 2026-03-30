@@ -229,6 +229,12 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
         {collapsed && <NotificationBell />}
         <div className={`flex items-center gap-2 ${collapsed ? 'flex-col' : ''}`}>
           {!collapsed && <NotificationBell />}
+          <NavLink to="/" title="العودة للمنصة" onClick={onNavigate}
+            className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+            </svg>
+          </NavLink>
           <button
             type="button"
             onClick={toggleCollapsed}
@@ -293,33 +299,16 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
         <div className="border-t border-slate-800 my-2" />
 
         {collapsed ? (
-          <>
-            <NavLink to="/knowledge-base" title="بنك المعلومات" onClick={onNavigate}
-              className="flex items-center justify-center p-2.5 rounded-lg mb-1 text-slate-400 hover:bg-slate-800 hover:text-white transition">
-              <NavIcon name="book" />
-            </NavLink>
-            <NavLink to="/" title="المنصة الرئيسية" onClick={onNavigate}
-              className="flex items-center justify-center p-2.5 rounded-lg mb-1 text-slate-400 hover:bg-slate-800 hover:text-white transition">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
-              </svg>
-            </NavLink>
-          </>
+          <NavLink to="/knowledge-base" title="بنك المعلومات" onClick={onNavigate}
+            className="flex items-center justify-center p-2.5 rounded-lg mb-1 text-slate-400 hover:bg-slate-800 hover:text-white transition">
+            <NavIcon name="book" />
+          </NavLink>
         ) : (
-          <>
-            <NavLink to="/knowledge-base" onClick={onNavigate}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm text-slate-400 hover:bg-slate-800 hover:text-white">
-              <NavIcon name="book" />
-              <span>بنك المعلومات</span>
-            </NavLink>
-            <NavLink to="/" onClick={onNavigate}
-              className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm text-slate-400 hover:bg-slate-800 hover:text-white">
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
-              </svg>
-              <span>العودة للمنصة</span>
-            </NavLink>
-          </>
+          <NavLink to="/knowledge-base" onClick={onNavigate}
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg mb-1 transition text-sm text-slate-400 hover:bg-slate-800 hover:text-white">
+            <NavIcon name="book" />
+            <span>بنك المعلومات</span>
+          </NavLink>
         )}
       </nav>
 

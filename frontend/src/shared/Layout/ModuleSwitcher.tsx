@@ -87,7 +87,8 @@ const BRANDS = [
 ];
 
 export default function ModuleSwitcher() {
-  const { token, logout, user } = useAuth();
+  const { token, logout, user, hasPermission } = useAuth();
+  const isAdmin = hasPermission('*') || ['admin', 'super_admin'].includes(user?.role?.slug ?? '');
   const navigate = useNavigate();
 
   return (
@@ -109,9 +110,11 @@ export default function ModuleSwitcher() {
               <Link to="/settings/profile" className="bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-xl transition-colors text-sm">
                 ملفي
               </Link>
-              <Link to="/settings" className="bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-xl transition-colors text-sm">
-                ⚙ الإعدادات
-              </Link>
+              {isAdmin && (
+                <Link to="/settings" className="bg-white/10 hover:bg-white/20 text-white font-medium px-4 py-2 rounded-xl transition-colors text-sm">
+                  ⚙ الإعدادات
+                </Link>
+              )}
               <button
                 onClick={() => { logout(); navigate('/login'); }}
                 className="bg-white/10 hover:bg-white/20 text-white font-medium px-5 py-2 rounded-xl transition-colors text-sm"

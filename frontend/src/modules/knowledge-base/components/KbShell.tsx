@@ -90,8 +90,13 @@ export default function KbShell({ children }: { children: ReactNode }) {
       {/* Main Content */}
       <main className="flex-1">
         {/* Top Bar */}
-        <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6">
-          <div />
+        <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-3 md:px-6">
+          <button onClick={() => navigate('/')} className="flex items-center gap-1.5 text-slate-400 hover:text-slate-600 transition text-sm">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" />
+            </svg>
+            <span className="hidden md:inline">المنصة</span>
+          </button>
           <div className="flex items-center gap-3">
             <NotificationBell />
           </div>
