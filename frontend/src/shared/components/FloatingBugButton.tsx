@@ -196,25 +196,26 @@ export default function FloatingBugButton() {
                       </div>
                       <button
                         type="button"
-                        onClick={async () => {
+                        onClick={() => {
+                          // 1. أخفي المودال
+                          setOpen(false);
                           setScreenshot(null);
                           setScreenshotPreview(null);
-                          setOpen(false);
-                          // استنى لحظة عشان المودال يختفي من الشاشة
-                          await new Promise(r => setTimeout(r, 600));
-                          // التقط screenshot جديد
-                          setCapturingScreenshot(true);
-                          try {
-                            const canvas = await html2canvas(document.body, {
+                          // 2. بعد ما المودال يختفي — التقط صورة جديدة
+                          setTimeout(() => {
+                            html2canvas(document.body, {
                               useCORS: true, allowTaint: true, scale: 0.5, logging: false,
                               ignoreElements: (el) => el.id === 'floating-bug-button' || el.id === 'floating-bug-modal',
+                            }).then((canvas) => {
+                              const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                              // 3. حدّث الصورة وافتح المودال
+                              setScreenshot(dataUrl);
+                              setScreenshotPreview(dataUrl);
+                              setOpen(true);
+                            }).catch(() => {
+                              setOpen(true);
                             });
-                            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                            setScreenshot(dataUrl);
-                            setScreenshotPreview(dataUrl);
-                          } catch { /* ignore */ }
-                          setCapturingScreenshot(false);
-                          setOpen(true);
+                          }, 800);
                         }}
                         className="w-full mt-2 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-600 hover:bg-slate-50 transition text-center"
                       >
