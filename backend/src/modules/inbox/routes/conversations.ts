@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../../db';
+import * as metaGraph from '../services/meta-graph.service';
 
 const router = Router();
 
@@ -115,8 +116,69 @@ router.get('/:id/messages', async (req: Request, res: Response) => {
  * POST /api/v1/inbox/conversations/:id/messages — Send a message
  */
 router.post('/:id/messages', async (req: Request, res: Response) => {
-  // TODO: Implement sending via meta-graph.service.ts in Phase 5
-  res.status(501).json({ error: 'Not implemented yet' });
+  try {
+    const { text } = req.body;
+    if (!text?.trim()) return res.status(400).json({ error: 'text is required' });
+
+    const conversationId = String(req.params.id);
+    const userId = (req as any).user?.userId;
+
+    // Get conversation with channel and token
+    const conversation = await prisma.inboxConversation.findUnique({
+      where: { id: conversationId },
+      include: { channel: { include: { socialPage: true } } },
+    });
+    if (!conversation) return res.status(404).json({ error: 'Conversation not found' });
+
+    const { token, pageId } = await metaGraph.getChannelToken(conversation.channelId);
+
+    // Send via Meta API
+    if (conversation.platform === 'messenger') {
+      await metaGraph.sendMessengerMessage(pageId, conversation.participantId, text, token);
+    } else if (conversation.platform === 'instagram_dm') {
+      await metaGraph.sendInstagramMessage(pageId, conversation.participantId, text, token);
+    }
+
+    // Save outbound message locally
+    const message = await prisma.inboxMessage.create({
+      data: {
+        conversationId,
+        platformId: `out_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        direction: 'outbound',
+        content: text,
+        contentType: 'text',
+        sentByUserId: userId,
+        deliveryStatus: 'sent',
+        platformTimestamp: new Date(),
+      },
+      include: { sentByUser: { select: { id: true, name: true } } },
+    });
+
+    // Compute firstResponseTimeMs if this is the first outbound reply
+    if (conversation.firstResponseTimeMs === null) {
+      const firstInbound = await prisma.inboxMessage.findFirst({
+        where: { conversationId, direction: 'inbound' },
+        orderBy: { createdAt: 'asc' },
+      });
+      if (firstInbound) {
+        const responseTime = Date.now() - firstInbound.createdAt.getTime();
+        await prisma.inboxConversation.update({
+          where: { id: conversationId },
+          data: { firstResponseTimeMs: responseTime },
+        });
+      }
+    }
+
+    // Update lastMessageAt
+    await prisma.inboxConversation.update({
+      where: { id: conversationId },
+      data: { lastMessageAt: new Date() },
+    });
+
+    res.json(message);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to send message' });
+  }
 });
 
 /**

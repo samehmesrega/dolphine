@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import { config } from '../../../shared/config';
 import { logger } from '../../../shared/config/logger';
 import { prisma } from '../../../db';
+import { processIncomingMessage } from '../services/conversation-sync.service';
+import { processIncomingComment } from '../services/comment-sync.service';
 
 const router = Router();
 
@@ -135,7 +137,7 @@ async function processWebhookPayload(payload: any): Promise<void> {
       for (const event of entry.messaging) {
         if (event.message) {
           logger.info(`[Meta Webhook] Incoming message from ${event.sender?.id} on page ${pageId}`);
-          // TODO: Process via conversation-sync.service.ts
+          await processIncomingMessage(pageId, event.sender.id, event.message, event.timestamp || Date.now());
         }
         if (event.delivery) {
           logger.info(`[Meta Webhook] Delivery update on page ${pageId}`);
@@ -153,7 +155,13 @@ async function processWebhookPayload(payload: any): Promise<void> {
       for (const change of entry.changes) {
         if (change.field === 'feed' && change.value?.item === 'comment') {
           logger.info(`[Meta Webhook] Incoming comment on page ${pageId}`);
-          // TODO: Process via comment-sync.service.ts
+          await processIncomingComment(pageId, change.value.post_id, {
+            comment_id: change.value.comment_id,
+            message: change.value.message || '',
+            from: { id: change.value.from?.id || '', name: change.value.from?.name || '' },
+            created_time: change.value.created_time || Math.floor(Date.now() / 1000),
+            parent_id: change.value.parent_id,
+          });
         }
       }
     }
