@@ -1,0 +1,73 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"MktProduct\\\\|mktProduct\\\\|mkt_product\" /c/Users/sameh/Desktop/APPS/dolphin-platform/backend/src/modules/marketing --include=*.ts)",
+      "Read(//c/Users/sameh/.claude/plans/**)",
+      "Bash(find C:UserssamehDesktopAPPSdolphin-platformfrontendsrcmodulesauth -type f -name *.tsx -o -name *.ts)",
+      "Bash(find /c/Users/sameh/Desktop/APPS/dolphin-platform/frontend -name *idebar* -o -name *avigation*)",
+      "Bash(pnpm add:*)",
+      "Bash(find c:UserssamehDesktopAPPSdolphin-platform -name .env* -o -name *.env)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(find /c/Users/sameh/Desktop/APPS/dolphin-platform/frontend/src -type f -name *lead* -o -name *order*)",
+      "Bash(find c:UserssamehDesktopAPPSdolphin-platformfrontendsrc -name *.tsx -path *shared* -o -name *.tsx -path *components*)",
+      "Bash(find c:UserssamehDesktopAPPSdolphin-platformfrontend -type f -name *[Oo]auth*)",
+      "Bash(grep -r \"setInterval\\\\|setTimeout\\\\|cron\\\\|schedule\\\\|agenda\" c:UserssamehDesktopAPPSdolphin-platformbackendsrc --include=*.ts)",
+      "Bash(grep -rn \"pending_accounts\\\\|accounts_confirmed\\\\|rejected\" c:UserssamehDesktopAPPSdolphin-platformfrontendsrc --include=*.tsx --include=*.ts)",
+      "Bash(grep -rn \"wooCommerceId\\\\|bostaStatus\\\\|bostaDeliveryId\" c:UserssamehDesktopAPPSdolphin-platformfrontendsrc --include=*.tsx --include=*.ts)",
+      "Bash(grep -r \"pending_accounts\\\\|accounts_confirmed\\\\|rejected\" c:UserssamehDesktopAPPSdolphin-platform --include=*.tsx --include=*.ts --include=*.jsx --include=*.js)",
+      "Bash(/tmp/test_issues.md:*)",
+      "Read(//tmp/**)",
+      "Bash(/tmp/audit_final.txt:*)",
+      "Bash(chmod +x \"c:/Users/sameh/Desktop/APPS/dolphin-platform/.claude/hooks/session-start.sh\" \"c:/Users/sameh/Desktop/APPS/dolphin-platform/.claude/hooks/session-end.sh\" \"c:/Users/sameh/Desktop/APPS/dolphin-platform/.claude/hooks/pre-edit-guard.sh\")",
+      "Bash(bash .claude/hooks/session-start.sh)",
+      "Bash(bash \"c:/Users/sameh/Desktop/APPS/dolphin-platform/.claude/hooks/pre-edit-guard.sh\")",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(chmod +x \"c:/Users/sameh/Desktop/APPS/dolphin-platform/agent/run-agent.sh\" \"c:/Users/sameh/Desktop/APPS/dolphin-platform/agent/analyze-suggestions.sh\" \"c:/Users/sameh/Desktop/APPS/dolphin-platform/agent/setup-vps.sh\")",
+      "Bash(rm -f \"c:/Users/sameh/Desktop/APPS/dolphin-platform/.claude/.lock\")",
+      "Bash(bash \"c:/Users/sameh/Desktop/APPS/dolphin-platform/.claude/hooks/session-start.sh\")"
+    ],
+    "additionalDirectories": [
+      "\\tmp",
+      "c:\\Users\\sameh\\Desktop\\APPS\\dolphin-platform\\.claude"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\"",
+            "timeout": 30,
+            "statusMessage": "Checking lock & pulling latest..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-end.sh\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/pre-edit-guard.sh\"",
+            "timeout": 5,
+            "statusMessage": "Safety check..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -10,3 +10,7 @@ Thumbs.db
 .vscode/
 !.vscode/settings.json
 coverage/
+.claude/.lock
+agent/logs/
+agent/.agent-lock
+agent/pending/

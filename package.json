@@ -15,7 +15,8 @@
     "db:studio": "pnpm --filter backend db:studio",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
-    "start": "node backend/dist/index.js"
+    "start": "node backend/dist/index.js",
+    "tickets": "cd backend && npx tsx ../agent/sync-tickets.ts"
   },
   "engines": {
     "node": ">=18",
