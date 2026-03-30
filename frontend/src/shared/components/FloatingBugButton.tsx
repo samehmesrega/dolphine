@@ -186,13 +186,38 @@ export default function FloatingBugButton() {
                     )}
                   </label>
                   {screenshotPreview && (
-                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <div className="border border-slate-200 rounded-lg overflow-hidden relative">
                       <img
                         src={screenshotPreview}
                         alt="Screenshot preview"
                         className="w-full h-24 object-cover object-top"
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScreenshot(null);
+                          setScreenshotPreview(null);
+                          // أخفي المودال لحظة، التقط، ورجّعه
+                          setOpen(false);
+                          setTimeout(async () => {
+                            await captureScreenshot();
+                            setOpen(true);
+                          }, 500);
+                        }}
+                        className="absolute top-1 left-1 bg-slate-800/70 text-white text-xs px-2 py-1 rounded hover:bg-slate-800 transition"
+                      >
+                        📸 إعادة التقاط
+                      </button>
                     </div>
+                  )}
+                  {!screenshotPreview && !capturingScreenshot && (
+                    <button
+                      type="button"
+                      onClick={captureScreenshot}
+                      className="w-full py-2 border border-dashed border-slate-300 rounded-lg text-xs text-slate-500 hover:bg-slate-50 transition"
+                    >
+                      📸 التقاط صورة الشاشة
+                    </button>
                   )}
                 </div>
 
