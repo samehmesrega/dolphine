@@ -78,6 +78,59 @@ async function main() {
     });
   }
 
+  // Create Inbox module
+  const inboxModule = await prisma.module.upsert({
+    where: { slug: 'inbox' },
+    update: {},
+    create: {
+      name: 'صندوق الوارد',
+      slug: 'inbox',
+      icon: '📨',
+      description: 'رسائل وتعليقات ميتا — ماسنجر وانستجرام',
+      isActive: true,
+      order: 3,
+    },
+  });
+
+  // Create default module roles for Inbox
+  const inboxRoles = [
+    { name: 'Admin', slug: 'admin', permissions: ['*'], isDefault: false },
+    {
+      name: 'Inbox Manager',
+      slug: 'inbox_manager',
+      permissions: [
+        'inbox.view', 'inbox.reply', 'inbox.manage', 'inbox.convert',
+      ],
+      isDefault: false,
+    },
+    {
+      name: 'Inbox Agent',
+      slug: 'inbox_agent',
+      permissions: ['inbox.view', 'inbox.reply', 'inbox.convert'],
+      isDefault: true,
+    },
+    {
+      name: 'Viewer',
+      slug: 'viewer',
+      permissions: ['inbox.view'],
+      isDefault: false,
+    },
+  ];
+
+  for (const role of inboxRoles) {
+    await prisma.moduleRole.upsert({
+      where: { moduleId_slug: { moduleId: inboxModule.id, slug: role.slug } },
+      update: { permissions: role.permissions },
+      create: {
+        moduleId: inboxModule.id,
+        name: role.name,
+        slug: role.slug,
+        permissions: role.permissions,
+        isDefault: role.isDefault,
+      },
+    });
+  }
+
   // Create default module roles for Marketing (for future use)
   const marketingRoles = [
     { name: 'Admin', slug: 'admin', permissions: ['*'], isDefault: false },
@@ -213,6 +266,23 @@ async function main() {
   }
   console.log(`  - Marketing permissions: ${marketingPermissions.length}`);
 
+  // === Seed Inbox Permissions ===
+  const inboxPermissions = [
+    { name: 'Inbox - View', slug: 'inbox.view', module: 'inbox', description: 'عرض المحادثات والتعليقات' },
+    { name: 'Inbox - Reply', slug: 'inbox.reply', module: 'inbox', description: 'إرسال رسائل والرد على تعليقات' },
+    { name: 'Inbox - Manage', slug: 'inbox.manage', module: 'inbox', description: 'إدارة القنوات وتعيين المحادثات' },
+    { name: 'Inbox - Convert', slug: 'inbox.convert', module: 'inbox', description: 'تحويل محادثة لليد أو طلب' },
+  ];
+
+  for (const perm of inboxPermissions) {
+    await prisma.permission.upsert({
+      where: { slug: perm.slug },
+      update: {},
+      create: perm,
+    });
+  }
+  console.log(`  - Inbox permissions: ${inboxPermissions.length}`);
+
   // === Seed Settings Permissions ===
   const settingsPermissions = [
     { name: 'Settings - View Users', slug: 'settings.users.view', module: 'settings', description: 'عرض المستخدمين' },
@@ -230,7 +300,7 @@ async function main() {
   console.log(`  - Settings permissions: ${settingsPermissions.length}`);
 
   // Assign marketing + settings permissions to admin roles
-  const allNewPerms = [...marketingPermissions, ...settingsPermissions];
+  const allNewPerms = [...marketingPermissions, ...settingsPermissions, ...inboxPermissions];
   const adminRolesForNewPerms = await prisma.role.findMany({
     where: { slug: { in: ['super_admin', 'admin'] } },
   });
@@ -320,6 +390,7 @@ async function main() {
   console.log('Seeding complete!');
   console.log(`  - Leads module: ${leadsModule.id}`);
   console.log(`  - Marketing module: ${marketingModule.id}`);
+  console.log(`  - Inbox module: ${inboxModule.id}`);
   console.log(`  - Projects: ${projects.length}`);
   console.log(`  - Tag categories: ${tagCategories.length}`);
 }

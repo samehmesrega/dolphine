@@ -68,6 +68,11 @@ model User {
   tickets               Ticket[]            @relation("TicketCreator")
   ticketComments        TicketComment[]     @relation("TicketCommenter")
 
+  // Relations - Inbox module
+  inboxAssigned         InboxConversation[] @relation("InboxAssigned")
+  inboxMessagesSent     InboxMessage[]      @relation("InboxMessageSender")
+  inboxCommentsSent     InboxComment[]      @relation("InboxCommentSender")
+
   @@map("users")
 }
 
@@ -177,6 +182,7 @@ model Customer {
 
   leads  Lead[]
   orders Order[]
+  inboxConversations InboxConversation[]
 
   @@map("customers")
 }
@@ -218,6 +224,8 @@ model Lead {
   orders           Order[]
   productInterests ProductInterest[]
   tasks            Task[]
+  inboxConversations  InboxConversation[]
+  inboxCommentThreads InboxCommentThread[]
 
   @@index([phoneNormalized])
   @@index([statusId])
@@ -901,7 +909,8 @@ model SocialPage {
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
-  postPages ScheduledPostPage[]
+  postPages     ScheduledPostPage[]
+  inboxChannels InboxChannel[]
 
   @@unique([platform, pageId])
   @@map("mkt_social_pages")
@@ -1503,4 +1512,145 @@ model TicketComment {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("ticket_comments")
+}
+
+// =============================================================
+// INBOX: صندوق الوارد — Meta Messenger + Instagram DMs + Comments
+// =============================================================
+
+model InboxChannel {
+  id              String     @id @default(uuid())
+  socialPageId    String     @map("social_page_id")
+  socialPage      SocialPage @relation(fields: [socialPageId], references: [id])
+  platform        String     // "messenger", "instagram_dm", "facebook_comments", "instagram_comments"
+  isActive        Boolean    @default(true) @map("is_active")
+  webhookVerified Boolean    @default(false) @map("webhook_verified")
+  lastSyncAt      DateTime?  @map("last_sync_at")
+  createdAt       DateTime   @default(now()) @map("created_at")
+  updatedAt       DateTime   @updatedAt @map("updated_at")
+
+  conversations  InboxConversation[]
+  commentThreads InboxCommentThread[]
+
+  @@unique([socialPageId, platform])
+  @@map("inbox_channels")
+}
+
+model InboxConversation {
+  id                   String    @id @default(uuid())
+  channelId            String    @map("channel_id")
+  channel              InboxChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  platform             String    // denormalized: "messenger" | "instagram_dm" — saves JOIN on list queries
+  platformId           String    @map("platform_id") // Meta conversation ID (t_xxxx)
+  participantId        String    @map("participant_id") // PSID or IGSID
+  participantName      String?   @map("participant_name")
+  participantAvatar    String?   @map("participant_avatar")
+  // Linking to Dolphin entities
+  leadId               String?   @map("lead_id")
+  lead                 Lead?     @relation(fields: [leadId], references: [id])
+  customerId           String?   @map("customer_id")
+  customer             Customer? @relation(fields: [customerId], references: [id])
+  assignedToId         String?   @map("assigned_to_id")
+  assignedTo           User?     @relation("InboxAssigned", fields: [assignedToId], references: [id])
+  // Status & metrics
+  status               String    @default("open") // "open", "closed", "snoozed"
+  lastMessageAt        DateTime? @map("last_message_at")
+  unreadCount          Int       @default(0) @map("unread_count")
+  firstResponseTimeMs  Int?      @map("first_response_time_ms") // pre-computed on first outbound reply
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  messages InboxMessage[]
+
+  @@unique([channelId, platformId])
+  @@index([leadId])
+  @@index([customerId])
+  @@index([assignedToId])
+  @@index([status])
+  @@index([lastMessageAt])
+  @@index([platform])
+  @@map("inbox_conversations")
+}
+
+model InboxMessage {
+  id                String    @id @default(uuid())
+  conversationId    String    @map("conversation_id")
+  conversation      InboxConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  platformId        String    @map("platform_id") // Meta message ID (m_xxxx)
+  direction         String    // "inbound" | "outbound"
+  senderId          String?   @map("sender_id") // PSID/IGSID for inbound
+  senderName        String?   @map("sender_name")
+  content           String?   // text content
+  contentType       String    @default("text") @map("content_type") // "text", "image", "video", "audio", "file", "sticker"
+  attachments       Json?     // [{type, url (R2), ...}]
+  platformTimestamp DateTime? @map("platform_timestamp")
+  sentByUserId      String?   @map("sent_by_user_id")
+  sentByUser        User?     @relation("InboxMessageSender", fields: [sentByUserId], references: [id])
+  deliveryStatus    String?   @map("delivery_status") // "sent", "delivered", "read", "failed"
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@unique([conversationId, platformId])
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("inbox_messages")
+}
+
+model InboxCommentThread {
+  id             String       @id @default(uuid())
+  channelId      String       @map("channel_id")
+  channel        InboxChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  postPlatformId String       @map("post_platform_id") // FB/IG post ID
+  postUrl        String?      @map("post_url")
+  postCaption    String?      @map("post_caption")
+  // Linking
+  leadId         String?      @map("lead_id")
+  lead           Lead?        @relation(fields: [leadId], references: [id])
+  status         String       @default("open") // "open", "closed"
+  lastCommentAt  DateTime?    @map("last_comment_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  comments InboxComment[]
+
+  @@unique([channelId, postPlatformId])
+  @@index([status])
+  @@index([lastCommentAt])
+  @@map("inbox_comment_threads")
+}
+
+model InboxComment {
+  id               String            @id @default(uuid())
+  threadId         String            @map("thread_id")
+  thread           InboxCommentThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  platformId       String            @map("platform_id") // Meta comment ID
+  parentCommentId  String?           @map("parent_comment_id") // for nested replies
+  direction        String            // "inbound" | "outbound"
+  authorId         String?           @map("author_id") // platform user ID
+  authorName       String?           @map("author_name")
+  content          String
+  attachmentUrl    String?           @map("attachment_url") // R2 URL
+  platformTimestamp DateTime?        @map("platform_timestamp")
+  sentByUserId     String?           @map("sent_by_user_id")
+  sentByUser       User?             @relation("InboxCommentSender", fields: [sentByUserId], references: [id])
+  isHidden         Boolean           @default(false) @map("is_hidden")
+  createdAt        DateTime          @default(now()) @map("created_at")
+
+  @@unique([threadId, platformId])
+  @@index([threadId])
+  @@index([createdAt])
+  @@map("inbox_comments")
+}
+
+model InboxWebhookLog {
+  id        String   @id @default(uuid())
+  source    String   // "messenger", "instagram", "facebook_feed"
+  event     String   // "message", "comment", "delivery", etc.
+  payload   Json
+  processed Boolean  @default(false)
+  error     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([createdAt])
+  @@index([processed])
+  @@map("inbox_webhook_logs")
 }
