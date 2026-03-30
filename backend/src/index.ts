@@ -230,6 +230,15 @@ app.use('/api/task-rules', authMiddleware, require('./modules/leads/routes/task-
 app.use('/api/blacklist', authMiddleware, require('./modules/leads/routes/blacklist').default);
 app.use('/api/integrations', authMiddleware, require('./modules/leads/routes/integration-settings').default);
 
+// ===== Dual Name Static Files =====
+const dualNameDist = path.join(process.cwd(), 'dual-name', 'dist');
+if (fs.existsSync(dualNameDist)) {
+  app.use('/dual-name', express.static(dualNameDist));
+  app.get('/dual-name/*', (_req: Request, res: Response) => {
+    res.sendFile(path.join(dualNameDist, 'index.html'));
+  });
+}
+
 // ===== Frontend Static Files (Production) =====
 if (process.env.NODE_ENV === 'production') {
   const frontendDist = path.join(process.cwd(), 'frontend', 'dist');

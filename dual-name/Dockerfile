@@ -1,0 +1,36 @@
+FROM node:20-bookworm
+
+# ── System dependencies for PrusaSlicer AppImage ──
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      wget ca-certificates libfuse2 \
+      libgtk-3-0 libwebkit2gtk-4.0-37 libegl1 libxkbcommon0 \
+      libgl1 libglu1-mesa libx11-6 libxrender1 libxext6 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ── PrusaSlicer 2.7.4 ──
+RUN wget -q -O /tmp/prusa.AppImage \
+      "https://github.com/prusa3d/PrusaSlicer/releases/download/version_2.7.4/PrusaSlicer-2.7.4%2Blinux-x64-GTK3-202404050928.AppImage" && \
+    chmod +x /tmp/prusa.AppImage && \
+    cd /tmp && ./prusa.AppImage --appimage-extract && \
+    mv /tmp/squashfs-root /opt/prusaslicer && \
+    rm /tmp/prusa.AppImage
+
+RUN printf '#!/bin/sh\nexport LD_LIBRARY_PATH=/opt/prusaslicer/usr/lib:${LD_LIBRARY_PATH}\nexec /opt/prusaslicer/usr/bin/prusa-slicer "$@"\n' \
+    > /usr/local/bin/prusa-slicer && chmod +x /usr/local/bin/prusa-slicer
+
+WORKDIR /app
+
+# Install ALL dependencies (including devDependencies for vite build)
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Copy app files
+COPY . .
+
+# Build frontend, then remove devDependencies
+RUN npm run build && npm prune --production
+
+EXPOSE 3001
+
+CMD ["node", "server.js"]

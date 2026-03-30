@@ -16,7 +16,8 @@
     "lint": "pnpm -r lint",
     "test": "pnpm -r test",
     "start": "node backend/dist/index.js",
-    "tickets": "cd backend && npx tsx ../agent/sync-tickets.ts"
+    "tickets": "cd backend && npx tsx ../agent/sync-tickets.ts",
+    "build:dual-name": "cd dual-name && npm run build"
   },
   "engines": {
     "node": ">=18",

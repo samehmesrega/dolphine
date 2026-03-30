@@ -1,0 +1,19 @@
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  base: '/',
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        embed: 'embed.html',
+        customer: 'customer.html'
+      }
+    }
+  },
+  server: {
+    port: 3001
+  }
+});

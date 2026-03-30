@@ -29,6 +29,15 @@ const MODULES = [
     gradient: 'from-emerald-500 to-teal-600',
     iconPath: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
   },
+  {
+    slug: 'dual-name',
+    nameAr: 'Dual Name 3D',
+    nameEn: 'Dual Name Generator',
+    description: 'مولد أسماء مزدوجة ثلاثية الأبعاد — تصدير STL و G-code',
+    path: '/dual-name/',
+    gradient: 'from-rose-500 to-pink-600',
+    iconPath: 'M21 7.5V18M15 7.5V18M3 16.811V8.69c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811z',
+  },
 ];
 
 const FEATURES = [
@@ -151,7 +160,7 @@ export default function ModuleSwitcher() {
             {MODULES.map((mod) => (
               <button
                 key={mod.slug}
-                onClick={() => navigate(mod.path)}
+                onClick={() => mod.path.startsWith('/dual-name') ? window.location.href = mod.path : navigate(mod.path)}
                 className={`bg-gradient-to-br ${mod.gradient} text-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-200 text-right group`}
               >
                 <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
