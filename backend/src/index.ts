@@ -90,6 +90,9 @@ app.use(
   })
 );
 
+// ⚠️ Raw body for Meta webhook signature verification — MUST be before express.json()
+app.use('/api/webhooks/meta', express.raw({ type: 'application/json' }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -118,6 +121,14 @@ const webhookLimiter = rateLimit({
   message: { error: 'طلبات ويب هوك كثيرة جداً' },
 });
 
+const metaWebhookLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Meta webhook rate limit exceeded' },
+});
+
 app.use('/api', generalLimiter);
 
 // ===== Static Uploads =====
@@ -133,7 +144,7 @@ app.get('/health', (_req: Request, res: Response) => {
     status: 'ok',
     app: 'dolphin-platform',
     version: '2.0.0',
-    modules: ['auth', 'leads', 'marketing'],
+    modules: ['auth', 'leads', 'marketing', 'inbox'],
   });
 });
 
@@ -160,6 +171,10 @@ app.use('/api/settings', authMiddleware, settingsRoutes);
 // Tickets module
 app.use('/api/v1/tickets', authMiddleware, ticketsRoutes);
 app.use('/api/tickets', authMiddleware, ticketsRoutes);
+
+// Inbox module
+app.use('/api/v1/inbox', authMiddleware, require('./modules/inbox/routes').default);
+app.use('/api/inbox', authMiddleware, require('./modules/inbox/routes').default);
 
 // Drive image proxy — validate fileId format to prevent SSRF
 app.get('/drive-proxy/:fileId', async (req: Request, res: Response) => {
@@ -202,6 +217,9 @@ const lpSubmitLimiter = rateLimit({
 // Landing Pages (public routes — no auth)
 app.use('/lp', lpSubmitLimiter, require('./modules/marketing/routes/lp-public').default);
 
+// Meta webhooks (public, rate-limited) — MUST be before /api/webhooks to avoid route conflict
+app.use('/api/webhooks/meta', metaWebhookLimiter, require('./modules/inbox/routes/webhooks').default);
+
 // Webhooks (public, rate-limited)
 // Keeping old path for backwards compatibility with WordPress plugins
 app.use('/api/webhooks', webhookLimiter, require('./modules/leads/routes/webhooks').default);
@@ -230,17 +248,6 @@ app.use('/api/task-rules', authMiddleware, require('./modules/leads/routes/task-
 app.use('/api/blacklist', authMiddleware, require('./modules/leads/routes/blacklist').default);
 app.use('/api/integrations', authMiddleware, require('./modules/leads/routes/integration-settings').default);
 
-// ===== Dual Name Static Files =====
-const dualNameDist = path.join(process.cwd(), 'dual-name', 'dist');
-if (fs.existsSync(dualNameDist)) {
-  app.get('/dual-name', (_req: Request, res: Response) => {
-    res.sendFile(path.join(dualNameDist, 'index.html'));
-  });
-  app.use('/dual-name', express.static(dualNameDist));
-  app.get('/dual-name/*', (_req: Request, res: Response) => {
-    res.sendFile(path.join(dualNameDist, 'index.html'));
-  });
-}
 
 // ===== Frontend Static Files (Production) =====
 if (process.env.NODE_ENV === 'production') {

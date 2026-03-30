@@ -77,6 +77,20 @@ function AppRoutes() {
         }
       />
 
+      {/* Dual Name — iframe to original app, auth-protected */}
+      <Route
+        path="/dual-name"
+        element={
+          <PrivateRoute>
+            <iframe
+              src="https://dual-letter-illusion.onrender.com"
+              style={{ width: '100%', height: '100vh', border: 'none' }}
+              title="Dual Name 3D"
+            />
+          </PrivateRoute>
+        }
+      />
+
       {/* Module switcher / landing page (public) */}
       <Route path="/" element={<ModuleSwitcher />} />
 
