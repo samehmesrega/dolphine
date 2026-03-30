@@ -33,7 +33,7 @@ async function getOrCreateAgentUser(): Promise<string> {
       data: {
         name: AI_AGENT_NAME,
         email: AI_AGENT_EMAIL,
-        password: 'AI_AGENT_NO_LOGIN_' + Date.now(), // can't login
+        passwordHash: 'AI_AGENT_NO_LOGIN_' + Date.now(), // can't login
         roleId: adminRole.id,
         isActive: true,
         status: 'active',

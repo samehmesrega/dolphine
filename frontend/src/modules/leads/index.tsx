@@ -14,7 +14,6 @@ import GeneralReports from './pages/reports/GeneralReports';
 import SalesReports from './pages/reports/SalesReports';
 import MarketingReports from './pages/reports/MarketingReports';
 import ProductsPage from './pages/ProductsPage';
-import UsersPage from './pages/UsersPage';
 import ShiftsPage from './pages/ShiftsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
 import AuditLogPage from './pages/AuditLogPage';
@@ -46,7 +45,6 @@ export default function LeadsModule() {
       </Route>
       <Route path="products" element={<ProductsPage />} />
       <Route path="shifts" element={<ShiftsPage />} />
-      <Route path="users" element={<UsersPage />} />
       <Route path="integrations" element={<IntegrationsPage />} />
       <Route path="audit" element={<AuditLogPage />} />
       <Route path="roles" element={<RolesPage />} />
