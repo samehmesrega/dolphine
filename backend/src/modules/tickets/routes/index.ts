@@ -22,7 +22,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { type, description, screenshot, pageUrl, userAgent } = req.body;
+    const { type, description, screenshot, extraImages, pageUrl, userAgent } = req.body;
 
     if (!type || !description) {
       res.status(400).json({ error: 'النوع والوصف مطلوبان' });
@@ -40,6 +40,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         type,
         description,
         screenshot: screenshot || null,
+        extraImages: Array.isArray(extraImages) && extraImages.length > 0 ? extraImages : undefined,
         pageUrl: pageUrl || null,
         userAgent: userAgent || null,
         createdBy: req.user.userId,

@@ -16,6 +16,7 @@ export default function FloatingBugButton() {
   const [description, setDescription] = useState('');
   const [screenshot, setScreenshot] = useState<string | null>(null);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
+  const [extraImages, setExtraImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [capturingScreenshot, setCapturingScreenshot] = useState(false);
@@ -65,7 +66,22 @@ export default function FloatingBugButton() {
     setDescription('');
     setScreenshot(null);
     setScreenshotPreview(null);
+    setExtraImages([]);
     setSuccess(false);
+  };
+
+  const handleAddImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith('image/')) continue;
+      const reader = new FileReader();
+      reader.onload = () => {
+        setExtraImages(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
   };
 
   const handleSubmit = async () => {
@@ -77,6 +93,7 @@ export default function FloatingBugButton() {
         type,
         description: description.trim(),
         screenshot,
+        extraImages: extraImages.length > 0 ? extraImages : undefined,
         pageUrl: window.location.href,
         userAgent: navigator.userAgent,
       });
@@ -186,52 +203,31 @@ export default function FloatingBugButton() {
                     )}
                   </label>
                   {screenshotPreview && (
-                    <div>
-                      <div className="border border-slate-200 rounded-lg overflow-hidden">
-                        <img
-                          src={screenshotPreview}
-                          alt="Screenshot preview"
-                          className="w-full h-24 object-cover object-top"
-                        />
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          // 1. أخفي المودال
-                          setOpen(false);
-                          setScreenshot(null);
-                          setScreenshotPreview(null);
-                          // 2. بعد ما المودال يختفي — التقط صورة جديدة
-                          setTimeout(() => {
-                            html2canvas(document.body, {
-                              useCORS: true, allowTaint: true, scale: 0.5, logging: false,
-                              ignoreElements: (el) => el.id === 'floating-bug-button' || el.id === 'floating-bug-modal',
-                            }).then((canvas) => {
-                              const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
-                              // 3. حدّث الصورة وافتح المودال
-                              setScreenshot(dataUrl);
-                              setScreenshotPreview(dataUrl);
-                              setOpen(true);
-                            }).catch(() => {
-                              setOpen(true);
-                            });
-                          }, 800);
-                        }}
-                        className="w-full mt-2 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-600 hover:bg-slate-50 transition text-center"
-                      >
-                        📸 إعادة التقاط صورة الشاشة
-                      </button>
+                    <div className="border border-slate-200 rounded-lg overflow-hidden">
+                      <img src={screenshotPreview} alt="Screenshot" className="w-full h-20 object-cover object-top" />
                     </div>
                   )}
-                  {!screenshotPreview && !capturingScreenshot && (
-                    <button
-                      type="button"
-                      onClick={captureScreenshot}
-                      className="w-full py-2 border border-dashed border-slate-300 rounded-lg text-xs text-slate-500 hover:bg-slate-50 transition"
-                    >
-                      📸 التقاط صورة الشاشة
-                    </button>
-                  )}
+
+                  {/* صور إضافية */}
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <label className="flex-1 py-1.5 border border-dashed border-slate-300 rounded-lg text-xs text-slate-500 hover:bg-slate-50 transition text-center cursor-pointer">
+                        📎 إضافة صور توضيحية
+                        <input type="file" accept="image/*" multiple onChange={handleAddImages} className="hidden" />
+                      </label>
+                    </div>
+                    {extraImages.length > 0 && (
+                      <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                        {extraImages.map((img, i) => (
+                          <div key={i} className="relative w-14 h-14">
+                            <img src={img} alt="" className="w-14 h-14 object-cover rounded border border-slate-200" />
+                            <button type="button" onClick={() => setExtraImages(prev => prev.filter((_, j) => j !== i))}
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full text-[10px] flex items-center justify-center">✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Submit */}

@@ -1473,6 +1473,7 @@ model Ticket {
   type        String    // bug, improvement, suggestion
   description String
   screenshot  String?   @db.Text // base64 screenshot
+  extraImages Json?     @map("extra_images") // array of base64 strings
   pageUrl     String?   @map("page_url")
   userAgent   String?   @map("user_agent")
   status      String    @default("new") // new, reviewing, in_progress, resolved, closed
