@@ -24,6 +24,7 @@ import leadsRoutes from './modules/leads/routes';
 import marketingRoutes from './modules/marketing/routes';
 import knowledgeBaseRoutes from './modules/knowledge-base/routes';
 import settingsRoutes from './modules/settings/routes';
+import ticketsRoutes from './modules/tickets/routes';
 
 // يسمح بـ users.manage أو مدير السيلز
 function requireUsersAccess(
@@ -89,8 +90,8 @@ app.use(
   })
 );
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ===== Rate Limiting =====
 const generalLimiter = rateLimit({
@@ -155,6 +156,10 @@ app.use('/api/knowledge-base', authMiddleware, knowledgeBaseRoutes);
 // Settings module
 app.use('/api/v1/settings', authMiddleware, settingsRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
+
+// Tickets module
+app.use('/api/v1/tickets', authMiddleware, ticketsRoutes);
+app.use('/api/tickets', authMiddleware, ticketsRoutes);
 
 // Drive image proxy — validate fileId format to prevent SSRF
 app.get('/drive-proxy/:fileId', async (req: Request, res: Response) => {

@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './modules/auth/context/AuthContext';
 import AppShell from './shared/Layout/AppShell';
 import ModuleSwitcher from './shared/Layout/ModuleSwitcher';
 import ErrorBoundary from './shared/components/ErrorBoundary';
+import FloatingBugButton from './shared/components/FloatingBugButton';
 import Login from './modules/auth/pages/Login';
 import Register from './modules/auth/pages/Register';
 import ForgotPassword from './modules/auth/pages/ForgotPassword';
@@ -128,6 +129,7 @@ export default function App() {
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
             <AppRoutes />
+            <FloatingBugButton />
           </AuthProvider>
         </QueryClientProvider>
       </BrowserRouter>

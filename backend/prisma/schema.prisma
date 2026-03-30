@@ -64,6 +64,10 @@ model User {
   createdLandingPages   LandingPage[]       @relation("LandingPageCreator")
   blacklistedPhones     BlacklistedPhone[]  @relation("BlacklistCreator")
 
+  // Relations - Tickets module
+  tickets               Ticket[]            @relation("TicketCreator")
+  ticketComments        TicketComment[]     @relation("TicketCommenter")
+
   @@map("users")
 }
 
@@ -1458,4 +1462,44 @@ model KbSalesScript {
 
   @@index([productId])
   @@map("kb_sales_scripts")
+}
+
+// =============================================================
+// TICKETS: التذاكر والبلاغات
+// =============================================================
+
+model Ticket {
+  id          String    @id @default(uuid())
+  type        String    // bug, improvement, suggestion
+  description String
+  screenshot  String?   @db.Text // base64 screenshot
+  pageUrl     String?   @map("page_url")
+  userAgent   String?   @map("user_agent")
+  status      String    @default("new") // new, reviewing, in_progress, resolved, closed
+  priority    String?   // critical, high, medium, low
+  createdBy   String    @map("created_by")
+  creator     User      @relation("TicketCreator", fields: [createdBy], references: [id])
+  assignedTo  String?   @map("assigned_to")
+  resolvedAt  DateTime? @map("resolved_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  comments TicketComment[]
+
+  @@index([status])
+  @@index([type])
+  @@index([createdBy])
+  @@map("tickets")
+}
+
+model TicketComment {
+  id        String   @id @default(uuid())
+  ticketId  String   @map("ticket_id")
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId    String   @map("user_id")
+  user      User     @relation("TicketCommenter", fields: [userId], references: [id])
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("ticket_comments")
 }
