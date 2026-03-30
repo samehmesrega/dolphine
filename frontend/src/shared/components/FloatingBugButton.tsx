@@ -186,27 +186,39 @@ export default function FloatingBugButton() {
                     )}
                   </label>
                   {screenshotPreview && (
-                    <div className="border border-slate-200 rounded-lg overflow-hidden relative">
-                      <img
-                        src={screenshotPreview}
-                        alt="Screenshot preview"
-                        className="w-full h-24 object-cover object-top"
-                      />
+                    <div>
+                      <div className="border border-slate-200 rounded-lg overflow-hidden">
+                        <img
+                          src={screenshotPreview}
+                          alt="Screenshot preview"
+                          className="w-full h-24 object-cover object-top"
+                        />
+                      </div>
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           setScreenshot(null);
                           setScreenshotPreview(null);
-                          // أخفي المودال لحظة، التقط، ورجّعه
                           setOpen(false);
-                          setTimeout(async () => {
-                            await captureScreenshot();
-                            setOpen(true);
-                          }, 500);
+                          // استنى لحظة عشان المودال يختفي من الشاشة
+                          await new Promise(r => setTimeout(r, 600));
+                          // التقط screenshot جديد
+                          setCapturingScreenshot(true);
+                          try {
+                            const canvas = await html2canvas(document.body, {
+                              useCORS: true, allowTaint: true, scale: 0.5, logging: false,
+                              ignoreElements: (el) => el.id === 'floating-bug-button' || el.id === 'floating-bug-modal',
+                            });
+                            const dataUrl = canvas.toDataURL('image/jpeg', 0.6);
+                            setScreenshot(dataUrl);
+                            setScreenshotPreview(dataUrl);
+                          } catch { /* ignore */ }
+                          setCapturingScreenshot(false);
+                          setOpen(true);
                         }}
-                        className="absolute top-1 left-1 bg-slate-800/70 text-white text-xs px-2 py-1 rounded hover:bg-slate-800 transition"
+                        className="w-full mt-2 py-1.5 border border-slate-300 rounded-lg text-xs text-slate-600 hover:bg-slate-50 transition text-center"
                       >
-                        📸 إعادة التقاط
+                        📸 إعادة التقاط صورة الشاشة
                       </button>
                     </div>
                   )}
