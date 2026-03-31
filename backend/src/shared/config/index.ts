@@ -63,6 +63,7 @@ export const config = {
     appId: process.env.META_APP_ID || '',
     appSecret: process.env.META_APP_SECRET || '',
     redirectUri: process.env.META_REDIRECT_URI || '',
+    inboxRedirectUri: process.env.META_INBOX_REDIRECT_URI || '',
     webhookVerifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN || '',
   },
 };

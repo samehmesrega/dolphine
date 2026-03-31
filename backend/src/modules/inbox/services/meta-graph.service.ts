@@ -30,13 +30,14 @@ const INBOX_SCOPES = [
 ].join(',');
 
 export function getInboxOAuthUrl(state: string): string {
-  if (!config.meta.appId || !config.meta.redirectUri) {
-    throw new Error('META_APP_ID and META_REDIRECT_URI must be set');
+  const redirectUri = config.meta.inboxRedirectUri || config.meta.redirectUri;
+  if (!config.meta.appId || !redirectUri) {
+    throw new Error('META_APP_ID and META_INBOX_REDIRECT_URI must be set');
   }
 
   const params = new URLSearchParams({
     client_id: config.meta.appId,
-    redirect_uri: config.meta.redirectUri,
+    redirect_uri: redirectUri,
     scope: INBOX_SCOPES,
     response_type: 'code',
     state,
@@ -49,10 +50,11 @@ export async function exchangeCodeForToken(code: string): Promise<{
   accessToken: string;
   expiresIn: number;
 }> {
+  const redirectUri = config.meta.inboxRedirectUri || config.meta.redirectUri;
   const params = new URLSearchParams({
     client_id: config.meta.appId,
     client_secret: config.meta.appSecret,
-    redirect_uri: config.meta.redirectUri,
+    redirect_uri: redirectUri,
     code,
   });
 
