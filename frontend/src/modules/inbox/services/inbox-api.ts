@@ -6,6 +6,8 @@ export const getOAuthUrl = () => api.get('/inbox/channels/oauth/meta');
 export const oauthCallback = (code: string) => api.post('/inbox/channels/oauth/meta/callback', { code });
 export const connectPages = (data: { pages: any[]; token: string; brandId: string }) =>
   api.post('/inbox/channels/oauth/meta/connect', data);
+export const connectPage = (page: any) =>
+  api.post('/inbox/channels/oauth/meta/connect', { page });
 export const syncChannel = (id: string) => api.post(`/inbox/channels/${id}/sync`);
 export const deactivateChannel = (id: string) => api.delete(`/inbox/channels/${id}`);
 
