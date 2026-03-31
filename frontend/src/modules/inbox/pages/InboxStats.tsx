@@ -38,7 +38,7 @@ export default function InboxStats() {
   const dateRange = getDateRange(period);
 
   const { data: brandsRes } = useQuery({ queryKey: ['brands'], queryFn: inboxApi.getBrands });
-  const brands = brandsRes?.data || [];
+  const brands = brandsRes?.data?.brands || [];
 
   const params: Record<string, string> = { from: dateRange.from, to: dateRange.to };
   if (brandFilter) params.brandId = brandFilter;

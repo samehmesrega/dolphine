@@ -23,7 +23,7 @@ export default function InboxLayout() {
 
   // Brands for filter
   const { data: brandsRes } = useQuery({ queryKey: ['brands'], queryFn: inboxApi.getBrands });
-  const brands = brandsRes?.data || [];
+  const brands = brandsRes?.data?.brands || [];
 
   // Channels for filter
   const { data: channelsRes } = useQuery({ queryKey: ['inbox', 'channels'], queryFn: inboxApi.getChannels });
