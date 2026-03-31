@@ -21,12 +21,13 @@ function fetchWithTimeout(url: string, options?: RequestInit, timeoutMs = 15000)
 
 const INBOX_SCOPES = [
   'pages_messaging',
-  'instagram_manage_messages',
   'pages_manage_metadata',
   'pages_read_engagement',
-  'pages_manage_engagement',
-  'instagram_manage_comments',
   'pages_show_list',
+  // Need App Review to enable:
+  // 'instagram_manage_messages',
+  // 'pages_manage_engagement',
+  // 'instagram_manage_comments',
 ].join(',');
 
 export function getInboxOAuthUrl(state: string): string {
