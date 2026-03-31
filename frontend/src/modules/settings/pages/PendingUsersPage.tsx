@@ -70,8 +70,8 @@ export default function PendingUsersPage() {
                   <td className="px-4 py-3 text-slate-500">{u.email}</td>
                   <td className="px-4 py-3 text-slate-500">{u.phone || '—'}</td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${u.authMethod === 'google' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>
-                      {u.authMethod === 'google' ? 'Google' : 'إيميل'}
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${u.authMethod === 'google' ? 'bg-blue-100 text-blue-700' : u.authMethod === 'slack' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'}`}>
+                      {u.authMethod === 'google' ? 'Google' : u.authMethod === 'slack' ? 'Slack' : 'إيميل'}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-slate-500">
