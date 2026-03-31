@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
+import { useAuth } from '../context/AuthContext';
 import api from '../../../shared/services/api';
 
 const SLACK_ICON = <svg width="20" height="20" viewBox="0 0 123 123" fill="none"><path d="M25.8 77.6a12.9 12.9 0 1 1-12.9-12.9h12.9v12.9Z" fill="#E01E5A"/><path d="M32.3 77.6a12.9 12.9 0 0 1 25.8 0v32.3a12.9 12.9 0 1 1-25.8 0V77.6Z" fill="#E01E5A"/><path d="M45.2 25.8a12.9 12.9 0 1 1 12.9-12.9v12.9H45.2Z" fill="#36C5F0"/><path d="M45.2 32.3a12.9 12.9 0 0 1 0 25.8H12.9a12.9 12.9 0 0 1 0-25.8h32.3Z" fill="#36C5F0"/><path d="M97 45.2a12.9 12.9 0 1 1 12.9 12.9H97V45.2Z" fill="#2EB67D"/><path d="M90.5 45.2a12.9 12.9 0 0 1-25.8 0V12.9a12.9 12.9 0 1 1 25.8 0v32.3Z" fill="#2EB67D"/><path d="M77.6 97a12.9 12.9 0 1 1-12.9 12.9V97h12.9Z" fill="#ECB22E"/><path d="M77.6 90.5a12.9 12.9 0 0 1 0-25.8h32.3a12.9 12.9 0 1 1 0 25.8H77.6Z" fill="#ECB22E"/></svg>;
@@ -9,6 +11,8 @@ export default function Register() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const { login } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +163,29 @@ export default function Register() {
           {SLACK_ICON}
           سجّل بـ Slack
         </button>
+
+        <div className="flex justify-center mt-3">
+          <GoogleLogin
+            onSuccess={async (credentialResponse) => {
+              setError('');
+              try {
+                const { data } = await api.post('/auth/google', { credential: credentialResponse.credential });
+                if (data.pending) {
+                  setSuccess(true);
+                } else {
+                  login(data.token, data.user);
+                  navigate('/');
+                }
+              } catch (err: any) {
+                setError(err.response?.data?.error || 'خطأ في التسجيل بـ Google');
+              }
+            }}
+            onError={() => setError('فشل التسجيل بـ Google')}
+            text="signup_with"
+            shape="rectangular"
+            theme="outline"
+          />
+        </div>
 
         <p className="text-center text-sm text-slate-500 mt-4">
           عندك حساب بالفعل؟{' '}

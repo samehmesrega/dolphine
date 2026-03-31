@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider, useAuth } from './modules/auth/context/AuthContext';
 import AppShell from './shared/Layout/AppShell';
 import ModuleSwitcher from './shared/Layout/ModuleSwitcher';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import ErrorBoundary from './shared/components/ErrorBoundary';
 import FloatingBugButton from './shared/components/FloatingBugButton';
 import Login from './modules/auth/pages/Login';
@@ -153,14 +154,16 @@ function AppRoutes() {
 export default function App() {
   return (
     <ErrorBoundary>
-      <BrowserRouter>
-        <QueryClientProvider client={queryClient}>
-          <AuthProvider>
-            <AppRoutes />
-            <FloatingBugButton />
-          </AuthProvider>
-        </QueryClientProvider>
-      </BrowserRouter>
+      <GoogleOAuthProvider clientId="153436775702-v2adks57l834f2qob1j24i27vid36r9p.apps.googleusercontent.com">
+        <BrowserRouter>
+          <QueryClientProvider client={queryClient}>
+            <AuthProvider>
+              <AppRoutes />
+              <FloatingBugButton />
+            </AuthProvider>
+          </QueryClientProvider>
+        </BrowserRouter>
+      </GoogleOAuthProvider>
     </ErrorBoundary>
   );
 }
