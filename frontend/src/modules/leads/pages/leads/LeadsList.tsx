@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useMemo, useState, useCallback } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../../shared/services/api';
 import { useAuth } from '../../../auth/context/AuthContext';
@@ -84,46 +84,67 @@ export default function LeadsList() {
   const { user: currentUser } = useAuth();
   const canBulkDelete = ['super_admin', 'admin', 'sales_manager'].includes(currentUser?.role?.slug ?? '');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [search, setSearch] = useState('');
-  const [statusId, setStatusId] = useState<string>('');
-  const [assignedToId, setAssignedToId] = useState<string>('');
-  const [datePreset, setDatePreset] = useState<string>('');
-  const [fromDate, setFromDate] = useState<string>('');
-  const [toDate, setToDate] = useState<string>('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read filters from URL — persists across navigation
+  const search = searchParams.get('q') || '';
+  const statusId = searchParams.get('status') || '';
+  const assignedToId = searchParams.get('assigned') || '';
+  const datePreset = searchParams.get('dp') || '';
+  const fromDate = searchParams.get('from') || '';
+  const toDate = searchParams.get('to') || '';
+  const sortBy = searchParams.get('sort') || 'createdAt';
+  const order = searchParams.get('order') || 'desc';
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const pageSize = 20;
+
+  const updateParams = useCallback((updates: Record<string, string>) => {
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev);
+      for (const [k, v] of Object.entries(updates)) {
+        if (v) next.set(k, v); else next.delete(k);
+      }
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  const setSearch = (v: string) => updateParams({ q: v, page: '' });
+  const setStatusId = (v: string) => updateParams({ status: v, page: '' });
+  const setAssignedToId = (v: string) => updateParams({ assigned: v, page: '' });
+  const setFromDate = (v: string) => updateParams({ from: v });
+  const setToDate = (v: string) => updateParams({ to: v });
+  const setSortBy = (v: string) => updateParams({ sort: v });
+  const setOrder = (v: string) => updateParams({ order: v });
+  const setPage = (v: number) => updateParams({ page: v > 1 ? String(v) : '' });
 
   const applyDatePreset = (preset: string) => {
-    setDatePreset(preset);
-    setPage(1);
     const today = new Date();
     const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
     const todayStr = fmt(today);
-    if (preset === 'today') { setFromDate(todayStr); setToDate(todayStr); }
+    let from = '', to = '';
+    if (preset === 'today') { from = todayStr; to = todayStr; }
     else if (preset === 'yesterday') {
       const y = new Date(today); y.setDate(y.getDate()-1); const ys = fmt(y);
-      setFromDate(ys); setToDate(ys);
+      from = ys; to = ys;
     }
     else if (preset === '7d') {
       const d = new Date(today); d.setDate(d.getDate()-6);
-      setFromDate(fmt(d)); setToDate(todayStr);
+      from = fmt(d); to = todayStr;
     }
     else if (preset === '30d') {
       const d = new Date(today); d.setDate(d.getDate()-29);
-      setFromDate(fmt(d)); setToDate(todayStr);
+      from = fmt(d); to = todayStr;
     }
     else if (preset === 'this_month') {
-      setFromDate(`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`); setToDate(todayStr);
+      from = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-01`; to = todayStr;
     }
     else if (preset === 'last_month') {
       const s = new Date(today.getFullYear(), today.getMonth()-1, 1);
       const e = new Date(today.getFullYear(), today.getMonth(), 0);
-      setFromDate(fmt(s)); setToDate(fmt(e));
+      from = fmt(s); to = fmt(e);
     }
-    else { setFromDate(''); setToDate(''); }
+    updateParams({ dp: preset, from, to, page: '' });
   };
-  const [sortBy, setSortBy] = useState<string>('createdAt');
-  const [order, setOrder] = useState<string>('desc');
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
   const [deleteError, setDeleteError] = useState('');
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -327,14 +348,14 @@ export default function LeadsList() {
           <input
             type="date"
             value={fromDate}
-            onChange={e => { setFromDate(e.target.value); setDatePreset('custom'); setPage(1); }}
+            onChange={e => updateParams({ from: e.target.value, dp: 'custom', page: '' })}
             className="border border-slate-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300"
           />
           <span className="text-xs text-slate-400">→</span>
           <input
             type="date"
             value={toDate}
-            onChange={e => { setToDate(e.target.value); setDatePreset('custom'); setPage(1); }}
+            onChange={e => updateParams({ to: e.target.value, dp: 'custom', page: '' })}
             className="border border-slate-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-300"
           />
           {fromDate && (
