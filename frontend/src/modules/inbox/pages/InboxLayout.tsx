@@ -3,6 +3,45 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as inboxApi from '../services/inbox-api';
 
+// Format message text — linkify URLs and handle long text
+function MessageText({ content, direction }: { content: string; direction: string }) {
+  const MAX_LEN = 500;
+  const [expanded, setExpanded] = useState(false);
+  const isLong = content.length > MAX_LEN;
+  const displayText = isLong && !expanded ? content.slice(0, MAX_LEN) + '...' : content;
+
+  // Split text by URLs and render links
+  const parts = displayText.split(/(https?:\/\/[^\s]+)/g);
+
+  return (
+    <p className="text-sm whitespace-pre-wrap break-words">
+      {parts.map((part, i) =>
+        part.match(/^https?:\/\//) ? (
+          <a
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`underline ${direction === 'inbound' ? 'text-blue-500' : 'text-violet-200'}`}
+          >
+            🔗 رابط
+          </a>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+      {isLong && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className={`block text-xs mt-1 underline ${direction === 'inbound' ? 'text-blue-500' : 'text-violet-200'}`}
+        >
+          {expanded ? 'عرض أقل' : 'عرض المزيد'}
+        </button>
+      )}
+    </p>
+  );
+}
+
 // Platform icons
 const PLATFORM_ICON: Record<string, { color: string; label: string }> = {
   messenger: { color: 'text-blue-500', label: 'Messenger' },
@@ -264,29 +303,53 @@ export default function InboxLayout() {
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.map((msg: any) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.direction === 'inbound' ? 'justify-end' : 'justify-start'}`}
-                  >
+                {messages.map((msg: any) => {
+                  const isCommentReply = msg.content?.includes('بصدد الرد على تعليق') || msg.content?.includes('comment_id=');
+                  const commentUrl = isCommentReply ? msg.content?.match(/https?:\/\/[^\s)]+/)?.[0] : null;
+
+                  return (
                     <div
-                      className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                        msg.direction === 'inbound'
-                          ? 'bg-white border border-slate-200 text-slate-800'
-                          : 'bg-violet-600 text-white'
-                      }`}
+                      key={msg.id}
+                      className={`flex ${msg.direction === 'inbound' ? 'justify-end' : 'justify-start'}`}
                     >
-                      {msg.contentType === 'image' && msg.attachments?.[0]?.url && (
-                        <img src={msg.attachments[0].url} alt="" className="rounded-lg max-w-full mb-1" />
-                      )}
-                      {msg.content && <p className="text-sm">{msg.content}</p>}
-                      <div className={`text-[10px] mt-1 ${msg.direction === 'inbound' ? 'text-slate-400' : 'text-violet-200'}`}>
-                        {msg.sentByUser?.name && <span className="ml-2">{msg.sentByUser.name}</span>}
-                        {new Date(msg.platformTimestamp || msg.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                      <div
+                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                          msg.direction === 'inbound'
+                            ? 'bg-white border border-slate-200 text-slate-800'
+                            : 'bg-violet-600 text-white'
+                        }`}
+                      >
+                        {msg.contentType === 'image' && msg.attachments?.[0]?.url && (
+                          <img src={msg.attachments[0].url} alt="" className="rounded-lg max-w-full mb-1" />
+                        )}
+                        {msg.content && (
+                          isCommentReply ? (
+                            <div className={`text-sm ${msg.direction === 'inbound' ? 'text-slate-600' : 'text-violet-100'}`}>
+                              <p className="text-xs opacity-70 mb-1">↩️ رد على تعليق</p>
+                              <p>{msg.content.replace(/\(https?:\/\/[^\s)]+\)/g, '').replace(/https?:\/\/[^\s]+/g, '').replace(/[\u200f\u200e]/g, '').trim()}</p>
+                              {commentUrl && (
+                                <a
+                                  href={commentUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className={`text-xs underline mt-1 inline-block ${msg.direction === 'inbound' ? 'text-blue-500' : 'text-violet-200'}`}
+                                >
+                                  عرض التعليق الأصلي
+                                </a>
+                              )}
+                            </div>
+                          ) : (
+                            <MessageText content={msg.content} direction={msg.direction} />
+                          )
+                        )}
+                        <div className={`text-[10px] mt-1 ${msg.direction === 'inbound' ? 'text-slate-400' : 'text-violet-200'}`}>
+                          {msg.sentByUser?.name && <span className="ml-2">{msg.sentByUser.name}</span>}
+                          {new Date(msg.platformTimestamp || msg.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
                 <div ref={messagesEndRef} />
               </div>
 
