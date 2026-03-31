@@ -462,7 +462,7 @@ export async function getAdSetsWithMetrics(filters: DashboardFilters & { page?: 
       { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, revenue: 0 }
     );
     return {
-      id: as.id, name: as.name, status: as.status, campaignName: as.campaign.name,
+      id: as.id, name: as.name, status: as.status, campaignId: as.campaignId, campaignName: as.campaign.name,
       platform: as.campaign.adAccount.platform, brand: as.campaign.adAccount.brand?.name,
       spend: t.spend, impressions: t.impressions, reach: t.reach, clicks: t.clicks, outboundClicks: t.outboundClicks,
       leads: t.leads, revenue: t.revenue,
@@ -493,7 +493,7 @@ export async function getAdsWithMetrics(filters: DashboardFilters & { page?: num
   const ads = await prisma.ad.findMany({
     where: adWhere,
     include: {
-      adSet: { select: { name: true, campaign: { select: { name: true, adAccount: { select: { platform: true, brand: true } } } } } },
+      adSet: { select: { name: true, campaignId: true, campaign: { select: { name: true, adAccount: { select: { platform: true, brand: true } } } } } },
       metrics: {
         where: {
           ...(dateFrom || dateTo ? { date: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
@@ -515,7 +515,7 @@ export async function getAdsWithMetrics(filters: DashboardFilters & { page?: num
       { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, revenue: 0 }
     );
     return {
-      id: ad.id, name: ad.name, status: ad.status, adSetName: ad.adSet.name, campaignName: ad.adSet.campaign.name,
+      id: ad.id, name: ad.name, status: ad.status, adSetId: ad.adSetId, campaignId: ad.adSet.campaignId, adSetName: ad.adSet.name, campaignName: ad.adSet.campaign.name,
       platform: ad.adSet.campaign.adAccount.platform, brand: ad.adSet.campaign.adAccount.brand?.name,
       spend: t.spend, impressions: t.impressions, reach: t.reach, clicks: t.clicks, outboundClicks: t.outboundClicks,
       leads: t.leads, revenue: t.revenue,

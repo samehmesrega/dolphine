@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as mktApi from '../services/marketing-api';
 
@@ -72,13 +72,11 @@ const platformColors: Record<string, string> = {
   snapchat: 'bg-yellow-400',
 };
 
-type ReportTab = 'overview' | 'campaigns' | 'adsets' | 'ads';
+type ReportTab = 'overview' | 'reports';
 
 const REPORT_TABS: { key: ReportTab; label: string }[] = [
   { key: 'overview', label: 'نظرة عامة' },
-  { key: 'campaigns', label: 'تقارير الحملات' },
-  { key: 'adsets', label: 'تقارير الأد سيت' },
-  { key: 'ads', label: 'تقارير الإعلانات' },
+  { key: 'reports', label: 'تقارير' },
 ];
 
 export default function MediaBuying() {
@@ -158,17 +156,17 @@ export default function MediaBuying() {
   const { data: campaignsData } = useQuery({
     queryKey: ['mb-campaigns', filterKey],
     queryFn: () => mktApi.getMediaBuyingCampaigns({ ...params, pageSize: '500' }),
-    enabled: activeTab === 'overview' || activeTab === 'campaigns',
+    enabled: activeTab === 'overview' || activeTab === 'reports',
   });
   const { data: adSetsData } = useQuery({
     queryKey: ['mb-adsets', filterKey],
     queryFn: () => mktApi.getMediaBuyingAdSets(params),
-    enabled: activeTab === 'adsets',
+    enabled: activeTab === 'reports',
   });
   const { data: adsData } = useQuery({
     queryKey: ['mb-ads', filterKey],
     queryFn: () => mktApi.getMediaBuyingAds(params),
-    enabled: activeTab === 'ads',
+    enabled: activeTab === 'reports',
   });
   const { data: accountsData } = useQuery({
     queryKey: ['marketing', 'ad-accounts'],
@@ -243,18 +241,148 @@ export default function MediaBuying() {
     };
   };
 
-  const filteredCampaigns = campaigns
-    .filter((c) => !filterStatus || c.status === filterStatus)
-    .filter((c) => {
-      if (!filterActivity) return true;
-      const hasActivity = c.spend > 0 || c.impressions > 0 || (c.reach || 0) > 0;
-      return filterActivity === 'active' ? hasActivity : !hasActivity;
-    })
-    .sort((a, b) => {
-      const av = a[sortKey] ?? 0;
-      const bv = b[sortKey] ?? 0;
-      return sortDir === 'desc' ? (bv > av ? 1 : -1) : (av > bv ? 1 : -1);
-    });
+  // === Tree View State ===
+  const [expandedCampaigns, setExpandedCampaigns] = useState<Set<string>>(new Set());
+  const [expandedAdSets, setExpandedAdSets] = useState<Set<string>>(new Set());
+  const [searchText, setSearchText] = useState('');
+  const [searchLevel, setSearchLevel] = useState<'campaign' | 'adset' | 'ad'>('campaign');
+
+  const passesActivityFilter = (item: any) => {
+    if (filterStatus && item.status !== filterStatus) return false;
+    if (filterActivity) {
+      const hasActivity = item.spend > 0 || item.impressions > 0 || (item.reach || 0) > 0;
+      if (filterActivity === 'active' && !hasActivity) return false;
+      if (filterActivity === 'zero' && hasActivity) return false;
+    }
+    return true;
+  };
+
+  const sorter = (a: any, b: any) => {
+    const av = a[sortKey] ?? 0;
+    const bv = b[sortKey] ?? 0;
+    return sortDir === 'desc' ? (bv > av ? 1 : -1) : (av > bv ? 1 : -1);
+  };
+
+  // Build hierarchical tree from flat arrays
+  const treeData = useMemo(() => {
+    const adSetsByCampaign = new Map<string, any[]>();
+    for (const as of adSets) {
+      const list = adSetsByCampaign.get(as.campaignId) || [];
+      list.push(as);
+      adSetsByCampaign.set(as.campaignId, list);
+    }
+    const adsByAdSet = new Map<string, any[]>();
+    for (const ad of ads) {
+      const list = adsByAdSet.get(ad.adSetId) || [];
+      list.push(ad);
+      adsByAdSet.set(ad.adSetId, list);
+    }
+    return campaigns.map((c: any) => ({
+      ...c,
+      _adSets: (adSetsByCampaign.get(c.id) || []).map((as: any) => ({
+        ...as,
+        _ads: adsByAdSet.get(as.id) || [],
+      })),
+    }));
+  }, [campaigns, adSets, ads]);
+
+  // Apply search filter + auto-expand
+  const { filteredTree, autoExpandCampaigns, autoExpandAdSets } = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    const noExpand = { filteredTree: treeData, autoExpandCampaigns: new Set<string>(), autoExpandAdSets: new Set<string>() };
+    if (!q) return noExpand;
+
+    const aec = new Set<string>();
+    const aeas = new Set<string>();
+
+    if (searchLevel === 'campaign') {
+      return { filteredTree: treeData.filter((c: any) => c.name.toLowerCase().includes(q) || c.id.includes(q)), autoExpandCampaigns: aec, autoExpandAdSets: aeas };
+    }
+    if (searchLevel === 'adset') {
+      const filtered = treeData.map((c: any) => {
+        const matching = c._adSets.filter((as: any) => as.name.toLowerCase().includes(q) || as.id.includes(q));
+        if (matching.length === 0) return null;
+        aec.add(c.id);
+        return { ...c, _adSets: matching };
+      }).filter(Boolean);
+      return { filteredTree: filtered, autoExpandCampaigns: aec, autoExpandAdSets: aeas };
+    }
+    // ad level
+    const filtered = treeData.map((c: any) => {
+      const matchingAS = c._adSets.map((as: any) => {
+        const matchingAds = as._ads.filter((ad: any) => ad.name.toLowerCase().includes(q) || ad.id.includes(q));
+        if (matchingAds.length === 0) return null;
+        aeas.add(as.id);
+        aec.add(c.id);
+        return { ...as, _ads: matchingAds };
+      }).filter(Boolean);
+      if (matchingAS.length === 0) return null;
+      return { ...c, _adSets: matchingAS };
+    }).filter(Boolean);
+    return { filteredTree: filtered, autoExpandCampaigns: aec, autoExpandAdSets: aeas };
+  }, [treeData, searchText, searchLevel]);
+
+  // Apply status/activity filter + sort
+  const sortedTree = useMemo(() => {
+    return filteredTree
+      .filter(passesActivityFilter)
+      .map((c: any) => ({
+        ...c,
+        _adSets: c._adSets
+          .filter(passesActivityFilter)
+          .map((as: any) => ({ ...as, _ads: [...as._ads].filter(passesActivityFilter).sort(sorter) }))
+          .sort(sorter),
+      }))
+      .sort(sorter);
+  }, [filteredTree, filterStatus, filterActivity, sortKey, sortDir]);
+
+  const isCampaignExpanded = (id: string) => expandedCampaigns.has(id) || autoExpandCampaigns.has(id);
+  const isAdSetExpanded = (id: string) => expandedAdSets.has(id) || autoExpandAdSets.has(id);
+
+  const toggleCampaign = (id: string) => {
+    setExpandedCampaigns((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const toggleAdSet = (id: string) => {
+    setExpandedAdSets((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+  const expandAll = () => {
+    setExpandedCampaigns(new Set(sortedTree.map((c: any) => c.id)));
+    setExpandedAdSets(new Set(sortedTree.flatMap((c: any) => c._adSets.map((as: any) => as.id))));
+  };
+  const collapseAll = () => { setExpandedCampaigns(new Set()); setExpandedAdSets(new Set()); };
+
+  // Metric cells renderer for any level
+  const renderMetricCells = (item: any, level: 'campaign' | 'adset' | 'ad') => (
+    <>
+      {visibleColumns.status && (
+        <td className="py-2">
+          <span className={`text-xs px-2 py-0.5 rounded-full ${item.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : item.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-700' : 'bg-slate-100 text-slate-700'}`}>
+            {item.status === 'ACTIVE' ? 'نشط' : item.status === 'PAUSED' ? 'متوقف' : item.status}
+          </span>
+        </td>
+      )}
+      {visibleColumns.spend && <td className="py-2">{formatCurrency(item.spend || 0)}</td>}
+      {visibleColumns.cpm && <td className="py-2">{formatCurrency(item.cpm || 0)}</td>}
+      {visibleColumns.outboundCtr && <td className="py-2">{(item.outboundCtr || 0).toFixed(2)}%</td>}
+      {visibleColumns.frequency && <td className="py-2">{(item.frequency || 0).toFixed(2)}</td>}
+      {visibleColumns.leads && <td className="py-2">{formatNumber(item.leads || 0)}</td>}
+      {visibleColumns.cpl && <td className="py-2">{formatCurrency(item.cpl || 0)}</td>}
+      {visibleColumns.confirmedOrders && <td className="py-2">{level === 'campaign' ? formatNumber(item.confirmedOrders || 0) : '—'}</td>}
+      {visibleColumns.cpp && <td className="py-2">{level === 'campaign' ? formatCurrency(item.cpp || 0) : '—'}</td>}
+      {visibleColumns.impressions && <td className="py-2">{formatNumber(item.impressions || 0)}</td>}
+      {visibleColumns.reach && <td className="py-2">{formatNumber(item.reach || 0)}</td>}
+      {visibleColumns.clicks && <td className="py-2">{formatNumber(item.clicks || 0)}</td>}
+      {visibleColumns.outboundClicks && <td className="py-2">{formatNumber(item.outboundClicks || 0)}</td>}
+      {visibleColumns.roas && (
+        <td className="py-2">
+          <span className={`font-semibold ${(item.roas || 0) >= 3 ? 'text-green-600' : (item.roas || 0) >= 2 ? 'text-yellow-600' : 'text-red-600'}`}>
+            {(item.roas || 0).toFixed(1)}x
+          </span>
+        </td>
+      )}
+      {visibleColumns.revenue && <td className="py-2">{formatCurrency(item.revenue || 0)}</td>}
+    </>
+  );
 
   return (
     <div className="space-y-6" dir="rtl">
@@ -511,261 +639,182 @@ export default function MediaBuying() {
 
       </>}
 
-      {/* Campaigns Tab */}
-      {activeTab === 'campaigns' && <div className="bg-white rounded-xl border border-slate-200 p-4">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-slate-700">الحملات</h3>
-          <div className="relative">
-            <button
-              onClick={() => setShowColumnPicker(!showColumnPicker)}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs border rounded-lg text-slate-600 hover:bg-slate-50"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-              </svg>
-              تخصيص الأعمدة
-            </button>
-            {showColumnPicker && (
-              <div className="absolute left-0 top-full mt-1 bg-white border rounded-lg shadow-lg p-3 z-10 min-w-[200px]">
-                {Object.entries(COLUMN_LABELS).map(([key, label]) => (
-                  <label key={key} className="flex items-center gap-2 py-1 text-sm cursor-pointer hover:bg-slate-50 px-1 rounded">
-                    <input
-                      type="checkbox"
-                      checked={visibleColumns[key] ?? false}
-                      onChange={(e) => setVisibleColumns((prev) => ({ ...prev, [key]: e.target.checked }))}
-                      className="rounded"
-                    />
-                    {label}
-                  </label>
-                ))}
+      {/* Reports Tab — Hierarchical Tree View */}
+      {activeTab === 'reports' && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          {/* Toolbar: Search + Column Picker */}
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="بحث بالاسم أو ID..."
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  className="border rounded-lg px-3 py-2 text-sm w-64"
+                />
+                {searchText && (
+                  <button onClick={() => setSearchText('')} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs">
+                    ✕
+                  </button>
+                )}
               </div>
-            )}
-          </div>
-        </div>
-        {campaigns.length === 0 ? (
-          <p className="text-slate-400 text-sm py-4 text-center">لا يوجد حملات. اربط حساب إعلاني واعمل مزامنة.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-slate-500 border-b">
-                  <th className="text-right py-2 whitespace-nowrap">الحملة</th>
-                  {visibleColumns.status && <th className="text-right py-2">الحالة</th>}
-                  {visibleColumns.spend && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('spend')}>الإنفاق{sortArrow('spend')}</th>}
-                  {visibleColumns.cpm && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpm')}>CPM{sortArrow('cpm')}</th>}
-                  {visibleColumns.outboundCtr && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('outboundCtr')}>Outbound CTR{sortArrow('outboundCtr')}</th>}
-                  {visibleColumns.frequency && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('frequency')}>التكرار{sortArrow('frequency')}</th>}
-                  {visibleColumns.leads && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('leads')}>ليدز{sortArrow('leads')}</th>}
-                  {visibleColumns.cpl && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpl')}>CPL{sortArrow('cpl')}</th>}
-                  {visibleColumns.confirmedOrders && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('confirmedOrders')}>طلبات مؤكدة{sortArrow('confirmedOrders')}</th>}
-                  {visibleColumns.cpp && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpp')}>CPP{sortArrow('cpp')}</th>}
-                  {visibleColumns.impressions && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('impressions')}>الظهور{sortArrow('impressions')}</th>}
-                  {visibleColumns.reach && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('reach')}>الوصول{sortArrow('reach')}</th>}
-                  {visibleColumns.clicks && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('clicks')}>النقرات{sortArrow('clicks')}</th>}
-                  {visibleColumns.outboundClicks && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('outboundClicks')}>نقرات خارجية{sortArrow('outboundClicks')}</th>}
-                  {visibleColumns.roas && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('roas')}>ROAS{sortArrow('roas')}</th>}
-                  {visibleColumns.revenue && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('revenue')}>الإيرادات{sortArrow('revenue')}</th>}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredCampaigns.map((c) => (
-                  <tr key={c.id} className="border-b last:border-0 hover:bg-slate-50">
-                    <td className="py-2">
-                      <div className="font-medium">{c.name}</div>
-                      {c.brand && <div className="text-xs text-slate-400">{c.brand}</div>}
-                    </td>
-                    {visibleColumns.status && (
-                      <td className="py-2">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          c.status === 'ACTIVE' ? 'bg-green-100 text-green-700' :
-                          c.status === 'PAUSED' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-slate-100 text-slate-700'
-                        }`}>{c.status === 'ACTIVE' ? 'نشطة' : c.status === 'PAUSED' ? 'متوقفة' : c.status}</span>
-                      </td>
-                    )}
-                    {visibleColumns.spend && <td className="py-2">{formatCurrency(c.spend)}</td>}
-                    {visibleColumns.cpm && <td className="py-2">{formatCurrency(c.cpm || 0)}</td>}
-                    {visibleColumns.outboundCtr && <td className="py-2">{(c.outboundCtr || 0).toFixed(2)}%</td>}
-                    {visibleColumns.frequency && <td className="py-2">{(c.frequency || 0).toFixed(2)}</td>}
-                    {visibleColumns.leads && <td className="py-2">{formatNumber(c.leads)}</td>}
-                    {visibleColumns.cpl && <td className="py-2">{formatCurrency(c.cpl || 0)}</td>}
-                    {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(c.confirmedOrders || 0)}</td>}
-                    {visibleColumns.cpp && <td className="py-2">{formatCurrency(c.cpp || 0)}</td>}
-                    {visibleColumns.impressions && <td className="py-2">{formatNumber(c.impressions)}</td>}
-                    {visibleColumns.reach && <td className="py-2">{formatNumber(c.reach || 0)}</td>}
-                    {visibleColumns.clicks && <td className="py-2">{formatNumber(c.clicks)}</td>}
-                    {visibleColumns.outboundClicks && <td className="py-2">{formatNumber(c.outboundClicks || 0)}</td>}
-                    {visibleColumns.roas && (
-                      <td className="py-2">
-                        <span className={`font-semibold ${c.roas >= 3 ? 'text-green-600' : c.roas >= 2 ? 'text-yellow-600' : 'text-red-600'}`}>
-                          {(c.roas || 0).toFixed(1)}x
-                        </span>
-                      </td>
-                    )}
-                    {visibleColumns.revenue && <td className="py-2">{formatCurrency(c.revenue || 0)}</td>}
-                  </tr>
-                ))}
-              </tbody>
-              {(() => { const t = calcTotals(filteredCampaigns); const o = overview; return (
-              <tfoot>
-                <tr className="border-t border-slate-200 bg-slate-50 text-slate-600">
-                  <td className="py-2 font-medium">إجمالي الظاهر ({filteredCampaigns.length})</td>
-                  {visibleColumns.status && <td className="py-2"></td>}
-                  {visibleColumns.spend && <td className="py-2">{formatCurrency(t.spend)}</td>}
-                  {visibleColumns.cpm && <td className="py-2">{formatCurrency(t.cpm)}</td>}
-                  {visibleColumns.outboundCtr && <td className="py-2">{t.outboundCtr.toFixed(2)}%</td>}
-                  {visibleColumns.frequency && <td className="py-2">{t.frequency.toFixed(2)}</td>}
-                  {visibleColumns.leads && <td className="py-2">{formatNumber(t.leads)}</td>}
-                  {visibleColumns.cpl && <td className="py-2">{formatCurrency(t.cpl)}</td>}
-                  {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(t.confirmedOrders)}</td>}
-                  {visibleColumns.cpp && <td className="py-2">{formatCurrency(t.cpp)}</td>}
-                  {visibleColumns.impressions && <td className="py-2">{formatNumber(t.impressions)}</td>}
-                  {visibleColumns.reach && <td className="py-2">{formatNumber(t.reach)}</td>}
-                  {visibleColumns.clicks && <td className="py-2">{formatNumber(t.clicks)}</td>}
-                  {visibleColumns.outboundClicks && <td className="py-2">{formatNumber(t.outboundClicks)}</td>}
-                  {visibleColumns.roas && <td className="py-2">{t.roas.toFixed(1)}x</td>}
-                  {visibleColumns.revenue && <td className="py-2">{formatCurrency(t.revenue)}</td>}
-                </tr>
-                <tr className="border-t-2 border-slate-300 bg-blue-50 font-bold text-slate-800">
-                  <td className="py-2">الإجمالي الفعلي (من Meta)</td>
-                  {visibleColumns.status && <td className="py-2"></td>}
-                  {visibleColumns.spend && <td className="py-2">{formatCurrency(o.totalSpend || 0)}</td>}
-                  {visibleColumns.cpm && <td className="py-2">—</td>}
-                  {visibleColumns.outboundCtr && <td className="py-2">—</td>}
-                  {visibleColumns.frequency && <td className="py-2">—</td>}
-                  {visibleColumns.leads && <td className="py-2">{formatNumber(o.totalLeads || 0)}</td>}
-                  {visibleColumns.cpl && <td className="py-2">{formatCurrency(o.overallCPL || 0)}</td>}
-                  {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(o.totalConfirmedOrders || 0)}</td>}
-                  {visibleColumns.cpp && <td className="py-2">{formatCurrency(o.overallCPP || 0)}</td>}
-                  {visibleColumns.impressions && <td className="py-2">—</td>}
-                  {visibleColumns.reach && <td className="py-2">—</td>}
-                  {visibleColumns.clicks && <td className="py-2">—</td>}
-                  {visibleColumns.outboundClicks && <td className="py-2">—</td>}
-                  {visibleColumns.roas && <td className="py-2">{(o.overallROAS || 0).toFixed(1)}x</td>}
-                  {visibleColumns.revenue && <td className="py-2">—</td>}
-                </tr>
-              </tfoot>
-              ); })()}
-            </table>
-          </div>
-        )}
-      </div>}
-
-      {/* Ad Sets Tab */}
-      {activeTab === 'adsets' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <h3 className="font-semibold text-slate-700 mb-4">تقارير الأد سيت</h3>
-          {adSets.length === 0 ? (
-            <p className="text-slate-400 text-sm py-4 text-center">لا يوجد بيانات. اعمل مزامنة أولاً.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-slate-500 border-b">
-                    <th className="text-right py-2">الأد سيت</th>
-                    <th className="text-right py-2">الحملة</th>
-                    <th className="text-right py-2">الحالة</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('spend')}>الإنفاق{sortArrow('spend')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('cpm')}>CPM{sortArrow('cpm')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('outboundCtr')}>Outbound CTR{sortArrow('outboundCtr')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('frequency')}>التكرار{sortArrow('frequency')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('leads')}>ليدز{sortArrow('leads')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('cpl')}>CPL{sortArrow('cpl')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {adSets
-                    .filter((a) => !filterStatus || a.status === filterStatus)
-                    .filter((a) => !filterActivity || (filterActivity === 'active' ? a.spend > 0 || a.impressions > 0 : a.spend === 0 && a.impressions === 0))
-                    .sort((a, b) => { const av = a[sortKey] ?? 0; const bv = b[sortKey] ?? 0; return sortDir === 'desc' ? (bv > av ? 1 : -1) : (av > bv ? 1 : -1); })
-                    .map((a) => (
-                    <tr key={a.id} className="border-b last:border-0 hover:bg-slate-50">
-                      <td className="py-2 font-medium">{a.name}</td>
-                      <td className="py-2 text-xs text-slate-400">{a.campaignName}</td>
-                      <td className="py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${a.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{a.status === 'ACTIVE' ? 'نشط' : 'متوقف'}</span></td>
-                      <td className="py-2">{formatCurrency(a.spend)}</td>
-                      <td className="py-2">{formatCurrency(a.cpm || 0)}</td>
-                      <td className="py-2">{(a.outboundCtr || 0).toFixed(2)}%</td>
-                      <td className="py-2">{(a.frequency || 0).toFixed(2)}</td>
-                      <td className="py-2">{formatNumber(a.leads)}</td>
-                      <td className="py-2">{formatCurrency(a.cpl || 0)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                {(() => { const filtered = adSets.filter((a) => !filterStatus || a.status === filterStatus).filter((a) => !filterActivity || (filterActivity === 'active' ? a.spend > 0 || a.impressions > 0 : a.spend === 0 && a.impressions === 0)); const t = calcTotals(filtered); return (
-                <tfoot>
-                  <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold text-slate-700">
-                    <td className="py-2">الإجمالي ({filtered.length})</td>
-                    <td className="py-2"></td>
-                    <td className="py-2"></td>
-                    <td className="py-2">{formatCurrency(t.spend)}</td>
-                    <td className="py-2">{formatCurrency(t.cpm)}</td>
-                    <td className="py-2">{t.outboundCtr.toFixed(2)}%</td>
-                    <td className="py-2">{t.frequency.toFixed(2)}</td>
-                    <td className="py-2">{formatNumber(t.leads)}</td>
-                    <td className="py-2">{formatCurrency(t.cpl)}</td>
-                  </tr>
-                </tfoot>
-                ); })()}
-              </table>
+              <select
+                value={searchLevel}
+                onChange={(e) => setSearchLevel(e.target.value as 'campaign' | 'adset' | 'ad')}
+                className="border rounded-lg px-2 py-2 text-sm text-slate-700"
+              >
+                <option value="campaign">بحث في: الحملات</option>
+                <option value="adset">بحث في: الأد سيت</option>
+                <option value="ad">بحث في: الإعلانات</option>
+              </select>
+              <button onClick={expandAll} className="px-3 py-2 text-xs border rounded-lg text-slate-600 hover:bg-slate-50">توسيع الكل</button>
+              <button onClick={collapseAll} className="px-3 py-2 text-xs border rounded-lg text-slate-600 hover:bg-slate-50">طي الكل</button>
             </div>
-          )}
-        </div>
-      )}
+            <div className="relative">
+              <button
+                onClick={() => setShowColumnPicker(!showColumnPicker)}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs border rounded-lg text-slate-600 hover:bg-slate-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                تخصيص الأعمدة
+              </button>
+              {showColumnPicker && (
+                <div className="absolute left-0 top-full mt-1 bg-white border rounded-lg shadow-lg p-3 z-10 min-w-[200px]">
+                  {Object.entries(COLUMN_LABELS).map(([key, label]) => (
+                    <label key={key} className="flex items-center gap-2 py-1 text-sm cursor-pointer hover:bg-slate-50 px-1 rounded">
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns[key] ?? false}
+                        onChange={(e) => setVisibleColumns((prev) => ({ ...prev, [key]: e.target.checked }))}
+                        className="rounded"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
-      {/* Ads Tab */}
-      {activeTab === 'ads' && (
-        <div className="bg-white rounded-xl border border-slate-200 p-4">
-          <h3 className="font-semibold text-slate-700 mb-4">تقارير الإعلانات</h3>
-          {ads.length === 0 ? (
-            <p className="text-slate-400 text-sm py-4 text-center">لا يوجد بيانات. اعمل مزامنة أولاً.</p>
+          {sortedTree.length === 0 ? (
+            <p className="text-slate-400 text-sm py-4 text-center">
+              {campaigns.length === 0 ? 'لا يوجد حملات. اربط حساب إعلاني واعمل مزامنة.' : 'لا توجد نتائج مطابقة.'}
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-slate-500 border-b">
-                    <th className="text-right py-2">الإعلان</th>
-                    <th className="text-right py-2">الأد سيت</th>
-                    <th className="text-right py-2">الحالة</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('spend')}>الإنفاق{sortArrow('spend')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('cpm')}>CPM{sortArrow('cpm')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('outboundCtr')}>Outbound CTR{sortArrow('outboundCtr')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('frequency')}>التكرار{sortArrow('frequency')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('leads')}>ليدز{sortArrow('leads')}</th>
-                    <th className="text-right py-2 cursor-pointer" onClick={() => handleSort('cpl')}>CPL{sortArrow('cpl')}</th>
+                    <th className="text-right py-2 whitespace-nowrap min-w-[250px]">الاسم</th>
+                    {visibleColumns.status && <th className="text-right py-2">الحالة</th>}
+                    {visibleColumns.spend && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('spend')}>الإنفاق{sortArrow('spend')}</th>}
+                    {visibleColumns.cpm && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpm')}>CPM{sortArrow('cpm')}</th>}
+                    {visibleColumns.outboundCtr && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('outboundCtr')}>Outbound CTR{sortArrow('outboundCtr')}</th>}
+                    {visibleColumns.frequency && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('frequency')}>التكرار{sortArrow('frequency')}</th>}
+                    {visibleColumns.leads && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('leads')}>ليدز{sortArrow('leads')}</th>}
+                    {visibleColumns.cpl && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpl')}>CPL{sortArrow('cpl')}</th>}
+                    {visibleColumns.confirmedOrders && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('confirmedOrders')}>طلبات مؤكدة{sortArrow('confirmedOrders')}</th>}
+                    {visibleColumns.cpp && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpp')}>CPP{sortArrow('cpp')}</th>}
+                    {visibleColumns.impressions && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('impressions')}>الظهور{sortArrow('impressions')}</th>}
+                    {visibleColumns.reach && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('reach')}>الوصول{sortArrow('reach')}</th>}
+                    {visibleColumns.clicks && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('clicks')}>النقرات{sortArrow('clicks')}</th>}
+                    {visibleColumns.outboundClicks && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('outboundClicks')}>نقرات خارجية{sortArrow('outboundClicks')}</th>}
+                    {visibleColumns.roas && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('roas')}>ROAS{sortArrow('roas')}</th>}
+                    {visibleColumns.revenue && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('revenue')}>الإيرادات{sortArrow('revenue')}</th>}
                   </tr>
                 </thead>
                 <tbody>
-                  {ads
-                    .filter((a) => !filterStatus || a.status === filterStatus)
-                    .filter((a) => !filterActivity || (filterActivity === 'active' ? a.spend > 0 || a.impressions > 0 : a.spend === 0 && a.impressions === 0))
-                    .sort((a, b) => { const av = a[sortKey] ?? 0; const bv = b[sortKey] ?? 0; return sortDir === 'desc' ? (bv > av ? 1 : -1) : (av > bv ? 1 : -1); })
-                    .map((a) => (
-                    <tr key={a.id} className="border-b last:border-0 hover:bg-slate-50">
-                      <td className="py-2 font-medium">{a.name}</td>
-                      <td className="py-2 text-xs text-slate-400">{a.adSetName}</td>
-                      <td className="py-2"><span className={`text-xs px-2 py-0.5 rounded-full ${a.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{a.status === 'ACTIVE' ? 'نشط' : 'متوقف'}</span></td>
-                      <td className="py-2">{formatCurrency(a.spend)}</td>
-                      <td className="py-2">{formatCurrency(a.cpm || 0)}</td>
-                      <td className="py-2">{(a.outboundCtr || 0).toFixed(2)}%</td>
-                      <td className="py-2">{(a.frequency || 0).toFixed(2)}</td>
-                      <td className="py-2">{formatNumber(a.leads)}</td>
-                      <td className="py-2">{formatCurrency(a.cpl || 0)}</td>
-                    </tr>
+                  {sortedTree.map((c: any) => (
+                    <Fragment key={c.id}>
+                      {/* Campaign Row */}
+                      <tr className="border-b hover:bg-slate-50 bg-white">
+                        <td className="py-2">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => toggleCampaign(c.id)} className="p-0.5 hover:bg-slate-100 rounded flex-shrink-0">
+                              <svg className={`w-4 h-4 text-slate-400 transition-transform ${isCampaignExpanded(c.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
+                            <div>
+                              <div className="font-semibold text-slate-800">{c.name}</div>
+                              {c.brand && <div className="text-xs text-slate-400">{c.brand}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        {renderMetricCells(c, 'campaign')}
+                      </tr>
+
+                      {/* Ad Set Rows (nested) */}
+                      {isCampaignExpanded(c.id) && c._adSets.map((as: any) => (
+                        <Fragment key={as.id}>
+                          <tr className="border-b hover:bg-blue-50/30 bg-slate-50/50">
+                            <td className="py-2" style={{ paddingRight: '2rem' }}>
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => toggleAdSet(as.id)} className="p-0.5 hover:bg-slate-100 rounded flex-shrink-0">
+                                  <svg className={`w-3.5 h-3.5 text-slate-400 transition-transform ${isAdSetExpanded(as.id) ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                                <div className="font-medium text-slate-700 text-sm">{as.name}</div>
+                              </div>
+                            </td>
+                            {renderMetricCells(as, 'adset')}
+                          </tr>
+
+                          {/* Ad Rows (leaf) */}
+                          {isAdSetExpanded(as.id) && as._ads.map((ad: any) => (
+                            <tr key={ad.id} className="border-b hover:bg-blue-50/20 bg-slate-50/30">
+                              <td className="py-2" style={{ paddingRight: '3.5rem' }}>
+                                <div className="text-sm text-slate-600">{ad.name}</div>
+                              </td>
+                              {renderMetricCells(ad, 'ad')}
+                            </tr>
+                          ))}
+                        </Fragment>
+                      ))}
+                    </Fragment>
                   ))}
                 </tbody>
-                {(() => { const filtered = ads.filter((a) => !filterStatus || a.status === filterStatus).filter((a) => !filterActivity || (filterActivity === 'active' ? a.spend > 0 || a.impressions > 0 : a.spend === 0 && a.impressions === 0)); const t = calcTotals(filtered); return (
+                {(() => { const t = calcTotals(sortedTree); const o = overview; return (
                 <tfoot>
-                  <tr className="border-t-2 border-slate-300 bg-slate-50 font-bold text-slate-700">
-                    <td className="py-2">الإجمالي ({filtered.length})</td>
-                    <td className="py-2"></td>
-                    <td className="py-2"></td>
-                    <td className="py-2">{formatCurrency(t.spend)}</td>
-                    <td className="py-2">{formatCurrency(t.cpm)}</td>
-                    <td className="py-2">{t.outboundCtr.toFixed(2)}%</td>
-                    <td className="py-2">{t.frequency.toFixed(2)}</td>
-                    <td className="py-2">{formatNumber(t.leads)}</td>
-                    <td className="py-2">{formatCurrency(t.cpl)}</td>
+                  <tr className="border-t border-slate-200 bg-slate-50 text-slate-600">
+                    <td className="py-2 font-medium">إجمالي الظاهر ({sortedTree.length} حملة)</td>
+                    {visibleColumns.status && <td className="py-2"></td>}
+                    {visibleColumns.spend && <td className="py-2">{formatCurrency(t.spend)}</td>}
+                    {visibleColumns.cpm && <td className="py-2">{formatCurrency(t.cpm)}</td>}
+                    {visibleColumns.outboundCtr && <td className="py-2">{t.outboundCtr.toFixed(2)}%</td>}
+                    {visibleColumns.frequency && <td className="py-2">{t.frequency.toFixed(2)}</td>}
+                    {visibleColumns.leads && <td className="py-2">{formatNumber(t.leads)}</td>}
+                    {visibleColumns.cpl && <td className="py-2">{formatCurrency(t.cpl)}</td>}
+                    {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(t.confirmedOrders)}</td>}
+                    {visibleColumns.cpp && <td className="py-2">{formatCurrency(t.cpp)}</td>}
+                    {visibleColumns.impressions && <td className="py-2">{formatNumber(t.impressions)}</td>}
+                    {visibleColumns.reach && <td className="py-2">{formatNumber(t.reach)}</td>}
+                    {visibleColumns.clicks && <td className="py-2">{formatNumber(t.clicks)}</td>}
+                    {visibleColumns.outboundClicks && <td className="py-2">{formatNumber(t.outboundClicks)}</td>}
+                    {visibleColumns.roas && <td className="py-2">{t.roas.toFixed(1)}x</td>}
+                    {visibleColumns.revenue && <td className="py-2">{formatCurrency(t.revenue)}</td>}
+                  </tr>
+                  <tr className="border-t-2 border-slate-300 bg-blue-50 font-bold text-slate-800">
+                    <td className="py-2">الإجمالي الفعلي (من Meta)</td>
+                    {visibleColumns.status && <td className="py-2"></td>}
+                    {visibleColumns.spend && <td className="py-2">{formatCurrency(o.totalSpend || 0)}</td>}
+                    {visibleColumns.cpm && <td className="py-2">—</td>}
+                    {visibleColumns.outboundCtr && <td className="py-2">—</td>}
+                    {visibleColumns.frequency && <td className="py-2">—</td>}
+                    {visibleColumns.leads && <td className="py-2">{formatNumber(o.totalLeads || 0)}</td>}
+                    {visibleColumns.cpl && <td className="py-2">{formatCurrency(o.overallCPL || 0)}</td>}
+                    {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(o.totalConfirmedOrders || 0)}</td>}
+                    {visibleColumns.cpp && <td className="py-2">{formatCurrency(o.overallCPP || 0)}</td>}
+                    {visibleColumns.impressions && <td className="py-2">—</td>}
+                    {visibleColumns.reach && <td className="py-2">—</td>}
+                    {visibleColumns.clicks && <td className="py-2">—</td>}
+                    {visibleColumns.outboundClicks && <td className="py-2">—</td>}
+                    {visibleColumns.roas && <td className="py-2">{(o.overallROAS || 0).toFixed(1)}x</td>}
+                    {visibleColumns.revenue && <td className="py-2">—</td>}
                   </tr>
                 </tfoot>
                 ); })()}
