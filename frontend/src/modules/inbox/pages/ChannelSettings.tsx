@@ -207,8 +207,21 @@ export default function ChannelSettings() {
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => inboxApi.syncChannel(ch.id)}
-                  className="text-xs text-violet-600 hover:underline"
+                  onClick={async (e) => {
+                    const btn = e.currentTarget;
+                    btn.textContent = 'جاري المزامنة...';
+                    btn.disabled = true;
+                    try {
+                      const { data } = await inboxApi.syncChannel(ch.id);
+                      btn.textContent = `تم (${data.synced || 0})`;
+                      queryClient.invalidateQueries({ queryKey: ['inbox', 'channels'] });
+                      setTimeout(() => { btn.textContent = 'مزامنة'; btn.disabled = false; }, 3000);
+                    } catch {
+                      btn.textContent = 'فشل';
+                      setTimeout(() => { btn.textContent = 'مزامنة'; btn.disabled = false; }, 3000);
+                    }
+                  }}
+                  className="text-xs text-violet-600 hover:underline disabled:opacity-50"
                 >
                   مزامنة
                 </button>

@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import crypto from 'crypto';
 import { prisma } from '../../../db';
 import * as metaGraph from '../services/meta-graph.service';
+import * as conversationSync from '../services/conversation-sync.service';
+import * as commentSync from '../services/comment-sync.service';
 
 const router = Router();
 
@@ -113,8 +115,22 @@ router.post('/oauth/meta/connect', async (req: Request, res: Response) => {
  * POST /api/v1/inbox/channels/:id/sync — Trigger manual sync
  */
 router.post('/:id/sync', async (req: Request, res: Response) => {
-  // TODO: Implement full sync in Phase 5 (conversation-sync.service.ts)
-  res.json({ message: 'Sync triggered', channelId: String(req.params.id) });
+  const channelId = String(req.params.id);
+  try {
+    const channel = await prisma.inboxChannel.findUnique({ where: { id: channelId } });
+    if (!channel) return res.status(404).json({ error: 'Channel not found' });
+
+    let synced = 0;
+    if (channel.platform === 'messenger' || channel.platform === 'instagram_dm') {
+      synced = await conversationSync.syncConversations(channelId);
+    } else if (channel.platform === 'facebook_comments' || channel.platform === 'instagram_comments') {
+      synced = await commentSync.syncComments(channelId);
+    }
+
+    res.json({ message: 'Sync complete', channelId, synced });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Sync failed' });
+  }
 });
 
 /**
