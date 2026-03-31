@@ -129,6 +129,7 @@ router.post('/:id/sync', async (req: Request, res: Response) => {
 
     res.json({ message: 'Sync complete', channelId, synced });
   } catch (err: any) {
+    console.error('[Inbox Sync Error]', err.message || err);
     res.status(500).json({ error: err.message || 'Sync failed' });
   }
 });

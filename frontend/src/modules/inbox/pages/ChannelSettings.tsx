@@ -216,8 +216,10 @@ export default function ChannelSettings() {
                       btn.textContent = `تم (${data.synced || 0})`;
                       queryClient.invalidateQueries({ queryKey: ['inbox', 'channels'] });
                       setTimeout(() => { btn.textContent = 'مزامنة'; btn.disabled = false; }, 3000);
-                    } catch {
-                      btn.textContent = 'فشل';
+                    } catch (err: any) {
+                      const msg = err.response?.data?.error || 'فشل';
+                      btn.textContent = msg.length > 30 ? 'فشل' : msg;
+                      alert('خطأ في المزامنة: ' + msg);
                       setTimeout(() => { btn.textContent = 'مزامنة'; btn.disabled = false; }, 3000);
                     }
                   }}
