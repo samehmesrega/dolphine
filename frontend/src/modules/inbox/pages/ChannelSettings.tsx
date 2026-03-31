@@ -11,6 +11,11 @@ export default function ChannelSettings() {
   const [oauthStatus, setOauthStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle');
   const [oauthMessage, setOauthMessage] = useState('');
   const [availablePages, setAvailablePages] = useState<any[]>([]);
+  const [oauthToken, setOauthToken] = useState('');
+  const [selectedBrandId, setSelectedBrandId] = useState('');
+
+  const { data: brandsRes } = useQuery({ queryKey: ['brands'], queryFn: inboxApi.getBrands });
+  const brands = brandsRes?.data?.brands || [];
 
   // Handle OAuth callback — detect ?code= in URL
   useEffect(() => {
@@ -18,36 +23,47 @@ export default function ChannelSettings() {
     if (!code) return;
 
     setOauthStatus('processing');
-    setOauthMessage('جاري ربط الصفحات...');
+    setOauthMessage('جاري جلب الصفحات...');
 
     inboxApi.oauthCallback(code)
       .then(({ data }) => {
         if (data.pages && data.pages.length > 0) {
           setAvailablePages(data.pages);
+          setOauthToken(data._token || '');
           setOauthStatus('success');
-          setOauthMessage(`تم العثور على ${data.pages.length} صفحة. اختر الصفحات اللي عايز تربطها.`);
+          setOauthMessage(`تم العثور على ${data.pages.length} صفحة. اختر البراند واضغط ربط.`);
         } else {
-          setOauthStatus('success');
-          setOauthMessage('تم ربط الصفحات بنجاح');
-          queryClient.invalidateQueries({ queryKey: ['inbox', 'channels'] });
+          setOauthStatus('error');
+          setOauthMessage('لم يتم العثور على صفحات');
         }
-        // Clean the URL
         navigate('/inbox/settings', { replace: true });
       })
       .catch((err) => {
         setOauthStatus('error');
-        setOauthMessage(err.response?.data?.error || 'فشل في ربط الصفحات');
+        setOauthMessage(err.response?.data?.error || 'فشل في جلب الصفحات');
         navigate('/inbox/settings', { replace: true });
       });
   }, [searchParams]);
 
   const connectPage = async (page: any) => {
+    if (!oauthToken) {
+      alert('انتهت الجلسة — جرب ربط صفحة جديدة مرة تانية');
+      return;
+    }
+    if (!selectedBrandId) {
+      alert('اختر البراند الأول');
+      return;
+    }
     try {
-      await inboxApi.connectPage(page);
+      await inboxApi.connectPages({
+        pages: [{ pageId: page.id, pageName: page.name, instagramBusinessAccountId: page.instagramId }],
+        token: oauthToken,
+        brandId: selectedBrandId,
+      });
       setAvailablePages((prev) => prev.filter((p) => p.id !== page.id));
       queryClient.invalidateQueries({ queryKey: ['inbox', 'channels'] });
-    } catch (err) {
-      alert('فشل في ربط الصفحة');
+    } catch (err: any) {
+      alert(err.response?.data?.error || 'فشل في ربط الصفحة');
     }
   };
 
@@ -57,7 +73,7 @@ export default function ChannelSettings() {
   });
   const channels = channelsRes?.data || [];
 
-  const { data: _brandsRes } = useQuery({ queryKey: ['brands'], queryFn: inboxApi.getBrands });
+  // brands query is above (before useEffect)
 
   const deactivateMutation = useMutation({
     mutationFn: (id: string) => inboxApi.deactivateChannel(id),
@@ -124,16 +140,32 @@ export default function ChannelSettings() {
       {availablePages.length > 0 && (
         <div className="bg-white rounded-xl border border-violet-200 p-4 mb-6">
           <h2 className="font-semibold text-sm mb-3 text-slate-700">{oauthMessage}</h2>
+          <div className="mb-4">
+            <label className="text-sm text-slate-600 mb-1 block">اختر البراند:</label>
+            <select
+              value={selectedBrandId}
+              onChange={(e) => setSelectedBrandId(e.target.value)}
+              className="border rounded-lg px-3 py-2 text-sm w-full max-w-xs"
+            >
+              <option value="">-- اختر البراند --</option>
+              {brands.map((b: any) => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
           <div className="space-y-2">
             {availablePages.map((page: any) => (
               <div key={page.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                 <div>
                   <p className="font-medium text-sm">{page.name}</p>
-                  <p className="text-xs text-slate-400">ID: {page.id} — {page.category || 'Page'}</p>
+                  <p className="text-xs text-slate-400">
+                    ID: {page.id} {page.hasInstagram && ' — Instagram متصل'}
+                  </p>
                 </div>
                 <button
                   onClick={() => connectPage(page)}
-                  className="bg-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-violet-700"
+                  disabled={!selectedBrandId}
+                  className="bg-violet-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-violet-700 disabled:opacity-50"
                 >
                   ربط
                 </button>
