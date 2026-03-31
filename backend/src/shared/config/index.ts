@@ -59,6 +59,11 @@ export const config = {
   recaptcha: {
     secretKey: process.env.RECAPTCHA_SECRET_KEY || '',
   },
+  slack: {
+    clientId: process.env.SLACK_CLIENT_ID || '',
+    clientSecret: process.env.SLACK_CLIENT_SECRET || '',
+    redirectUri: process.env.SLACK_REDIRECT_URI || '',
+  },
   meta: {
     appId: process.env.META_APP_ID || '',
     appSecret: process.env.META_APP_SECRET || '',

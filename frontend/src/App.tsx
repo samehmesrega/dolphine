@@ -8,6 +8,7 @@ import ModuleSwitcher from './shared/Layout/ModuleSwitcher';
 import ErrorBoundary from './shared/components/ErrorBoundary';
 import FloatingBugButton from './shared/components/FloatingBugButton';
 import Login from './modules/auth/pages/Login';
+import SlackCallback from './modules/auth/pages/SlackCallback';
 import Register from './modules/auth/pages/Register';
 import ForgotPassword from './modules/auth/pages/ForgotPassword';
 import ResetPassword from './modules/auth/pages/ResetPassword';
@@ -41,6 +42,7 @@ function AppRoutes() {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/auth/slack/callback" element={<SlackCallback />} />
 
       {/* Marketing module (has its own shell) */}
       <Route

@@ -8,6 +8,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [slackLoading, setSlackLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -89,6 +90,31 @@ export default function Login() {
             {loading ? 'جاري الدخول...' : 'تسجيل الدخول'}
           </button>
         </form>
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200" /></div>
+          <div className="relative flex justify-center text-sm"><span className="bg-white px-3 text-slate-400">أو</span></div>
+        </div>
+
+        <button
+          type="button"
+          disabled={slackLoading}
+          onClick={async () => {
+            setSlackLoading(true);
+            setError('');
+            try {
+              const { data } = await api.get('/auth/slack');
+              window.location.href = data.url;
+            } catch {
+              setError('فشل الاتصال بـ Slack');
+              setSlackLoading(false);
+            }
+          }}
+          className="w-full flex items-center justify-center gap-3 py-2.5 border border-slate-300 rounded-lg hover:bg-slate-50 transition text-sm font-medium text-slate-700 disabled:opacity-50"
+        >
+          <svg width="20" height="20" viewBox="0 0 123 123" fill="none"><path d="M25.8 77.6a12.9 12.9 0 1 1-12.9-12.9h12.9v12.9Z" fill="#E01E5A"/><path d="M32.3 77.6a12.9 12.9 0 0 1 25.8 0v32.3a12.9 12.9 0 1 1-25.8 0V77.6Z" fill="#E01E5A"/><path d="M45.2 25.8a12.9 12.9 0 1 1 12.9-12.9v12.9H45.2Z" fill="#36C5F0"/><path d="M45.2 32.3a12.9 12.9 0 0 1 0 25.8H12.9a12.9 12.9 0 0 1 0-25.8h32.3Z" fill="#36C5F0"/><path d="M97 45.2a12.9 12.9 0 1 1 12.9 12.9H97V45.2Z" fill="#2EB67D"/><path d="M90.5 45.2a12.9 12.9 0 0 1-25.8 0V12.9a12.9 12.9 0 1 1 25.8 0v32.3Z" fill="#2EB67D"/><path d="M77.6 97a12.9 12.9 0 1 1-12.9 12.9V97h12.9Z" fill="#ECB22E"/><path d="M77.6 90.5a12.9 12.9 0 0 1 0-25.8h32.3a12.9 12.9 0 1 1 0 25.8H77.6Z" fill="#ECB22E"/></svg>
+          {slackLoading ? 'جاري التحويل...' : 'سجل دخول بـ Slack'}
+        </button>
 
         <div className="mt-4 space-y-2 text-center text-sm">
           <p>

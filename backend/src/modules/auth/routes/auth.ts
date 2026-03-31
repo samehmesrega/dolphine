@@ -346,6 +346,169 @@ router.post('/google', async (req: Request, res: Response) => {
   }
 });
 
+// ===== SLACK OAUTH =====
+
+// GET /auth/slack — returns Slack OAuth URL
+router.get('/slack', (_req: Request, res: Response) => {
+  if (!config.slack.clientId) {
+    res.status(500).json({ error: 'Slack OAuth غير مُعد — أضف SLACK_CLIENT_ID' });
+    return;
+  }
+  const state = require('crypto').randomBytes(16).toString('hex');
+  const url = `https://slack.com/oauth/v2/authorize?client_id=${config.slack.clientId}&user_scope=identity.basic,identity.email,identity.avatar&redirect_uri=${encodeURIComponent(config.slack.redirectUri)}&state=${state}`;
+  res.json({ url, state });
+});
+
+// POST /auth/slack/callback — exchange code for token + login/register
+router.post('/slack/callback', async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+    if (!code) {
+      res.status(400).json({ error: 'Authorization code مطلوب' });
+      return;
+    }
+
+    // Exchange code for access token
+    const tokenRes = await fetch('https://slack.com/api/oauth.v2.access', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: config.slack.clientId,
+        client_secret: config.slack.clientSecret,
+        code,
+        redirect_uri: config.slack.redirectUri,
+      }),
+    });
+    const tokenData = await tokenRes.json() as any;
+
+    if (!tokenData.ok) {
+      console.error('Slack token exchange failed:', tokenData.error);
+      res.status(400).json({ error: `Slack OAuth فشل: ${tokenData.error}` });
+      return;
+    }
+
+    // Get user identity
+    const identityRes = await fetch('https://slack.com/api/users.identity', {
+      headers: { Authorization: `Bearer ${tokenData.authed_user?.access_token}` },
+    });
+    const identity = await identityRes.json() as any;
+
+    if (!identity.ok) {
+      console.error('Slack identity failed:', identity.error);
+      res.status(400).json({ error: 'فشل جلب بيانات المستخدم من Slack' });
+      return;
+    }
+
+    const slackUser = identity.user;
+    const slackTeam = identity.team;
+    const email = (slackUser.email || '').toLowerCase();
+    const name = slackUser.name || '';
+    const avatar = slackUser.image_192 || slackUser.image_72 || '';
+    const slackId = slackUser.id;
+    const slackTeamId = slackTeam?.id || '';
+
+    if (!email) {
+      res.status(400).json({ error: 'الإيميل غير متوفر من Slack — تأكد من صلاحية identity.email' });
+      return;
+    }
+
+    // Check if user exists by email or slackId
+    let user = await prisma.user.findFirst({
+      where: { OR: [{ email }, { slackId }] },
+      include: {
+        role: { include: { rolePermissions: { include: { permission: true } } } },
+        userPermissions: { include: { permission: true } },
+      },
+    });
+
+    if (user) {
+      // Link Slack ID if not set
+      if (!user.slackId || !user.slackTeamId) {
+        await prisma.user.update({
+          where: { id: user.id },
+          data: { slackId, slackTeamId, avatarUrl: avatar || user.avatarUrl },
+        });
+      }
+
+      if (user.status === 'pending') {
+        res.status(403).json({ error: 'حسابك في انتظار موافقة المدير' });
+        return;
+      }
+      if (user.status === 'suspended' || !user.isActive) {
+        res.status(403).json({ error: 'حسابك معطّل — تواصل مع الإدارة' });
+        return;
+      }
+
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        config.jwt.secret,
+        { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
+      );
+      const permissions = getPermissions(user.role, user.userPermissions);
+      res.json({
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          avatarUrl: user.avatarUrl || avatar,
+          role: user.role
+            ? { id: user.role.id, name: user.role.name, slug: user.role.slug }
+            : { id: '', name: 'Pending', slug: 'pending' },
+          permissions,
+        },
+      });
+    } else {
+      // New user — create as pending
+      const pendingRole = await prisma.role.findUnique({ where: { slug: 'pending' } });
+      if (!pendingRole) {
+        res.status(500).json({ error: 'خطأ في الإعداد — دور pending غير موجود' });
+        return;
+      }
+
+      const newUser = await prisma.user.create({
+        data: {
+          name: name || email.split('@')[0],
+          email,
+          passwordHash: '',
+          roleId: pendingRole.id,
+          status: 'pending',
+          isActive: false,
+          authMethod: 'slack',
+          emailVerified: true,
+          slackId,
+          slackTeamId,
+          avatarUrl: avatar,
+        },
+      });
+
+      const admins = await prisma.user.findMany({
+        where: { isActive: true, role: { slug: { in: ['super_admin', 'admin'] } } },
+        select: { id: true },
+      });
+      if (admins.length > 0) {
+        await prisma.notification.createMany({
+          data: admins.map((a) => ({
+            userId: a.id,
+            type: 'new_registration',
+            title: 'طلب تسجيل جديد',
+            body: `مستخدم جديد سجّل بـ Slack: ${newUser.name} (${newUser.email}) — في انتظار الموافقة`,
+            link: '/settings/pending',
+          })),
+        });
+      }
+
+      res.status(201).json({
+        message: 'تم التسجيل بنجاح — حسابك في انتظار موافقة المدير',
+        pending: true,
+      });
+    }
+  } catch (err: any) {
+    console.error('Slack auth error:', err);
+    res.status(500).json({ error: 'خطأ في تسجيل الدخول بـ Slack' });
+  }
+});
+
 // ===== EMAIL VERIFICATION =====
 
 router.get('/verify-email/:token', async (req: Request, res: Response) => {

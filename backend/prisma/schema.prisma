@@ -28,6 +28,8 @@ model User {
   authMethod    String    @default("email") @map("auth_method") // "email", "google"
   emailVerified Boolean   @default(true) @map("email_verified")
   googleId      String?   @unique @map("google_id")
+  slackId       String?   @unique @map("slack_id")
+  slackTeamId   String?   @map("slack_team_id")
   avatarUrl     String?   @map("avatar_url")
   verificationToken String? @map("verification_token")
   resetToken        String? @map("reset_token")
