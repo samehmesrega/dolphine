@@ -52,7 +52,7 @@ router.use('/users', requireUsersAccess, usersRoutes);
 router.use('/products', productsRoutes);
 router.use('/orders', ordersRoutes);
 router.use('/customers', customersRoutes);
-router.use('/dashboard', dashboardRoutes);
+router.use('/dashboard', requirePermission('dashboard.view'), dashboardRoutes);
 router.use('/shifts', shiftsRoutes);
 router.use('/woocommerce', woocommerceRoutes);
 router.use('/form-connections', formConnectionsRoutes);

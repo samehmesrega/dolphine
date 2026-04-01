@@ -83,7 +83,9 @@ export default function Dashboard() {
   const [leadsDays, setLeadsDays] = useState(30);
   const [fraudPeriod, setFraudPeriod] = useState<'today' | 'thisWeek' | 'thisMonth'>('today');
 
-  const { data: stats, isLoading } = useQuery({
+  const PERIOD_LABELS: Record<string, string> = { today: 'اليوم', thisWeek: 'هذا الأسبوع', thisMonth: 'هذا الشهر' };
+
+  const { data: stats, isLoading, isError } = useQuery({
     queryKey: ['dashboard', 'stats'],
     queryFn: fetchStats,
   });
@@ -109,6 +111,14 @@ export default function Dashboard() {
     value: r.count,
     status: r.status,
   }));
+
+  if (isError) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-600 bg-red-50 inline-block px-6 py-3 rounded-lg">حدث خطأ في تحميل بيانات الداشبورد. حاول مرة أخرى.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -284,7 +294,7 @@ export default function Dashboard() {
       {/* Top Suspicious Agents */}
       {!loadingFraud && fraudStats && fraudStats.topSuspiciousAgents.length > 0 && (
         <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">سيلز مشتبه بهم (هذا الشهر)</h2>
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">سيلز مشتبه بهم ({PERIOD_LABELS[fraudPeriod]})</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -324,7 +334,7 @@ export default function Dashboard() {
       {/* Top Suspicious Phones */}
       {!loadingFraud && fraudStats && fraudStats.topSuspiciousPhones.length > 0 && (
         <div className="bg-white rounded-xl shadow p-6">
-          <h2 className="text-lg font-semibold text-slate-800 mb-4">أرقام محوّل متكررة (هذا الشهر)</h2>
+          <h2 className="text-lg font-semibold text-slate-800 mb-4">أرقام محوّل متكررة ({PERIOD_LABELS[fraudPeriod]})</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

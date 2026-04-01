@@ -19,7 +19,7 @@ function RateBar({ value }: { value: number }) {
           style={{ width: `${Math.min(value, 100)}%` }}
         />
       </div>
-      <span className="text-xs text-slate-500 w-8 text-left">{value}%</span>
+      <span className="text-xs text-slate-500 w-8 text-left">{Math.min(value, 100)}%</span>
     </div>
   );
 }

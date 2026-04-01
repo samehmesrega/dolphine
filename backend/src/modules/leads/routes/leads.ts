@@ -7,6 +7,7 @@ import { AuthRequest } from '../../../shared/middleware/auth';
 import { getNextAssignedUserId } from '../services/roundRobin';
 import { auditLog } from '../services/audit';
 import { syncCommunicationToSheet } from '../services/googleSheetsWrite';
+import { parseDateRangeCairo } from '../../../shared/services/metrics.service';
 
 const router = Router();
 
@@ -60,10 +61,10 @@ router.get('/', async (req: Request, res: Response) => {
       where.assignedToId = assignedToId;
     }
     if (from || to) {
+      const [fromDate, toDate] = parseDateRangeCairo(from, to);
       where.createdAt = {};
-      // Egypt timezone (UTC+2) — midnight in Egypt = 10:00 PM previous day in UTC
-      if (from) where.createdAt.gte = new Date(from + 'T00:00:00+02:00');
-      if (to) where.createdAt.lte = new Date(to + 'T23:59:59.999+02:00');
+      if (from) where.createdAt.gte = fromDate;
+      if (to) where.createdAt.lte = toDate;
     }
     if (search && search.trim()) {
       const s = search.trim().replace(/^#/, ''); // شيل # لو موجود
