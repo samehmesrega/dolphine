@@ -782,12 +782,15 @@ router.post('/:id/backfill-dolphin', async (req: Request, res: Response) => {
       res.status(400).json({ error: 'startRow يجب أن يكون رقم >= 2' });
       return;
     }
+    const maxRows = req.body?.maxRows ? Number(req.body.maxRows) : undefined;
 
     const result = await backfillDolphinDataToSheet(
       conn.spreadsheetId,
       conn.sheetName,
       mapping.phone,
       startRow,
+      maxRows,
+      mapping,
     );
 
     res.json({ success: true, ...result });

@@ -4,8 +4,8 @@
  * Env var: GOOGLE_SERVICE_ACCOUNT_KEY (JSON string أو base64)
  *
  * الأعمدة الثابتة:
- *   T → السيلز المسؤول
- *   U → حالة الليد
+ *   T → السيلز المسؤول (بأسماء الشيت من userMapping)
+ *   U → حالة الليد (بأسماء الشيت من statusMapping)
  *   V → ملاحظات التواصل (تتراكم)
  *   X → قيمة الطلب
  */
@@ -19,6 +19,13 @@ interface ServiceAccountCredentials {
   client_email: string;
   private_key: string;
   token_uri: string;
+}
+
+interface FieldMapping {
+  phone?: string;
+  userMapping?: Record<string, string>;   // sheetName → dolphinUserId
+  statusMapping?: Record<string, string>; // sheetStatus → dolphinSlug
+  [k: string]: unknown;
 }
 
 let cachedToken: { token: string; expires: number } | null = null;
@@ -86,6 +93,38 @@ function colLetter(index: number): string {
   return String.fromCharCode(64 + Math.floor(index / 26)) + String.fromCharCode(65 + (index % 26));
 }
 
+/** عكس userMapping: من dolphinUserId → اسم المودريتور على الشيت */
+function reverseUserMapping(mapping: FieldMapping): Record<string, string> {
+  const reversed: Record<string, string> = {};
+  if (mapping.userMapping) {
+    for (const [sheetName, userId] of Object.entries(mapping.userMapping)) {
+      // لو فيه أكتر من اسم لنفس الـ userId، الأول يكسب
+      if (!reversed[userId]) reversed[userId] = sheetName;
+    }
+  }
+  return reversed;
+}
+
+/** عكس statusMapping: من dolphinSlug → اسم الحالة على الشيت */
+function reverseStatusMapping(mapping: FieldMapping): Record<string, string> {
+  const reversed: Record<string, string> = {};
+  if (mapping.statusMapping) {
+    for (const [sheetStatus, slug] of Object.entries(mapping.statusMapping)) {
+      // لو فيه أكتر من اسم لنفس الـ slug، الأول يكسب
+      if (!reversed[slug]) reversed[slug] = sheetStatus;
+    }
+  }
+  return reversed;
+}
+
+const COMM_TYPE_LABELS: Record<string, string> = {
+  call: 'مكالمة', whatsapp: 'واتساب', email: 'إيميل', physical: 'زيارة',
+};
+
+function formatCommNote(_type: string, notes: string | null, _userName: string, _date?: Date): string {
+  return notes?.trim() || '';
+}
+
 /**
  * مزامنة بيانات الليد للشيت — يُستدعى عند:
  *   1. تسجيل تواصل جديد
@@ -107,7 +146,7 @@ export async function syncLeadDataToSheet(
     where: { id: leadId },
     include: {
       status: true,
-      assignedTo: { select: { name: true } },
+      assignedTo: { select: { id: true, name: true } },
       orders: {
         where: { deletedAt: null },
         include: { orderItems: true },
@@ -125,10 +164,6 @@ export async function syncLeadDataToSheet(
   });
   if (connections.length === 0) return;
 
-  // ─── تجهيز البيانات ───
-  const salesName = lead.assignedTo?.name || '—';
-  const statusName = lead.status?.name || '—';
-
   // قيمة الطلب
   let orderValue = '';
   if (lead.orders.length > 0) {
@@ -143,19 +178,23 @@ export async function syncLeadDataToSheet(
   // ملاحظة التواصل
   let commNote = '';
   if (commInfo) {
-    const typeLabels: Record<string, string> = {
-      call: 'مكالمة', whatsapp: 'واتساب', email: 'إيميل', physical: 'زيارة',
-    };
-    const now = new Date();
-    const dateStr = `${now.getDate()}/${now.getMonth() + 1} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    commNote = `[${dateStr}] ${typeLabels[commInfo.type] || commInfo.type} — ${commInfo.salesName}${commInfo.notes ? ` — "${commInfo.notes}"` : ''}`;
+    commNote = formatCommNote(commInfo.type, commInfo.notes, commInfo.salesName);
   }
 
   for (const conn of connections) {
     try {
-      const mapping = (conn.fieldMapping ?? {}) as { phone?: string; [k: string]: unknown };
+      const mapping = (conn.fieldMapping ?? {}) as FieldMapping;
       const phoneColumn = mapping.phone;
       if (!phoneColumn) continue;
+
+      // عكس الـ mappings للكتابة بأسماء الشيت
+      const userIdToSheetName = reverseUserMapping(mapping);
+      const slugToSheetStatus = reverseStatusMapping(mapping);
+
+      const sheetSalesName = (lead.assignedTo?.id && userIdToSheetName[lead.assignedTo.id])
+        || lead.assignedTo?.name || '—';
+      const sheetStatusName = (lead.status?.slug && slugToSheetStatus[lead.status.slug])
+        || lead.status?.name || '—';
 
       // قراءة الشيت
       const range = encodeURIComponent(`${conn.sheetName}!A1:ZZ`);
@@ -195,8 +234,8 @@ export async function syncLeadDataToSheet(
 
       // تحديث الأعمدة دفعة واحدة
       const updates: Array<{ range: string; values: string[][] }> = [
-        { range: `${conn.sheetName}!${colLetter(COL_T)}${targetRow}`, values: [[salesName]] },
-        { range: `${conn.sheetName}!${colLetter(COL_U)}${targetRow}`, values: [[statusName]] },
+        { range: `${conn.sheetName}!${colLetter(COL_T)}${targetRow}`, values: [[sheetSalesName]] },
+        { range: `${conn.sheetName}!${colLetter(COL_U)}${targetRow}`, values: [[sheetStatusName]] },
       ];
       if (commNote) {
         updates.push({ range: `${conn.sheetName}!${colLetter(COL_V)}${targetRow}`, values: [[notesValue]] });
@@ -217,7 +256,7 @@ export async function syncLeadDataToSheet(
         continue;
       }
 
-      console.log(`[Sheets Write] Synced lead ${lead.phone} → row ${targetRow} (T=${salesName}, U=${statusName}${orderValue ? `, X=${orderValue}` : ''})`);
+      console.log(`[Sheets Write] Synced lead ${lead.phone} → row ${targetRow} (T=${sheetSalesName}, U=${sheetStatusName}${orderValue ? `, X=${orderValue}` : ''})`);
     } catch (err) {
       console.error(`[Sheets Write] Failed for connection ${conn.spreadsheetId}:`, err);
     }
@@ -235,19 +274,26 @@ export async function syncCommunicationToSheet(
 }
 
 /**
- * Backfill — مزامنة بيانات دولفين (T,U,X) للشيت لصفوف موجودة
+ * Backfill — مزامنة بيانات دولفين (T,U,V,X) للشيت لصفوف موجودة
  * بيقرأ الشيت من startRow، بيطابق كل صف بالفون مع ليد في دولفين،
- * وبيكتب السيلز والحالة وقيمة الطلب.
+ * وبيكتب السيلز والحالة وآخر تواصل وقيمة الطلب — بأسماء الشيت.
  */
 export async function backfillDolphinDataToSheet(
   spreadsheetId: string,
   sheetName: string,
   phoneColumnName: string,
   startRow: number,
+  maxRows?: number,
+  fieldMapping?: FieldMapping,
   onProgress?: (done: number, total: number) => void,
 ): Promise<{ synced: number; notFound: number; skipped: number; total: number }> {
   const token = await getAccessToken();
   if (!token) throw new Error('Google Service Account غير مُعد');
+
+  // عكس الـ mappings
+  const mapping = fieldMapping ?? {};
+  const userIdToSheetName = reverseUserMapping(mapping);
+  const slugToSheetStatus = reverseStatusMapping(mapping);
 
   // قراءة الشيت
   const range = encodeURIComponent(`${sheetName}!A1:ZZ`);
@@ -269,10 +315,11 @@ export async function backfillDolphinDataToSheet(
     return { synced: 0, notFound: 0, skipped: 0, total: 0 };
   }
 
-  const targetRows = rows.slice(dataStartIndex);
+  const allTargetRows = rows.slice(dataStartIndex);
+  const targetRows = maxRows ? allTargetRows.slice(0, maxRows) : allTargetRows;
   let synced = 0, notFound = 0, skipped = 0;
 
-  // تجميع التحديثات في batches عشان نقلل عدد الطلبات
+  // تجميع التحديثات في batches
   const BATCH_SIZE = 50;
   let batchUpdates: Array<{ range: string; values: string[][] }> = [];
 
@@ -294,21 +341,32 @@ export async function backfillDolphinDataToSheet(
       orderBy: { createdAt: 'desc' },
       include: {
         status: true,
-        assignedTo: { select: { name: true } },
+        assignedTo: { select: { id: true, name: true } },
         orders: {
           where: { deletedAt: null },
           include: { orderItems: true },
           orderBy: { createdAt: 'desc' },
           take: 1,
         },
+        communications: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          include: { user: { select: { name: true } } },
+        },
       },
     });
 
     if (!lead) { notFound++; continue; }
 
-    const salesName = lead.assignedTo?.name || '—';
-    const statusName = lead.status?.name || '—';
+    // السيلز — بأسماء الشيت
+    const sheetSalesName = (lead.assignedTo?.id && userIdToSheetName[lead.assignedTo.id])
+      || lead.assignedTo?.name || '—';
 
+    // الحالة — بأسماء الشيت
+    const sheetStatusName = (lead.status?.slug && slugToSheetStatus[lead.status.slug])
+      || lead.status?.name || '—';
+
+    // قيمة الطلب
     let orderValue = '';
     if (lead.orders.length > 0) {
       const order = lead.orders[0];
@@ -319,18 +377,33 @@ export async function backfillDolphinDataToSheet(
       orderValue = String(total - discount);
     }
 
+    // آخر تواصل
+    let lastCommNote = '';
+    if (lead.communications.length > 0) {
+      const comm = lead.communications[0];
+      lastCommNote = formatCommNote(
+        comm.type,
+        comm.notes,
+        comm.user?.name || '—',
+        comm.createdAt,
+      );
+    }
+
     // إضافة التحديثات
     batchUpdates.push(
-      { range: `${sheetName}!${colLetter(COL_T)}${sheetRowNumber}`, values: [[salesName]] },
-      { range: `${sheetName}!${colLetter(COL_U)}${sheetRowNumber}`, values: [[statusName]] },
+      { range: `${sheetName}!${colLetter(COL_T)}${sheetRowNumber}`, values: [[sheetSalesName]] },
+      { range: `${sheetName}!${colLetter(COL_U)}${sheetRowNumber}`, values: [[sheetStatusName]] },
     );
+    if (lastCommNote) {
+      batchUpdates.push({ range: `${sheetName}!${colLetter(COL_V)}${sheetRowNumber}`, values: [[lastCommNote]] });
+    }
     if (orderValue) {
       batchUpdates.push({ range: `${sheetName}!${colLetter(COL_X)}${sheetRowNumber}`, values: [[orderValue]] });
     }
     synced++;
 
     // إرسال الـ batch لما يمتلي
-    if (batchUpdates.length >= BATCH_SIZE * 3) {
+    if (batchUpdates.length >= BATCH_SIZE * 4) {
       const batchUrl = `${SHEETS_API}/${spreadsheetId}/values:batchUpdate?access_token=${token}`;
       const batchRes = await fetch(batchUrl, {
         method: 'POST',
