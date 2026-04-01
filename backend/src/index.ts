@@ -224,6 +224,7 @@ app.use('/api/webhooks/meta', metaWebhookLimiter, require('./modules/inbox/route
 // Keeping old path for backwards compatibility with WordPress plugins
 app.use('/api/webhooks', webhookLimiter, require('./modules/leads/routes/webhooks').default);
 app.use('/api/webhooks/bosta', webhookLimiter, require('./modules/leads/routes/bosta-webhook').default);
+app.use('/api/webhooks/woocommerce', webhookLimiter, require('./modules/leads/routes/woocommerce-webhook').default);
 
 // === Backwards compatibility: /api/* routes redirect to /api/v1/* ===
 // This ensures the existing frontend works while we migrate
