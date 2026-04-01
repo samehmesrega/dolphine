@@ -111,8 +111,6 @@ export default function LeadsList() {
   const setSearch = (v: string) => updateParams({ q: v, page: '' });
   const setStatusId = (v: string) => updateParams({ status: v, page: '' });
   const setAssignedToId = (v: string) => updateParams({ assigned: v, page: '' });
-  const setFromDate = (v: string) => updateParams({ from: v });
-  const setToDate = (v: string) => updateParams({ to: v });
   const setSortBy = (v: string) => updateParams({ sort: v });
   const setOrder = (v: string) => updateParams({ order: v });
   const setPage = (v: number) => updateParams({ page: v > 1 ? String(v) : '' });
@@ -542,14 +540,14 @@ export default function LeadsList() {
           <button
             className="px-4 py-2.5 border rounded-lg disabled:opacity-50 text-sm min-h-[44px]"
             disabled={page <= 1}
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            onClick={() => setPage(Math.max(1, page - 1))}
           >
             السابق
           </button>
           <button
             className="px-4 py-2.5 border rounded-lg disabled:opacity-50 text-sm min-h-[44px]"
             disabled={!!data && page >= Math.ceil(data.total / data.pageSize)}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => setPage(page + 1)}
           >
             التالي
           </button>
