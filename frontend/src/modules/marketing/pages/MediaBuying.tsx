@@ -94,22 +94,16 @@ export default function MediaBuying() {
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [sortKey, setSortKey] = useState<string>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>({
-    spend: true,
-    leads: true,
-    cpl: true,
-    confirmedOrders: true,
-    cpp: true,
-    roas: true,
-    cpm: false,
-    outboundCtr: false,
-    frequency: false,
-    clicks: false,
-    impressions: false,
-    reach: false,
-    outboundClicks: false,
-    revenue: false,
-    status: false,
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem('mb_columns');
+      if (saved) return JSON.parse(saved);
+    } catch { /* ignore */ }
+    return {
+      spend: true, leads: true, cpl: true, confirmedOrders: true, cpp: true, roas: true,
+      cpm: false, outboundCtr: false, frequency: false, clicks: false,
+      impressions: false, reach: false, outboundClicks: false, revenue: false, status: false,
+    };
   });
 
   const COLUMN_LABELS: Record<string, string> = {
@@ -141,7 +135,7 @@ export default function MediaBuying() {
 
   const filterKey = JSON.stringify(params);
 
-  const { data: overviewData } = useQuery({
+  const { data: overviewData, isError: overviewError } = useQuery({
     queryKey: ['mb-overview', filterKey],
     queryFn: () => mktApi.getMediaBuyingOverview(params),
   });
@@ -508,6 +502,12 @@ export default function MediaBuying() {
       {/* Overview Tab */}
       {activeTab === 'overview' && <>
 
+      {overviewError && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-lg text-sm mb-4">
+          تعذر تحميل البيانات من Meta — تأكد من اتصال حسابات الإعلانات.
+        </div>
+      )}
+
       {/* Overview Metrics */}
       <div className="space-y-4">
         {/* Row 1: Spend + Leads + CPL */}
@@ -688,7 +688,11 @@ export default function MediaBuying() {
                       <input
                         type="checkbox"
                         checked={visibleColumns[key] ?? false}
-                        onChange={(e) => setVisibleColumns((prev) => ({ ...prev, [key]: e.target.checked }))}
+                        onChange={(e) => setVisibleColumns((prev) => {
+                          const next = { ...prev, [key]: e.target.checked };
+                          try { localStorage.setItem('mb_columns', JSON.stringify(next)); } catch { /* */ }
+                          return next;
+                        })}
                         className="rounded"
                       />
                       {label}

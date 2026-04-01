@@ -17,7 +17,7 @@ export default function MarketingDashboard() {
 
   const params = getDateParams();
 
-  const { data: statsData } = useQuery({
+  const { data: statsData, isLoading, isError } = useQuery({
     queryKey: ['mkt-dashboard', dateRange],
     queryFn: () => getDashboardStats(params),
   });
@@ -34,6 +34,30 @@ export default function MarketingDashboard() {
   const recentLeads: any[] = stats?.recentLeads || [];
   const bySource: any[] = sourcesData?.data?.bySource || [];
   const byUtmSource: any[] = sourcesData?.data?.byUtmSource || [];
+
+  if (isError) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-600 bg-red-50 inline-block px-6 py-3 rounded-lg">حدث خطأ في تحميل بيانات الداشبورد. حاول مرة أخرى.</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-slate-800">دولفين ماركتينج</h1>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white p-5 rounded-xl shadow animate-pulse">
+              <div className="h-3 bg-slate-200 rounded w-20 mb-3" />
+              <div className="h-6 bg-slate-200 rounded w-16" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
