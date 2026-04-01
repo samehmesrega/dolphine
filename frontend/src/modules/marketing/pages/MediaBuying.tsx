@@ -361,8 +361,8 @@ export default function MediaBuying() {
       {visibleColumns.frequency && <td className="py-2">{(item.frequency || 0).toFixed(2)}</td>}
       {visibleColumns.leads && <td className="py-2">{formatNumber(item.leads || 0)}</td>}
       {visibleColumns.cpl && <td className="py-2">{formatCurrency(item.cpl || 0)}</td>}
-      {visibleColumns.confirmedOrders && <td className="py-2">{level === 'campaign' ? formatNumber(item.confirmedOrders || 0) : '—'}</td>}
-      {visibleColumns.cpp && <td className="py-2">{level === 'campaign' ? formatCurrency(item.cpp || 0) : '—'}</td>}
+      {visibleColumns.confirmedOrders && <td className="py-2">{level === 'ad' ? '—' : formatNumber(item.confirmedOrders || 0)}</td>}
+      {visibleColumns.cpp && <td className="py-2">{level === 'ad' ? '—' : formatCurrency(item.cpp || 0)}</td>}
       {visibleColumns.impressions && <td className="py-2">{formatNumber(item.impressions || 0)}</td>}
       {visibleColumns.reach && <td className="py-2">{formatNumber(item.reach || 0)}</td>}
       {visibleColumns.clicks && <td className="py-2">{formatNumber(item.clicks || 0)}</td>}

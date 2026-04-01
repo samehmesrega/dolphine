@@ -1,4 +1,5 @@
 import { prisma } from '../../../db';
+import { parseDateRangeCairo } from '../../../shared/services/metrics.service';
 
 // === Exchange Rate (EGP → USD) ===
 
@@ -97,15 +98,13 @@ async function resolveAccountIds(filters: DashboardFilters): Promise<string[] | 
 function buildMetricWhere(filters: DashboardFilters, accountIds?: string[]) {
   const where: Record<string, unknown> = {};
   if (filters.from || filters.to) {
+    const [fromDate, toDate] = parseDateRangeCairo(
+      filters.from?.split('T')[0],
+      filters.to?.split('T')[0],
+    );
     where.date = {};
-    if (filters.from) {
-      // "2026-03-17" → start of day UTC
-      (where.date as Record<string, unknown>).gte = new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`);
-    }
-    if (filters.to) {
-      // "2026-03-24" → end of day UTC (include the full day)
-      (where.date as Record<string, unknown>).lte = new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`);
-    }
+    (where.date as Record<string, unknown>).gte = fromDate;
+    (where.date as Record<string, unknown>).lte = toDate;
   }
   if (accountIds && accountIds.length > 0) {
     where.adAccountId = { in: accountIds };
@@ -165,10 +164,12 @@ export async function getOverviewMetrics(filters: DashboardFilters) {
   const impressions = totalImpressions;
   const clicks = totalClicks;
 
-  // Date range for Dolphin queries
-  const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
-  const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
-  const dateWhere = dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {};
+  // Date range for Dolphin queries — Africa/Cairo timezone
+  const [cairoFrom, cairoTo] = parseDateRangeCairo(
+    filters.from?.split('T')[0],
+    filters.to?.split('T')[0],
+  );
+  const dateWhere = { createdAt: { gte: cairoFrom, lte: cairoTo } };
 
   // Dolphin leads count (actual leads in CRM)
   const dolphinLeads = await prisma.lead.count({
@@ -335,8 +336,7 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
 
   // Get confirmed orders per campaign from Dolphin Leads (via utm_campaign = ad set name)
   const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'confirmed' } });
-  const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
-  const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
+  const [dateFrom, dateTo] = parseDateRangeCairo(filters.from?.split('T')[0], filters.to?.split('T')[0]);
 
   const result = await Promise.all(campaigns.map(async (c) => {
     const totals = c.metrics.reduce(
@@ -429,8 +429,7 @@ export async function getCampaignDetail(id: string) {
 export async function getAdSetsWithMetrics(filters: DashboardFilters & { page?: number; pageSize?: number }) {
   const { page = 1, pageSize = 500 } = filters;
   const accountIds = await resolveAccountIds(filters);
-  const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
-  const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
+  const [dateFrom, dateTo] = parseDateRangeCairo(filters.from?.split('T')[0], filters.to?.split('T')[0]);
 
   const adSetWhere: any = {};
   if (accountIds && accountIds.length > 0) {
@@ -452,7 +451,10 @@ export async function getAdSetsWithMetrics(filters: DashboardFilters & { page?: 
     take: pageSize,
   });
 
-  const result = adSets.map((as) => {
+  // Get confirmed status for ad set level matching
+  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'confirmed' } });
+
+  const result = await Promise.all(adSets.map(async (as) => {
     const t = as.metrics.reduce(
       (acc, m) => ({
         spend: acc.spend + m.spend, impressions: acc.impressions + m.impressions, reach: acc.reach + m.reach,
@@ -461,18 +463,34 @@ export async function getAdSetsWithMetrics(filters: DashboardFilters & { page?: 
       }),
       { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, revenue: 0 }
     );
+
+    // Confirmed orders: match utmCampaign = adSet.name
+    let confirmedOrders = 0;
+    if (confirmedStatus && as.name) {
+      confirmedOrders = await prisma.lead.count({
+        where: {
+          utmCampaign: as.name,
+          createdAt: { gte: dateFrom, lte: dateTo },
+          statusId: confirmedStatus.id,
+          deletedAt: null,
+        },
+      });
+    }
+    const cpp = confirmedOrders > 0 ? t.spend / confirmedOrders : 0;
+
     return {
       id: as.id, name: as.name, status: as.status, campaignId: as.campaignId, campaignName: as.campaign.name,
       platform: as.campaign.adAccount.platform, brand: as.campaign.adAccount.brand?.name,
       spend: t.spend, impressions: t.impressions, reach: t.reach, clicks: t.clicks, outboundClicks: t.outboundClicks,
-      leads: t.leads, revenue: t.revenue,
+      leads: t.leads, confirmedOrders, revenue: t.revenue,
       frequency: t.reach > 0 ? +(t.impressions / t.reach).toFixed(2) : 0,
       cpm: t.impressions > 0 ? +((t.spend / t.impressions) * 1000).toFixed(2) : 0,
       outboundCtr: t.impressions > 0 ? +((t.outboundClicks / t.impressions) * 100).toFixed(2) : 0,
       cpl: t.leads > 0 ? +(t.spend / t.leads).toFixed(2) : 0,
+      cpp: +cpp.toFixed(2),
       roas: t.spend > 0 ? +(t.revenue / t.spend).toFixed(2) : 0,
     };
-  });
+  }));
 
   return { adSets: result, total: result.length };
 }
@@ -482,8 +500,7 @@ export async function getAdSetsWithMetrics(filters: DashboardFilters & { page?: 
 export async function getAdsWithMetrics(filters: DashboardFilters & { page?: number; pageSize?: number }) {
   const { page = 1, pageSize = 500 } = filters;
   const accountIds = await resolveAccountIds(filters);
-  const dateFrom = filters.from ? new Date(`${filters.from.split('T')[0]}T00:00:00.000Z`) : undefined;
-  const dateTo = filters.to ? new Date(`${filters.to.split('T')[0]}T23:59:59.999Z`) : undefined;
+  const [dateFrom, dateTo] = parseDateRangeCairo(filters.from?.split('T')[0], filters.to?.split('T')[0]);
 
   const adWhere: any = {};
   if (accountIds && accountIds.length > 0) {

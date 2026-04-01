@@ -1,4 +1,5 @@
 import { prisma } from '../../../db';
+import { parseDateRangeCairo } from '../../../shared/services/metrics.service';
 
 interface DateRange {
   from?: string;
@@ -8,15 +9,14 @@ interface DateRange {
 // === Creative ROI (cross-module: Marketing + Leads) ===
 
 export async function getCreativeROI(creativeCode: string, dateRange: DateRange) {
-  const dateFilter: any = {};
-  if (dateRange.from) dateFilter.gte = new Date(dateRange.from);
-  if (dateRange.to) dateFilter.lte = new Date(dateRange.to);
+  const [cairoFrom, cairoTo] = parseDateRangeCairo(dateRange.from?.split('T')[0], dateRange.to?.split('T')[0]);
+  const dateFilter = { gte: cairoFrom, lte: cairoTo };
 
   // 1. Ad spend from metrics
   const adMetrics = await prisma.adMetric.aggregate({
     where: {
       ad: { creativeCode },
-      ...(dateRange.from || dateRange.to ? { date: dateFilter } : {}),
+      date: dateFilter,
     },
     _sum: { spend: true, impressions: true, clicks: true },
   });
@@ -25,7 +25,7 @@ export async function getCreativeROI(creativeCode: string, dateRange: DateRange)
   const leadCount = await prisma.lead.count({
     where: {
       creativeCode,
-      ...(dateRange.from || dateRange.to ? { createdAt: dateFilter } : {}),
+      createdAt: dateFilter,
     },
   });
 
@@ -33,7 +33,7 @@ export async function getCreativeROI(creativeCode: string, dateRange: DateRange)
   const ordersData = await prisma.order.findMany({
     where: {
       lead: { creativeCode },
-      ...(dateRange.from || dateRange.to ? { createdAt: dateFilter } : {}),
+      createdAt: dateFilter,
     },
     include: { orderItems: true },
   });
@@ -65,11 +65,11 @@ export async function getCreativeROI(creativeCode: string, dateRange: DateRange)
 // === Marketing Dashboard Stats (cross-module) ===
 
 export async function getDashboardStats(dateRange: DateRange) {
-  const dateFilter: any = {};
-  if (dateRange.from) dateFilter.gte = new Date(dateRange.from);
-  if (dateRange.to) dateFilter.lte = new Date(dateRange.to);
-
-  const createdAtFilter = dateRange.from || dateRange.to ? { createdAt: dateFilter } : {};
+  const [cairoFrom, cairoTo] = parseDateRangeCairo(
+    dateRange.from?.split('T')[0],
+    dateRange.to?.split('T')[0],
+  );
+  const createdAtFilter = { createdAt: { gte: cairoFrom, lte: cairoTo } };
 
   // Parallel queries for speed
   const [
@@ -87,11 +87,11 @@ export async function getDashboardStats(dateRange: DateRange) {
   ] = await Promise.all([
     // Content stats
     prisma.creative.count({ where: createdAtFilter }),
-    prisma.creativeRequest.count({ where: { status: 'NEW' } }),
-    prisma.idea.count({ where: { status: 'NEW' } }),
+    prisma.creativeRequest.count({ where: { status: 'NEW', ...createdAtFilter } }),
+    prisma.idea.count({ where: { status: 'NEW', ...createdAtFilter } }),
     prisma.script.count({ where: createdAtFilter }),
-    prisma.landingPage.count(),
-    prisma.landingPage.count({ where: { status: 'PUBLISHED' } }),
+    prisma.landingPage.count({ where: createdAtFilter }),
+    prisma.landingPage.count({ where: { status: 'PUBLISHED', ...createdAtFilter } }),
 
     // Cross-module: Leads from marketing sources
     prisma.lead.count({
@@ -121,7 +121,7 @@ export async function getDashboardStats(dateRange: DateRange) {
 
     // Ad spend
     prisma.adMetric.aggregate({
-      where: dateRange.from || dateRange.to ? { date: dateFilter } : {},
+      where: { date: { gte: cairoFrom, lte: cairoTo } },
       _sum: { spend: true, leads: true, revenue: true },
     }),
 
