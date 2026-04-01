@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
+import { prisma } from '../../../db';
 import {
-  getTotalLeads,
-  getTotalOrders,
   getPendingOrders,
   getLeadsOverTime,
   getOrdersByStatus,
@@ -10,11 +9,12 @@ import {
 
 const router = Router();
 
+// Stats: all-time totals (no date filter) — matches original behavior
 router.get('/stats', async (_req: Request, res: Response) => {
   try {
     const [totalLeads, totalOrders, pendingOrders] = await Promise.all([
-      getTotalLeads(...parseDateRangeCairo()), // last 30 days default
-      getTotalOrders(...parseDateRangeCairo()),
+      prisma.lead.count({ where: { deletedAt: null } }),
+      prisma.order.count({ where: { deletedAt: null } }),
       getPendingOrders(),
     ]);
     res.json({ totalLeads, totalOrders, pendingOrders });
