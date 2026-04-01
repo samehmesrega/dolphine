@@ -6,7 +6,7 @@ import { normalizePhone } from '../../../shared/utils/phone';
 import { AuthRequest } from '../../../shared/middleware/auth';
 import { getNextAssignedUserId } from '../services/roundRobin';
 import { auditLog } from '../services/audit';
-import { syncCommunicationToSheet } from '../services/googleSheetsWrite';
+import { syncCommunicationToSheet, syncLeadDataToSheet } from '../services/googleSheetsWrite';
 import { parseDateRangeCairo } from '../../../shared/services/metrics.service';
 
 const router = Router();
@@ -359,6 +359,13 @@ router.patch('/:id', async (req: Request, res: Response) => {
       oldData: { name: lead.name, statusId: lead.statusId, assignedToId: lead.assignedToId },
       newData: { name: updated.name, statusId: updated.statusId, assignedToId: updated.assignedToId },
     });
+
+    // Sync to Google Sheets when status or assignee changes
+    if (updateData.statusId !== undefined || updateData.assignedToId !== undefined) {
+      syncLeadDataToSheet(id).catch((err) => {
+        console.error('[Sheets Sync] Lead update sync failed:', err);
+      });
+    }
 
     // لو اتغير التعيين → أكمل مهام الموظف القديم وأنشئ للجديد
     if (updateData.assignedToId !== undefined && updateData.assignedToId !== lead.assignedToId) {

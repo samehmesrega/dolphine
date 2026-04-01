@@ -12,6 +12,7 @@ import { extractSpreadsheetId, readHeaders, readRows } from '../services/googleS
 import { normalizePhone } from '../../../shared/utils/phone';
 import { getNextAssignedUserId } from '../services/roundRobin';
 import { encryptToken, decryptToken } from '../../../shared/utils/token-encryption';
+import { backfillDolphinDataToSheet } from '../services/googleSheetsWrite';
 
 const router = Router();
 
@@ -760,6 +761,39 @@ router.post('/:id/backfill-statuses', async (req: Request, res: Response) => {
     res.json({ success: true, updated, skipped, notFound, total: dataRows.length });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'خطأ';
+    res.status(500).json({ error: msg });
+  }
+});
+
+// POST /api/sheet-connections/:id/backfill-dolphin — مزامنة بيانات دولفين (سيلز، حالة، قيمة طلب) للشيت
+router.post('/:id/backfill-dolphin', async (req: Request, res: Response) => {
+  try {
+    const conn = await prisma.sheetConnection.findUnique({ where: { id: String(req.params.id) } });
+    if (!conn) { res.status(404).json({ error: 'الاتصال غير موجود' }); return; }
+
+    const mapping = (conn.fieldMapping ?? {}) as { phone?: string; [k: string]: unknown };
+    if (!mapping.phone) {
+      res.status(400).json({ error: 'عمود الموبايل (phone) غير محدد في الماپنج' });
+      return;
+    }
+
+    const startRow = req.body?.startRow ? Number(req.body.startRow) : 2;
+    if (isNaN(startRow) || startRow < 2) {
+      res.status(400).json({ error: 'startRow يجب أن يكون رقم >= 2' });
+      return;
+    }
+
+    const result = await backfillDolphinDataToSheet(
+      conn.spreadsheetId,
+      conn.sheetName,
+      mapping.phone,
+      startRow,
+    );
+
+    res.json({ success: true, ...result });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'خطأ';
+    console.error('Backfill dolphin data error:', msg);
     res.status(500).json({ error: msg });
   }
 });

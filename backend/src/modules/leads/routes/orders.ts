@@ -9,6 +9,7 @@ import { createWooCommerceOrder, isConfigured as isWooConfigured, addWooCommerce
 import { createBostaDelivery, isConfigured as isBostaConfigured, terminateDelivery } from '../services/bosta';
 import { auditLog } from '../services/audit';
 import { verifyTransfer } from '../services/transfer-verification';
+import { syncLeadDataToSheet } from '../services/googleSheetsWrite';
 
 const router = Router();
 
@@ -518,6 +519,11 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
         });
       }
     }
+
+    // Sync order value to Google Sheets (async, non-blocking)
+    syncLeadDataToSheet(leadId).catch((err) => {
+      console.error('[Sheets Sync] Order creation sync failed:', err);
+    });
 
     res.status(201).json({ order });
   } catch (err: unknown) {
