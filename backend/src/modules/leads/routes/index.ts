@@ -47,26 +47,22 @@ function requireUsersAccess(
 }
 
 router.use('/lead-statuses', leadStatusesRoutes);
-router.use('/leads', leadsRoutes);
+router.use('/leads', requirePermission('leads.view'), leadsRoutes);
 router.use('/users', requireUsersAccess, usersRoutes);
-router.use('/products', productsRoutes);
-router.use('/orders', ordersRoutes);
-router.use('/customers', customersRoutes);
+router.use('/products', requirePermission('leads.view'), productsRoutes);
+router.use('/orders', requirePermission('orders.view'), ordersRoutes);
+router.use('/customers', requirePermission('customers.view'), customersRoutes);
 router.use('/dashboard', requirePermission('dashboard.view'), dashboardRoutes);
-router.use('/shifts', shiftsRoutes);
-router.use('/woocommerce', woocommerceRoutes);
-router.use('/form-connections', formConnectionsRoutes);
-router.use(
-  '/sheet-connections',
-  requirePermission('integrations.manage'),
-  sheetConnectionsRoutes
-);
+router.use('/shifts', requirePermission('shifts.manage'), shiftsRoutes);
+router.use('/woocommerce', requirePermission('integrations.manage'), woocommerceRoutes);
+router.use('/form-connections', requirePermission('integrations.manage'), formConnectionsRoutes);
+router.use('/sheet-connections', requirePermission('integrations.manage'), sheetConnectionsRoutes);
 router.use('/notifications', notificationsRoutes);
-router.use('/audit-logs', auditLogsRoutes);
+router.use('/audit-logs', requirePermission('audit.view'), auditLogsRoutes);
 router.use('/reports', requirePermission('reports.view'), reportsRoutes);
 router.use('/tasks', tasksRoutes);
-router.use('/task-rules', taskRulesRoutes);
-router.use('/blacklist', blacklistRoutes);
-router.use('/integrations', integrationSettingsRoutes);
+router.use('/task-rules', requirePermission('tasks.manage'), taskRulesRoutes);
+router.use('/blacklist', requirePermission('blacklist.manage'), blacklistRoutes);
+router.use('/integrations', requirePermission('integrations.manage'), integrationSettingsRoutes);
 
 export default router;

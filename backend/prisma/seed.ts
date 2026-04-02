@@ -176,6 +176,72 @@ async function main() {
     });
   }
 
+  // === Seed Leads Permissions ===
+  const leadsPermissions = [
+    { name: 'عرض الليدز', slug: 'leads.view', module: 'leads', description: 'عرض قائمة الليدز والبحث فيها' },
+    { name: 'إضافة ليد', slug: 'leads.create', module: 'leads', description: 'إنشاء ليدز جديدة يدوياً' },
+    { name: 'تعديل ليد', slug: 'leads.edit', module: 'leads', description: 'تعديل بيانات الليد وحالته وتعيينه' },
+    { name: 'حذف ليد', slug: 'leads.delete', module: 'leads', description: 'حذف الليدز من النظام' },
+    { name: 'عرض الطلبات', slug: 'orders.view', module: 'leads', description: 'عرض قائمة الطلبات وتفاصيلها' },
+    { name: 'إنشاء طلب', slug: 'orders.create', module: 'leads', description: 'إنشاء طلب جديد من ليد' },
+    { name: 'تعديل طلب', slug: 'orders.edit', module: 'leads', description: 'تعديل بيانات الطلب وحالته' },
+    { name: 'عرض العملاء', slug: 'customers.view', module: 'leads', description: 'عرض قائمة العملاء وبياناتهم' },
+    { name: 'تعديل عميل', slug: 'customers.edit', module: 'leads', description: 'تعديل بيانات العميل' },
+    { name: 'إدارة الشيفتات', slug: 'shifts.manage', module: 'leads', description: 'إنشاء وتعديل الشيفتات وأعضائها' },
+    { name: 'عرض الداشبورد', slug: 'dashboard.view', module: 'leads', description: 'عرض داشبورد الإحصائيات والرسوم البيانية' },
+    { name: 'عرض التقارير', slug: 'reports.view', module: 'leads', description: 'عرض تقارير الأداء والمبيعات والمصادر' },
+    { name: 'سجل التدقيق', slug: 'audit.view', module: 'leads', description: 'عرض سجل التدقيق وتتبع التغييرات' },
+    { name: 'إدارة المنتجات', slug: 'products.manage', module: 'leads', description: 'إضافة وتعديل وإخفاء المنتجات' },
+    { name: 'إدارة المهام', slug: 'tasks.manage', module: 'leads', description: 'إنشاء وتعديل المهام وقواعد المهام' },
+    { name: 'إدارة الأرقام المحظورة', slug: 'blacklist.manage', module: 'leads', description: 'إضافة وحذف أرقام من القائمة السوداء' },
+    { name: 'إدارة التكامل', slug: 'integrations.manage', module: 'leads', description: 'إعدادات الربط مع الخدمات الخارجية' },
+    { name: 'إدارة المستخدمين', slug: 'users.manage', module: 'leads', description: 'إضافة وتعديل المستخدمين وأدوارهم' },
+  ];
+
+  for (const perm of leadsPermissions) {
+    await prisma.permission.upsert({
+      where: { slug: perm.slug },
+      update: { name: perm.name, description: perm.description, module: perm.module },
+      create: perm,
+    });
+  }
+  console.log(`  - Leads permissions: ${leadsPermissions.length}`);
+
+  // Assign leads permissions to admin roles
+  const adminRolesForLeads = await prisma.role.findMany({
+    where: { slug: { in: ['super_admin', 'admin'] } },
+  });
+  for (const role of adminRolesForLeads) {
+    for (const perm of leadsPermissions) {
+      const permission = await prisma.permission.findUnique({ where: { slug: perm.slug } });
+      if (permission) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+          update: {},
+          create: { roleId: role.id, permissionId: permission.id },
+        });
+      }
+    }
+  }
+
+  // Assign appropriate leads permissions to sales_manager
+  const salesManagerRole = await prisma.role.findUnique({ where: { slug: 'sales_manager' } });
+  if (salesManagerRole) {
+    const smPerms = ['leads.view', 'leads.create', 'leads.edit', 'leads.delete', 'orders.view', 'orders.create', 'orders.edit',
+      'customers.view', 'customers.edit', 'shifts.manage', 'dashboard.view', 'reports.view', 'products.manage', 'tasks.manage',
+      'blacklist.manage', 'users.manage'];
+    for (const slug of smPerms) {
+      const permission = await prisma.permission.findUnique({ where: { slug } });
+      if (permission) {
+        await prisma.rolePermission.upsert({
+          where: { roleId_permissionId: { roleId: salesManagerRole.id, permissionId: permission.id } },
+          update: {},
+          create: { roleId: salesManagerRole.id, permissionId: permission.id },
+        });
+      }
+    }
+  }
+
   // === Seed Knowledge Base Permissions ===
   const kbPermissions = [
     { name: 'KB - View', slug: 'kb.view', module: 'knowledge-base', description: 'عرض بنك المعلومات' },
