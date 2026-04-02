@@ -545,11 +545,15 @@ export async function getAdsWithMetrics(filters: DashboardFilters & { page?: num
       { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, revenue: 0 }
     );
 
-    // Dolphin leads for this ad (via creativeCode)
+    // Dolphin leads for this ad (via creativeCode, fallback to adSet.name)
     let dolphinLeads = 0;
     if (ad.creativeCode) {
       dolphinLeads = await prisma.lead.count({
         where: { creativeCode: ad.creativeCode, createdAt: { gte: dateFrom, lte: dateTo }, deletedAt: null },
+      });
+    } else if (ad.adSet?.name) {
+      dolphinLeads = await prisma.lead.count({
+        where: { utmCampaign: ad.adSet.name, createdAt: { gte: dateFrom, lte: dateTo }, deletedAt: null },
       });
     }
     const dolphinCpl = dolphinLeads > 0 ? t.spend / dolphinLeads : 0;

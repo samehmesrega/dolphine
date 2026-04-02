@@ -128,10 +128,19 @@ router.get(
         leadWhere = { utmCampaign: adSet.name, ...dateFilter };
 
       } else if (level === 'ad') {
-        // Ad level: match by creativeCode (direct link to leads)
-        const ad = await prisma.ad.findUnique({ where: { id: parentId }, select: { creativeCode: true } });
-        if (!ad?.creativeCode) { res.json({ breakdown: [] }); return; }
-        leadWhere = { creativeCode: ad.creativeCode, ...dateFilter };
+        const ad = await prisma.ad.findUnique({
+          where: { id: parentId },
+          select: { creativeCode: true, adSet: { select: { name: true } } },
+        });
+        if (!ad) { res.json({ breakdown: [] }); return; }
+        // Prefer creativeCode for exact match, fallback to adSet.name
+        if (ad.creativeCode) {
+          leadWhere = { creativeCode: ad.creativeCode, ...dateFilter };
+        } else if (ad.adSet?.name) {
+          leadWhere = { utmCampaign: ad.adSet.name, ...dateFilter };
+        } else {
+          res.json({ breakdown: [] }); return;
+        }
       }
 
       const breakdown = await getBreakdown(by, leadWhere);
