@@ -448,6 +448,7 @@ export async function getAdSetsWithMetrics(filters: DashboardFilters & { page?: 
       campaign: { select: { name: true, adAccount: { select: { platform: true, brand: true } } } },
       metrics: {
         where: {
+          adId: null, // Ad set level metrics only — exclude ad-level metrics
           ...(dateFrom || dateTo ? { date: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
         },
         select: { spend: true, impressions: true, reach: true, clicks: true, outboundClicks: true, leads: true, purchases: true, revenue: true, cpm: true },
