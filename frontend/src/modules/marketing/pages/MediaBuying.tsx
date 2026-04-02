@@ -521,17 +521,6 @@ export default function MediaBuying() {
             <option value="|zero">بدون نشاط</option>
           </select>
 
-          <select
-            value={breakdownBy}
-            onChange={(e) => setBreakdownBy(e.target.value as any)}
-            className="border rounded-lg px-2 py-1.5 text-sm text-slate-700"
-          >
-            <option value="">بدون تقسيم</option>
-            <option value="sales">تقسيم بالسيلز</option>
-            <option value="shift">تقسيم بالشيفت</option>
-            <option value="status">تقسيم بحالة الليد</option>
-          </select>
-
           {(filterPlatform || filterBrand || filterAccount || filterStatus || filterActivity) && (
             <button
               onClick={() => { setFilterPlatform(''); setFilterBrand(''); setFilterAccount(''); setFilterStatus(''); setFilterActivity(''); }}
@@ -731,6 +720,16 @@ export default function MediaBuying() {
               </select>
               <button onClick={expandAll} className="px-3 py-2 text-xs border rounded-lg text-slate-600 hover:bg-slate-50">توسيع الكل</button>
               <button onClick={collapseAll} className="px-3 py-2 text-xs border rounded-lg text-slate-600 hover:bg-slate-50">طي الكل</button>
+              <select
+                value={breakdownBy}
+                onChange={(e) => setBreakdownBy(e.target.value as any)}
+                className="border rounded-lg px-2 py-1.5 text-xs text-slate-600"
+              >
+                <option value="">بدون تقسيم</option>
+                <option value="sales">تقسيم بالسيلز</option>
+                <option value="shift">تقسيم بالشيفت</option>
+                <option value="status">تقسيم بحالة الليد</option>
+              </select>
             </div>
             <div className="relative">
               <button
@@ -843,12 +842,18 @@ export default function MediaBuying() {
 
                           {/* Ad Rows (leaf) */}
                           {isAdSetExpanded(as.id) && as._ads.map((ad: any) => (
-                            <tr key={ad.id} className="border-b hover:bg-blue-50/20 bg-slate-50/30">
-                              <td className="py-2" style={{ paddingRight: '3.5rem' }}>
-                                <div className="text-sm text-slate-600">{ad.name}</div>
-                              </td>
-                              {renderMetricCells(ad, 'ad')}
-                            </tr>
+                            <Fragment key={ad.id}>
+                              <tr className="border-b hover:bg-blue-50/20 bg-slate-50/30">
+                                <td className="py-2" style={{ paddingRight: '3.5rem' }}>
+                                  <div className="text-sm text-slate-600">{ad.name}</div>
+                                </td>
+                                {renderMetricCells(ad, 'ad')}
+                              </tr>
+                              {/* Breakdown rows for ad */}
+                              {breakdownBy && (
+                                <BreakdownRows parentId={ad.id} level="ad" by={breakdownBy} params={params} colCount={Object.values(visibleColumns).filter(Boolean).length + 1} />
+                              )}
+                            </Fragment>
                           ))}
                         </Fragment>
                       ))}
