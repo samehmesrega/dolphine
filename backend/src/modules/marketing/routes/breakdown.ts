@@ -130,14 +130,15 @@ router.get(
       } else if (level === 'ad') {
         const ad = await prisma.ad.findUnique({
           where: { id: parentId },
-          select: { creativeCode: true, adSet: { select: { name: true } } },
+          select: { name: true, creativeCode: true, adSet: { select: { name: true } } },
         });
         if (!ad) { res.json({ breakdown: [] }); return; }
-        // Prefer creativeCode for exact match, fallback to adSet.name
+        // utm_source={{ad.name}} & utm_campaign={{adset.name}}
         if (ad.creativeCode) {
           leadWhere = { creativeCode: ad.creativeCode, ...dateFilter };
-        } else if (ad.adSet?.name) {
-          leadWhere = { utmCampaign: ad.adSet.name, ...dateFilter };
+        } else if (ad.name) {
+          // Match by utmSource = ad.name (from UTM template)
+          leadWhere = { utmSource: ad.name, ...dateFilter };
         } else {
           res.json({ breakdown: [] }); return;
         }
