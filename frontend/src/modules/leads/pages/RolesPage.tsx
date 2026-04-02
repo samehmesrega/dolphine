@@ -24,6 +24,7 @@ const MODULE_LABELS: Record<string, { name: string; color: string; bg: string; b
   'knowledge-base': { name: 'بنك المعلومات', color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200' },
   inbox: { name: 'إنبوكس', color: 'text-purple-700', bg: 'bg-purple-50', border: 'border-purple-200' },
   settings: { name: 'إعدادات', color: 'text-slate-700', bg: 'bg-slate-50', border: 'border-slate-200' },
+  'dual-name': { name: 'Dual Name', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200' },
 };
 
 function Tooltip({ text, slug }: { text: string; slug: string }) {

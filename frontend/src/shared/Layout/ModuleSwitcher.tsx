@@ -8,6 +8,7 @@ const MODULES = [
     nameEn: 'Dolphin Leads',
     description: 'إدارة الليدز والعملاء والطلبات والمبيعات',
     path: '/leads/dashboard',
+    requiredPermission: 'leads.view',
     gradient: 'from-amber-500 to-orange-600',
     iconPath: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z',
   },
@@ -17,6 +18,7 @@ const MODULES = [
     nameEn: 'Dolphin Marketing',
     description: 'إدارة المحتوى والحملات والكريتيفز واللاندنج بيدجز',
     path: '/marketing',
+    requiredPermission: 'marketing.creatives.view',
     gradient: 'from-blue-500 to-indigo-600',
     iconPath: 'M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z',
   },
@@ -26,6 +28,7 @@ const MODULES = [
     nameEn: 'Knowledge Base',
     description: 'بنك معلومات شامل لكل منتج — صور، فيديوهات، أسئلة شائعة، ومواصفات',
     path: '/knowledge-base',
+    requiredPermission: 'kb.view',
     gradient: 'from-emerald-500 to-teal-600',
     iconPath: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
   },
@@ -35,6 +38,7 @@ const MODULES = [
     nameEn: 'Dolphin Inbox',
     description: 'رسائل وتعليقات ميتا — ماسنجر وانستجرام',
     path: '/inbox/conversations',
+    requiredPermission: 'inbox.view',
     gradient: 'from-purple-500 to-violet-600',
     iconPath: 'M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4',
   },
@@ -44,6 +48,7 @@ const MODULES = [
     nameEn: 'Dual Name Generator',
     description: 'مولد أسماء مزدوجة ثلاثية الأبعاد — تصدير STL و G-code',
     path: '/dual-name',
+    requiredPermission: 'dual-name.access',
     gradient: 'from-rose-500 to-pink-600',
     iconPath: 'M21 7.5V18M15 7.5V18M3 16.811V8.69c0-.864.933-1.406 1.683-.977l7.108 4.061a1.125 1.125 0 010 1.954l-7.108 4.061A1.125 1.125 0 013 16.811z',
   },
@@ -166,22 +171,33 @@ export default function ModuleSwitcher() {
         {/* Module Cards */}
         {token ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            {MODULES.map((mod) => (
-              <button
-                key={mod.slug}
-                onClick={() => navigate(mod.path)}
-                className={`bg-gradient-to-br ${mod.gradient} text-white rounded-2xl p-8 shadow-lg hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-200 text-right group`}
-              >
-                <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mb-4 group-hover:bg-white/30 transition-colors">
-                  <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d={mod.iconPath} />
-                  </svg>
-                </div>
-                <h2 className="text-xl font-bold mb-1">{mod.nameAr}</h2>
-                <p className="text-xs font-medium opacity-60 mb-2">{mod.nameEn}</p>
-                <p className="text-sm opacity-80">{mod.description}</p>
-              </button>
-            ))}
+            {MODULES.map((mod) => {
+              const hasAccess = !mod.requiredPermission || hasPermission(mod.requiredPermission);
+              return (
+                <button
+                  key={mod.slug}
+                  onClick={() => hasAccess && navigate(mod.path)}
+                  disabled={!hasAccess}
+                  className={`rounded-2xl p-8 shadow-lg text-right group transition-all duration-200 ${
+                    hasAccess
+                      ? `bg-gradient-to-br ${mod.gradient} text-white hover:shadow-2xl transform hover:-translate-y-1 cursor-pointer`
+                      : 'bg-slate-700/50 text-slate-400 cursor-not-allowed opacity-60'
+                  }`}
+                >
+                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center mb-4 transition-colors ${
+                    hasAccess ? 'bg-white/20 group-hover:bg-white/30' : 'bg-white/10'
+                  }`}>
+                    <svg className={`w-7 h-7 ${hasAccess ? 'text-white' : 'text-slate-500'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d={mod.iconPath} />
+                    </svg>
+                  </div>
+                  <h2 className="text-xl font-bold mb-1">{mod.nameAr}</h2>
+                  <p className="text-xs font-medium opacity-60 mb-2">{mod.nameEn}</p>
+                  <p className="text-sm opacity-80">{mod.description}</p>
+                  {!hasAccess && <p className="text-xs mt-2 opacity-50">ليس لديك صلاحية الوصول</p>}
+                </button>
+              );
+            })}
           </div>
         ) : (
           <Link

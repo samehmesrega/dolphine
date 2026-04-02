@@ -196,6 +196,7 @@ async function main() {
     { name: 'إدارة الأرقام المحظورة', slug: 'blacklist.manage', module: 'leads', description: 'إضافة وحذف أرقام من القائمة السوداء' },
     { name: 'إدارة التكامل', slug: 'integrations.manage', module: 'leads', description: 'إعدادات الربط مع الخدمات الخارجية' },
     { name: 'إدارة المستخدمين', slug: 'users.manage', module: 'leads', description: 'إضافة وتعديل المستخدمين وأدوارهم' },
+    { name: 'Dual Name', slug: 'dual-name.access', module: 'dual-name', description: 'الوصول لمولد الأسماء المزدوجة ثلاثية الأبعاد' },
   ];
 
   for (const perm of leadsPermissions) {
