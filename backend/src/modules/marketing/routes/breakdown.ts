@@ -18,13 +18,73 @@ type BreakdownRow = {
   orderCount: number;
 };
 
-/**
- * GET /api/v1/marketing/media-buying/breakdown
- * ?by=sales|shift|status
- * &level=campaign|adset|ad
- * &parentId=UUID
- * &from=YYYY-MM-DD&to=YYYY-MM-DD
- */
+// ── Shared breakdown builders ──
+
+async function buildSalesBreakdown(leadWhere: any, confirmedStatus: any): Promise<BreakdownRow[]> {
+  const groups = await prisma.lead.groupBy({ by: ['assignedToId'], where: leadWhere, _count: true });
+  const confirmedGroups = confirmedStatus
+    ? await prisma.lead.groupBy({ by: ['assignedToId'], where: { ...leadWhere, statusId: confirmedStatus.id }, _count: true })
+    : [];
+  const confirmedMap = new Map(confirmedGroups.map(g => [g.assignedToId, g._count]));
+  const agentIds = groups.map(g => g.assignedToId).filter(Boolean) as string[];
+  const users = agentIds.length > 0 ? await prisma.user.findMany({ where: { id: { in: agentIds } }, select: { id: true, name: true } }) : [];
+  const userMap = new Map(users.map(u => [u.id, u.name]));
+
+  return groups.map(g => ({
+    id: g.assignedToId || 'unassigned',
+    name: g.assignedToId ? (userMap.get(g.assignedToId) || 'غير معروف') : 'غير معيّن',
+    leadCount: g._count,
+    confirmedCount: confirmedMap.get(g.assignedToId) || 0,
+    orderCount: 0,
+  }));
+}
+
+async function buildShiftBreakdown(leadWhere: any, confirmedStatus: any): Promise<BreakdownRow[]> {
+  const leads = await prisma.lead.findMany({ where: leadWhere, select: { id: true, assignedToId: true, statusId: true } });
+  const assignedIds = [...new Set(leads.map(l => l.assignedToId).filter(Boolean))] as string[];
+  const shiftMembers = assignedIds.length > 0
+    ? await prisma.shiftMember.findMany({ where: { userId: { in: assignedIds } }, include: { shift: { select: { id: true, name: true } } } })
+    : [];
+  const userShiftMap = new Map<string, { id: string; name: string }>();
+  for (const sm of shiftMembers) {
+    if (!userShiftMap.has(sm.userId)) userShiftMap.set(sm.userId, { id: sm.shift.id, name: sm.shift.name });
+  }
+  const shiftAgg = new Map<string, { name: string; leads: number; confirmed: number }>();
+  for (const lead of leads) {
+    const shift = lead.assignedToId ? userShiftMap.get(lead.assignedToId) : null;
+    const key = shift?.id || 'no-shift';
+    const name = shift?.name || 'بدون شيفت';
+    const entry = shiftAgg.get(key) || { name, leads: 0, confirmed: 0 };
+    entry.leads++;
+    if (confirmedStatus && lead.statusId === confirmedStatus.id) entry.confirmed++;
+    shiftAgg.set(key, entry);
+  }
+  return Array.from(shiftAgg.entries()).map(([id, data]) => ({
+    id, name: data.name, leadCount: data.leads, confirmedCount: data.confirmed, orderCount: 0,
+  }));
+}
+
+async function buildStatusBreakdown(leadWhere: any): Promise<BreakdownRow[]> {
+  const groups = await prisma.lead.groupBy({ by: ['statusId'], where: leadWhere, _count: true });
+  const statusIds = groups.map(g => g.statusId).filter(Boolean);
+  const statuses = statusIds.length > 0 ? await prisma.leadStatus.findMany({ where: { id: { in: statusIds } }, select: { id: true, name: true, slug: true } }) : [];
+  const statusMap = new Map(statuses.map(s => [s.id, s]));
+  return groups.map(g => {
+    const status = statusMap.get(g.statusId);
+    return { id: g.statusId, name: status?.name || 'غير محدد', leadCount: g._count, confirmedCount: status?.slug === 'confirmed' ? g._count : 0, orderCount: 0 };
+  });
+}
+
+async function getBreakdown(by: string, leadWhere: any): Promise<BreakdownRow[]> {
+  const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'confirmed' } });
+  if (by === 'sales') return buildSalesBreakdown(leadWhere, confirmedStatus);
+  if (by === 'shift') return buildShiftBreakdown(leadWhere, confirmedStatus);
+  if (by === 'status') return buildStatusBreakdown(leadWhere);
+  return [];
+}
+
+// ── Route ──
+
 router.get(
   '/',
   requirePermission('marketing.media-buying.view'),
@@ -52,170 +112,30 @@ router.get(
         (req.query.to as string)?.split('T')[0],
       );
 
-      // Get adSet names linked to this parent
-      let utmValues: string[] = [];
+      const dateFilter = { createdAt: { gte: dateFrom, lte: dateTo }, deletedAt: null as null };
+
+      let leadWhere: any;
 
       if (level === 'campaign') {
-        const adSets = await prisma.adSet.findMany({
-          where: { campaignId: parentId },
-          select: { name: true },
-        });
-        utmValues = adSets.map(a => a.name).filter(Boolean);
+        const adSets = await prisma.adSet.findMany({ where: { campaignId: parentId }, select: { name: true } });
+        const names = adSets.map(a => a.name).filter(Boolean);
+        if (names.length === 0) { res.json({ breakdown: [] }); return; }
+        leadWhere = { utmCampaign: { in: names }, ...dateFilter };
+
       } else if (level === 'adset') {
-        const adSet = await prisma.adSet.findUnique({
-          where: { id: parentId },
-          select: { name: true },
-        });
-        if (adSet?.name) utmValues = [adSet.name];
+        const adSet = await prisma.adSet.findUnique({ where: { id: parentId }, select: { name: true } });
+        if (!adSet?.name) { res.json({ breakdown: [] }); return; }
+        leadWhere = { utmCampaign: adSet.name, ...dateFilter };
+
       } else if (level === 'ad') {
-        const ad = await prisma.ad.findUnique({
-          where: { id: parentId },
-          select: { creativeCode: true, adSet: { select: { name: true } } },
-        });
-        // For ads, match by adSet name (same as parent adset)
-        if (ad?.adSet?.name) utmValues = [ad.adSet.name];
+        // Ad level: match by creativeCode (direct link to leads)
+        const ad = await prisma.ad.findUnique({ where: { id: parentId }, select: { creativeCode: true } });
+        if (!ad?.creativeCode) { res.json({ breakdown: [] }); return; }
+        leadWhere = { creativeCode: ad.creativeCode, ...dateFilter };
       }
 
-      if (utmValues.length === 0) {
-        res.json({ breakdown: [] });
-        return;
-      }
-
-      // Base where clause for leads
-      const leadWhere = {
-        utmCampaign: { in: utmValues },
-        createdAt: { gte: dateFrom, lte: dateTo },
-        deletedAt: null as null,
-      };
-
-      const confirmedStatus = await prisma.leadStatus.findUnique({ where: { slug: 'confirmed' } });
-      let breakdown: BreakdownRow[] = [];
-
-      if (by === 'sales') {
-        // Group by assigned sales agent
-        const groups = await prisma.lead.groupBy({
-          by: ['assignedToId'],
-          where: leadWhere,
-          _count: true,
-        });
-
-        // Get confirmed counts per agent
-        const confirmedGroups = confirmedStatus ? await prisma.lead.groupBy({
-          by: ['assignedToId'],
-          where: { ...leadWhere, statusId: confirmedStatus.id },
-          _count: true,
-        }) : [];
-        const confirmedMap = new Map(confirmedGroups.map(g => [g.assignedToId, g._count]));
-
-        // Get order counts per agent
-        const agentIds = groups.map(g => g.assignedToId).filter(Boolean) as string[];
-        const orderCounts = agentIds.length > 0 ? await prisma.order.groupBy({
-          by: ['leadId'],
-          where: {
-            lead: { assignedToId: { in: agentIds }, ...leadWhere },
-            deletedAt: null,
-          },
-          _count: true,
-        }) : [];
-
-        // Map leadId → assignedToId for order counting
-        const leadAssignments = agentIds.length > 0 ? await prisma.lead.findMany({
-          where: { id: { in: orderCounts.map(o => o.leadId) } },
-          select: { id: true, assignedToId: true },
-        }) : [];
-        const ordersByAgent = new Map<string, number>();
-        for (const la of leadAssignments) {
-          if (la.assignedToId) {
-            ordersByAgent.set(la.assignedToId, (ordersByAgent.get(la.assignedToId) || 0) + 1);
-          }
-        }
-
-        // Get user names
-        const users = agentIds.length > 0 ? await prisma.user.findMany({
-          where: { id: { in: agentIds } },
-          select: { id: true, name: true },
-        }) : [];
-        const userMap = new Map(users.map(u => [u.id, u.name]));
-
-        breakdown = groups.map(g => ({
-          id: g.assignedToId || 'unassigned',
-          name: g.assignedToId ? (userMap.get(g.assignedToId) || 'غير معروف') : 'غير معيّن',
-          leadCount: g._count,
-          confirmedCount: confirmedMap.get(g.assignedToId) || 0,
-          orderCount: g.assignedToId ? (ordersByAgent.get(g.assignedToId) || 0) : 0,
-        }));
-      } else if (by === 'shift') {
-        // Group by shift (via shift_members)
-        const leads = await prisma.lead.findMany({
-          where: leadWhere,
-          select: { id: true, assignedToId: true, statusId: true },
-        });
-
-        // Get all shift memberships
-        const assignedIds = [...new Set(leads.map(l => l.assignedToId).filter(Boolean))] as string[];
-        const shiftMembers = assignedIds.length > 0 ? await prisma.shiftMember.findMany({
-          where: { userId: { in: assignedIds } },
-          include: { shift: { select: { id: true, name: true } } },
-        }) : [];
-
-        // Map userId → shiftId + shiftName
-        const userShiftMap = new Map<string, { id: string; name: string }>();
-        for (const sm of shiftMembers) {
-          // Take first shift if user is in multiple
-          if (!userShiftMap.has(sm.userId)) {
-            userShiftMap.set(sm.userId, { id: sm.shift.id, name: sm.shift.name });
-          }
-        }
-
-        // Aggregate by shift
-        const shiftAgg = new Map<string, { name: string; leads: number; confirmed: number }>();
-        for (const lead of leads) {
-          const shift = lead.assignedToId ? userShiftMap.get(lead.assignedToId) : null;
-          const key = shift?.id || 'no-shift';
-          const name = shift?.name || 'بدون شيفت';
-          const entry = shiftAgg.get(key) || { name, leads: 0, confirmed: 0 };
-          entry.leads++;
-          if (confirmedStatus && lead.statusId === confirmedStatus.id) entry.confirmed++;
-          shiftAgg.set(key, entry);
-        }
-
-        breakdown = Array.from(shiftAgg.entries()).map(([id, data]) => ({
-          id,
-          name: data.name,
-          leadCount: data.leads,
-          confirmedCount: data.confirmed,
-          orderCount: 0, // simplified for shifts
-        }));
-      } else if (by === 'status') {
-        // Group by lead status
-        const groups = await prisma.lead.groupBy({
-          by: ['statusId'],
-          where: leadWhere,
-          _count: true,
-        });
-
-        const statusIds = groups.map(g => g.statusId).filter(Boolean);
-        const statuses = statusIds.length > 0 ? await prisma.leadStatus.findMany({
-          where: { id: { in: statusIds } },
-          select: { id: true, name: true, slug: true },
-        }) : [];
-        const statusMap = new Map(statuses.map(s => [s.id, s]));
-
-        breakdown = groups.map(g => {
-          const status = statusMap.get(g.statusId);
-          return {
-            id: g.statusId,
-            name: status?.name || 'غير محدد',
-            leadCount: g._count,
-            confirmedCount: status?.slug === 'confirmed' ? g._count : 0,
-            orderCount: 0,
-          };
-        });
-      }
-
-      // Sort by leadCount descending
+      const breakdown = await getBreakdown(by, leadWhere);
       breakdown.sort((a, b) => b.leadCount - a.leadCount);
-
       res.json({ breakdown });
     } catch (err: any) {
       console.error('[Breakdown]', err);

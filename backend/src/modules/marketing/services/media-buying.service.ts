@@ -535,7 +535,7 @@ export async function getAdsWithMetrics(filters: DashboardFilters & { page?: num
     take: pageSize,
   });
 
-  const result = ads.map((ad) => {
+  const result = await Promise.all(ads.map(async (ad) => {
     const t = ad.metrics.reduce(
       (acc, m) => ({
         spend: acc.spend + m.spend, impressions: acc.impressions + m.impressions, reach: acc.reach + m.reach,
@@ -544,18 +544,30 @@ export async function getAdsWithMetrics(filters: DashboardFilters & { page?: num
       }),
       { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, revenue: 0 }
     );
+
+    // Dolphin leads for this ad (via creativeCode)
+    let dolphinLeads = 0;
+    if (ad.creativeCode) {
+      dolphinLeads = await prisma.lead.count({
+        where: { creativeCode: ad.creativeCode, createdAt: { gte: dateFrom, lte: dateTo }, deletedAt: null },
+      });
+    }
+    const dolphinCpl = dolphinLeads > 0 ? t.spend / dolphinLeads : 0;
+
     return {
-      id: ad.id, name: ad.name, status: ad.status, adSetId: ad.adSetId, campaignId: ad.adSet.campaignId, adSetName: ad.adSet.name, campaignName: ad.adSet.campaign.name,
+      id: ad.id, name: ad.name, status: ad.status, creativeCode: ad.creativeCode,
+      adSetId: ad.adSetId, campaignId: ad.adSet.campaignId, adSetName: ad.adSet.name, campaignName: ad.adSet.campaign.name,
       platform: ad.adSet.campaign.adAccount.platform, brand: ad.adSet.campaign.adAccount.brand?.name,
       spend: t.spend, impressions: t.impressions, reach: t.reach, clicks: t.clicks, outboundClicks: t.outboundClicks,
-      leads: t.leads, revenue: t.revenue,
+      leads: t.leads, dolphinLeads, revenue: t.revenue,
       frequency: t.reach > 0 ? +(t.impressions / t.reach).toFixed(2) : 0,
       cpm: t.impressions > 0 ? +((t.spend / t.impressions) * 1000).toFixed(2) : 0,
       outboundCtr: t.impressions > 0 ? +((t.outboundClicks / t.impressions) * 100).toFixed(2) : 0,
       cpl: t.leads > 0 ? +(t.spend / t.leads).toFixed(2) : 0,
+      dolphinCpl: +dolphinCpl.toFixed(2),
       roas: t.spend > 0 ? +(t.revenue / t.spend).toFixed(2) : 0,
     };
-  });
+  }));
 
   return { ads: result, total: result.length };
 }
