@@ -214,15 +214,25 @@ export async function syncLeadDataToSheet(
       if (phoneColIndex === -1) continue;
 
       // البحث عن الصف بالموبايل
+      // لو فيه صفوف مكررة (نفس الموبايل)، نحاول نلاقي الصف اللي مكتوب فيه
+      // نفس اسم السيلز المعيّن أو الصف الفاضي (مش متكتب فيه سيلز لسه)
       let targetRow = -1;
+      let fallbackRow = -1;
       for (let i = 1; i < rows.length; i++) {
         const cellPhone = rows[i]?.[phoneColIndex] || '';
         const normalizedCell = normalizePhone(cellPhone);
         if (normalizedCell === lead.phoneNormalized || cellPhone === lead.phone) {
-          targetRow = i + 1; // 1-indexed
-          break;
+          const cellSales = rows[i]?.[COL_T] || '';
+          // Perfect match: same phone + same sales name (or empty sales column)
+          if (!cellSales || cellSales === sheetSalesName) {
+            targetRow = i + 1;
+            break;
+          }
+          // Fallback: first phone match (in case no sales match found)
+          if (fallbackRow === -1) fallbackRow = i + 1;
         }
       }
+      if (targetRow === -1) targetRow = fallbackRow;
       if (targetRow === -1) continue;
 
       // تجهيز ملاحظات التواصل (تراكمية)

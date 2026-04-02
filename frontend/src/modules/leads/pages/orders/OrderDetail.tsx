@@ -211,9 +211,9 @@ export default function OrderDetailPage() {
           {order.transferImage && (
             <div className="mt-4">
               <span className="text-slate-500 text-sm block mb-2">صورة التحويل</span>
-              <a href={`/uploads/${order.transferImage}`} target="_blank" rel="noreferrer">
+              <a href={order.transferImage.startsWith('http') ? order.transferImage : `/uploads/${order.transferImage}`} target="_blank" rel="noreferrer">
                 <img
-                  src={`/uploads/${order.transferImage}`}
+                  src={order.transferImage.startsWith('http') ? order.transferImage : `/uploads/${order.transferImage}`}
                   alt="صورة التحويل"
                   className="max-w-full max-h-[400px] rounded-lg border border-slate-200 object-contain"
                 />

@@ -4,6 +4,11 @@ import * as mktApi from '../services/marketing-api';
 import api from '../../../shared/services/api';
 
 const BREAKDOWN_ICONS: Record<string, string> = { sales: '👤', shift: '🕐', status: '📊' };
+const BREAKDOWN_STYLES: Record<string, { bg: string; border: string; badge: string }> = {
+  campaign: { bg: 'bg-indigo-50/60', border: 'border-r-[3px] border-indigo-400', badge: 'bg-indigo-100 text-indigo-700' },
+  adset: { bg: 'bg-violet-50/50', border: 'border-r-[3px] border-violet-400', badge: 'bg-violet-100 text-violet-700' },
+  ad: { bg: 'bg-fuchsia-50/40', border: 'border-r-[3px] border-fuchsia-400', badge: 'bg-fuchsia-100 text-fuchsia-700' },
+};
 
 function BreakdownRows({ parentId, level, by, params, colCount }: {
   parentId: string; level: string; by: string;
@@ -21,21 +26,23 @@ function BreakdownRows({ parentId, level, by, params, colCount }: {
   });
 
   if (isLoading) return (
-    <tr><td colSpan={colCount} className="py-1 text-center text-xs text-slate-400">جاري التحميل...</td></tr>
+    <tr><td colSpan={colCount} className="py-1 text-center text-xs text-slate-400 italic">جاري تحميل التقسيم...</td></tr>
   );
   if (!data?.length) return null;
 
-  const indent = level === 'campaign' ? '2rem' : level === 'adset' ? '3.5rem' : '5rem';
+  const style = BREAKDOWN_STYLES[level] || BREAKDOWN_STYLES.campaign;
+  const indent = level === 'campaign' ? '2.5rem' : level === 'adset' ? '4rem' : '5.5rem';
   return (
     <>
       {data.map((row) => (
-        <tr key={`${parentId}-${row.id}`} className="border-b bg-amber-50/40">
-          <td className="py-1.5" style={{ paddingRight: indent }}>
-            <div className="flex items-center gap-1.5 text-xs">
-              <span>{BREAKDOWN_ICONS[by]}</span>
-              <span className="font-medium text-slate-700">{row.name}</span>
-              <span className="text-slate-400">— {row.leadCount} ليد</span>
-              {row.confirmedCount > 0 && <span className="text-green-600">({row.confirmedCount} مؤكد)</span>}
+        <tr key={`${parentId}-${row.id}`} className={`${style.bg} ${style.border}`}>
+          <td className="py-1" style={{ paddingRight: indent }}>
+            <div className="flex items-center gap-2 text-xs">
+              <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium ${style.badge}`}>
+                {BREAKDOWN_ICONS[by]} {row.name}
+              </span>
+              <span className="text-slate-500 font-medium">{row.leadCount} ليد</span>
+              {row.confirmedCount > 0 && <span className="text-green-600 text-[10px] font-semibold">({row.confirmedCount} مؤكد)</span>}
             </div>
           </td>
           <td colSpan={colCount - 1}></td>

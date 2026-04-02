@@ -10,6 +10,9 @@ import { createBostaDelivery, isConfigured as isBostaConfigured, terminateDelive
 import { auditLog } from '../services/audit';
 import { verifyTransfer } from '../services/transfer-verification';
 import { syncLeadDataToSheet } from '../services/googleSheetsWrite';
+import { uploadFileToDrive } from '../../../shared/services/google-drive';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const router = Router();
 
@@ -297,7 +300,25 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
       leadCustomerId = foundLead.customerId;
     }
 
-    const transferImage = (req as Request & { file?: { filename: string } }).file?.filename ?? undefined;
+    // Upload transfer image to Google Drive (persistent) instead of local filesystem
+    let transferImage: string | undefined;
+    const uploadedFile = (req as Request & { file?: { filename: string; path: string; mimetype: string } }).file;
+    if (uploadedFile) {
+      try {
+        const fileBuffer = fs.readFileSync(uploadedFile.path);
+        const driveUrl = await uploadFileToDrive(fileBuffer, uploadedFile.filename, uploadedFile.mimetype);
+        if (driveUrl) {
+          transferImage = driveUrl;
+        } else {
+          // Fallback to local filename if Drive upload fails
+          transferImage = uploadedFile.filename;
+        }
+        // Clean up local file
+        fs.unlink(uploadedFile.path, () => {});
+      } catch {
+        transferImage = uploadedFile.filename;
+      }
+    }
 
     // New fields from body
     const senderPhone = typeof body.senderPhone === 'string' ? body.senderPhone.trim() || undefined : undefined;
