@@ -358,26 +358,30 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
     const outboundCtr = totals.impressions > 0 ? (totals.outboundClicks / totals.impressions) * 100 : 0;
     const cpl = totals.leads > 0 ? totals.spend / totals.leads : 0;
 
-    // Get confirmed orders from Dolphin via ad set names
+    // Get Dolphin leads + confirmed orders via ad set names
+    const adSets = await prisma.adSet.findMany({
+      where: { campaignId: c.id },
+      select: { name: true },
+    });
+    const adSetNames = adSets.map((a) => a.name).filter(Boolean);
+    const dolphinWhere = {
+      utmCampaign: { in: adSetNames },
+      createdAt: { gte: dateFrom, lte: dateTo },
+      deletedAt: null as null,
+    };
+
+    let dolphinLeads = 0;
     let confirmedOrders = 0;
-    if (confirmedStatus) {
-      const adSets = await prisma.adSet.findMany({
-        where: { campaignId: c.id },
-        select: { name: true },
-      });
-      const adSetNames = adSets.map((a) => a.name);
-      if (adSetNames.length > 0) {
+    if (adSetNames.length > 0) {
+      dolphinLeads = await prisma.lead.count({ where: dolphinWhere });
+      if (confirmedStatus) {
         confirmedOrders = await prisma.lead.count({
-          where: {
-            utmCampaign: { in: adSetNames },
-            ...(dateFrom || dateTo ? { createdAt: { ...(dateFrom ? { gte: dateFrom } : {}), ...(dateTo ? { lte: dateTo } : {}) } } : {}),
-            statusId: confirmedStatus.id,
-            deletedAt: null,
-          },
+          where: { ...dolphinWhere, statusId: confirmedStatus.id },
         });
       }
     }
     const cpp = confirmedOrders > 0 ? totals.spend / confirmedOrders : 0;
+    const dolphinCpl = dolphinLeads > 0 ? totals.spend / dolphinLeads : 0;
 
     return {
       id: c.id,
@@ -393,13 +397,15 @@ export async function getCampaignsWithMetrics(filters: DashboardFilters & { page
       reach: totals.reach,
       clicks: totals.clicks,
       outboundClicks: totals.outboundClicks,
-      leads: totals.leads,           // Digitics leads (= Meta purchases)
-      confirmedOrders,               // Dolphin confirmed orders
+      leads: totals.leads,           // Meta purchases
+      dolphinLeads,                  // Dolphin CRM leads
+      confirmedOrders,
       revenue: totals.revenue,
       frequency: +frequency.toFixed(2),
       cpm: +cpm.toFixed(2),
       outboundCtr: +outboundCtr.toFixed(2),
       cpl: +cpl.toFixed(2),
+      dolphinCpl: +dolphinCpl.toFixed(2),
       cpp: +cpp.toFixed(2),
       roas: totals.spend > 0 ? +(totals.revenue / totals.spend).toFixed(2) : 0,
     };
@@ -464,29 +470,35 @@ export async function getAdSetsWithMetrics(filters: DashboardFilters & { page?: 
       { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, revenue: 0 }
     );
 
-    // Confirmed orders: match utmCampaign = adSet.name
+    // Dolphin leads + confirmed orders: match utmCampaign = adSet.name
+    let dolphinLeads = 0;
     let confirmedOrders = 0;
-    if (confirmedStatus && as.name) {
-      confirmedOrders = await prisma.lead.count({
-        where: {
-          utmCampaign: as.name,
-          createdAt: { gte: dateFrom, lte: dateTo },
-          statusId: confirmedStatus.id,
-          deletedAt: null,
-        },
-      });
+    const adSetLeadWhere = {
+      utmCampaign: as.name,
+      createdAt: { gte: dateFrom, lte: dateTo },
+      deletedAt: null as null,
+    };
+    if (as.name) {
+      dolphinLeads = await prisma.lead.count({ where: adSetLeadWhere });
+      if (confirmedStatus) {
+        confirmedOrders = await prisma.lead.count({
+          where: { ...adSetLeadWhere, statusId: confirmedStatus.id },
+        });
+      }
     }
     const cpp = confirmedOrders > 0 ? t.spend / confirmedOrders : 0;
+    const dolphinCpl = dolphinLeads > 0 ? t.spend / dolphinLeads : 0;
 
     return {
       id: as.id, name: as.name, status: as.status, campaignId: as.campaignId, campaignName: as.campaign.name,
       platform: as.campaign.adAccount.platform, brand: as.campaign.adAccount.brand?.name,
       spend: t.spend, impressions: t.impressions, reach: t.reach, clicks: t.clicks, outboundClicks: t.outboundClicks,
-      leads: t.leads, confirmedOrders, revenue: t.revenue,
+      leads: t.leads, dolphinLeads, confirmedOrders, revenue: t.revenue,
       frequency: t.reach > 0 ? +(t.impressions / t.reach).toFixed(2) : 0,
       cpm: t.impressions > 0 ? +((t.spend / t.impressions) * 1000).toFixed(2) : 0,
       outboundCtr: t.impressions > 0 ? +((t.outboundClicks / t.impressions) * 100).toFixed(2) : 0,
       cpl: t.leads > 0 ? +(t.spend / t.leads).toFixed(2) : 0,
+      dolphinCpl: +dolphinCpl.toFixed(2),
       cpp: +cpp.toFixed(2),
       roas: t.spend > 0 ? +(t.revenue / t.spend).toFixed(2) : 0,
     };

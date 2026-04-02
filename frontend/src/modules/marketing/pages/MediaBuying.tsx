@@ -144,7 +144,7 @@ export default function MediaBuying() {
       if (saved) return JSON.parse(saved);
     } catch { /* ignore */ }
     return {
-      spend: true, leads: true, cpl: true, confirmedOrders: true, cpp: true, roas: true,
+      spend: true, leads: true, dolphinLeads: true, cpl: true, dolphinCpl: true, confirmedOrders: true, cpp: true, roas: true,
       cpm: false, outboundCtr: false, frequency: false, clicks: false,
       impressions: false, reach: false, outboundClicks: false, revenue: false, status: false,
     };
@@ -155,8 +155,10 @@ export default function MediaBuying() {
     cpm: 'CPM',
     outboundCtr: 'Outbound CTR',
     frequency: 'التكرار',
-    leads: 'ليدز',
-    cpl: 'CPL (تكلفة الليد)',
+    leads: 'ليدز Meta',
+    dolphinLeads: 'ليدز دولفين',
+    cpl: 'CPL Meta',
+    dolphinCpl: 'CPL دولفين',
     confirmedOrders: 'طلبات مؤكدة',
     cpp: 'CPP (تكلفة الطلب المؤكد)',
     clicks: 'النقرات',
@@ -265,15 +267,17 @@ export default function MediaBuying() {
       clicks: acc.clicks + (c.clicks || 0),
       outboundClicks: acc.outboundClicks + (c.outboundClicks || 0),
       leads: acc.leads + (c.leads || 0),
+      dolphinLeads: acc.dolphinLeads + (c.dolphinLeads || 0),
       confirmedOrders: acc.confirmedOrders + (c.confirmedOrders || 0),
       revenue: acc.revenue + (c.revenue || 0),
-    }), { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, confirmedOrders: 0, revenue: 0 });
+    }), { spend: 0, impressions: 0, reach: 0, clicks: 0, outboundClicks: 0, leads: 0, dolphinLeads: 0, confirmedOrders: 0, revenue: 0 });
     return {
       ...t,
       cpm: t.impressions > 0 ? +((t.spend / t.impressions) * 1000).toFixed(2) : 0,
       outboundCtr: t.impressions > 0 ? +((t.outboundClicks / t.impressions) * 100).toFixed(2) : 0,
       frequency: t.reach > 0 ? +(t.impressions / t.reach).toFixed(2) : 0,
       cpl: t.leads > 0 ? +(t.spend / t.leads).toFixed(2) : 0,
+      dolphinCpl: t.dolphinLeads > 0 ? +(t.spend / t.dolphinLeads).toFixed(2) : 0,
       cpp: t.confirmedOrders > 0 ? +(t.spend / t.confirmedOrders).toFixed(2) : 0,
       roas: t.spend > 0 ? +(t.revenue / t.spend).toFixed(2) : 0,
     };
@@ -404,7 +408,9 @@ export default function MediaBuying() {
       {visibleColumns.outboundCtr && <td className="py-2">{(item.outboundCtr || 0).toFixed(2)}%</td>}
       {visibleColumns.frequency && <td className="py-2">{(item.frequency || 0).toFixed(2)}</td>}
       {visibleColumns.leads && <td className="py-2">{formatNumber(item.leads || 0)}</td>}
+      {visibleColumns.dolphinLeads && <td className="py-2">{formatNumber(item.dolphinLeads || 0)}</td>}
       {visibleColumns.cpl && <td className="py-2">{formatCurrency(item.cpl || 0)}</td>}
+      {visibleColumns.dolphinCpl && <td className="py-2">{formatCurrency(item.dolphinCpl || 0)}</td>}
       {visibleColumns.confirmedOrders && <td className="py-2">{level === 'ad' ? '—' : formatNumber(item.confirmedOrders || 0)}</td>}
       {visibleColumns.cpp && <td className="py-2">{level === 'ad' ? '—' : formatCurrency(item.cpp || 0)}</td>}
       {visibleColumns.impressions && <td className="py-2">{formatNumber(item.impressions || 0)}</td>}
@@ -773,8 +779,10 @@ export default function MediaBuying() {
                     {visibleColumns.cpm && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpm')}>CPM{sortArrow('cpm')}</th>}
                     {visibleColumns.outboundCtr && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('outboundCtr')}>Outbound CTR{sortArrow('outboundCtr')}</th>}
                     {visibleColumns.frequency && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('frequency')}>التكرار{sortArrow('frequency')}</th>}
-                    {visibleColumns.leads && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('leads')}>ليدز{sortArrow('leads')}</th>}
-                    {visibleColumns.cpl && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpl')}>CPL{sortArrow('cpl')}</th>}
+                    {visibleColumns.leads && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('leads')}>ليدز Meta{sortArrow('leads')}</th>}
+                    {visibleColumns.dolphinLeads && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('dolphinLeads')}>ليدز دولفين{sortArrow('dolphinLeads')}</th>}
+                    {visibleColumns.cpl && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpl')}>CPL Meta{sortArrow('cpl')}</th>}
+                    {visibleColumns.dolphinCpl && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('dolphinCpl')}>CPL دولفين{sortArrow('dolphinCpl')}</th>}
                     {visibleColumns.confirmedOrders && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('confirmedOrders')}>طلبات مؤكدة{sortArrow('confirmedOrders')}</th>}
                     {visibleColumns.cpp && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('cpp')}>CPP{sortArrow('cpp')}</th>}
                     {visibleColumns.impressions && <th className="text-right py-2 cursor-pointer hover:text-slate-700" onClick={() => handleSort('impressions')}>الظهور{sortArrow('impressions')}</th>}
@@ -857,7 +865,9 @@ export default function MediaBuying() {
                     {visibleColumns.outboundCtr && <td className="py-2">{t.outboundCtr.toFixed(2)}%</td>}
                     {visibleColumns.frequency && <td className="py-2">{t.frequency.toFixed(2)}</td>}
                     {visibleColumns.leads && <td className="py-2">{formatNumber(t.leads)}</td>}
+                    {visibleColumns.dolphinLeads && <td className="py-2">{formatNumber(t.dolphinLeads || 0)}</td>}
                     {visibleColumns.cpl && <td className="py-2">{formatCurrency(t.cpl)}</td>}
+                    {visibleColumns.dolphinCpl && <td className="py-2">{formatCurrency(t.dolphinCpl || 0)}</td>}
                     {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(t.confirmedOrders)}</td>}
                     {visibleColumns.cpp && <td className="py-2">{formatCurrency(t.cpp)}</td>}
                     {visibleColumns.impressions && <td className="py-2">{formatNumber(t.impressions)}</td>}
@@ -875,7 +885,9 @@ export default function MediaBuying() {
                     {visibleColumns.outboundCtr && <td className="py-2">—</td>}
                     {visibleColumns.frequency && <td className="py-2">—</td>}
                     {visibleColumns.leads && <td className="py-2">{formatNumber(o.totalLeads || 0)}</td>}
+                    {visibleColumns.dolphinLeads && <td className="py-2">{formatNumber(o.dolphinLeads || 0)}</td>}
                     {visibleColumns.cpl && <td className="py-2">{formatCurrency(o.overallCPL || 0)}</td>}
+                    {visibleColumns.dolphinCpl && <td className="py-2">{o.dolphinLeads > 0 ? formatCurrency((o.totalSpend || 0) / o.dolphinLeads) : '—'}</td>}
                     {visibleColumns.confirmedOrders && <td className="py-2">{formatNumber(o.totalConfirmedOrders || 0)}</td>}
                     {visibleColumns.cpp && <td className="py-2">{formatCurrency(o.overallCPP || 0)}</td>}
                     {visibleColumns.impressions && <td className="py-2">—</td>}
