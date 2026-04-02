@@ -275,7 +275,7 @@ export default function LeadsList() {
       {showAddForm && (
         <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-6">
           <h2 className="font-semibold text-slate-700 mb-3">إضافة ليد يدوي</h2>
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <input
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
               placeholder="الاسم"
@@ -315,18 +315,18 @@ export default function LeadsList() {
               value={form.email}
               onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
             />
-            <button
-              disabled={submitting}
-              className="bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 disabled:opacity-50"
-            >
-              {submitting ? 'جاري الحفظ...' : 'حفظ'}
-            </button>
             <input
-              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors md:col-span-5"
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
               placeholder="العنوان (اختياري)"
               value={form.address}
               onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
             />
+            <button
+              disabled={submitting}
+              className="bg-blue-600 text-white rounded-lg px-4 py-2 hover:bg-blue-700 disabled:opacity-50 md:col-span-3"
+            >
+              {submitting ? 'جاري الحفظ...' : 'حفظ'}
+            </button>
           </form>
           {error && <div className="mt-3 text-sm text-red-600 bg-red-50 p-2 rounded">{error}</div>}
         </div>
