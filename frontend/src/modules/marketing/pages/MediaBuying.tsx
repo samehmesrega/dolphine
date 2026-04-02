@@ -1,6 +1,49 @@
 import { useState, useMemo, Fragment } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as mktApi from '../services/marketing-api';
+import api from '../../../shared/services/api';
+
+const BREAKDOWN_ICONS: Record<string, string> = { sales: '👤', shift: '🕐', status: '📊' };
+
+function BreakdownRows({ parentId, level, by, params, colCount }: {
+  parentId: string; level: string; by: string;
+  params: { from?: string; to?: string };
+  colCount: number;
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['mb-breakdown', parentId, level, by, params.from, params.to],
+    queryFn: async () => {
+      const { data } = await api.get('/v1/marketing/media-buying/breakdown', {
+        params: { parentId, level, by, from: params.from, to: params.to },
+      });
+      return data.breakdown as { id: string; name: string; leadCount: number; confirmedCount: number; orderCount: number }[];
+    },
+  });
+
+  if (isLoading) return (
+    <tr><td colSpan={colCount} className="py-1 text-center text-xs text-slate-400">جاري التحميل...</td></tr>
+  );
+  if (!data?.length) return null;
+
+  const indent = level === 'campaign' ? '2rem' : level === 'adset' ? '3.5rem' : '5rem';
+  return (
+    <>
+      {data.map((row) => (
+        <tr key={`${parentId}-${row.id}`} className="border-b bg-amber-50/40">
+          <td className="py-1.5" style={{ paddingRight: indent }}>
+            <div className="flex items-center gap-1.5 text-xs">
+              <span>{BREAKDOWN_ICONS[by]}</span>
+              <span className="font-medium text-slate-700">{row.name}</span>
+              <span className="text-slate-400">— {row.leadCount} ليد</span>
+              {row.confirmedCount > 0 && <span className="text-green-600">({row.confirmedCount} مؤكد)</span>}
+            </div>
+          </td>
+          <td colSpan={colCount - 1}></td>
+        </tr>
+      ))}
+    </>
+  );
+}
 
 function formatCurrency(val: number) {
   return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -92,6 +135,8 @@ export default function MediaBuying() {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
+  const [breakdownBy, setBreakdownBy] = useState<'' | 'sales' | 'shift' | 'status'>('');
+  const [expandedBreakdowns, setExpandedBreakdowns] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<string>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
@@ -471,6 +516,17 @@ export default function MediaBuying() {
             <option value="|zero">بدون نشاط</option>
           </select>
 
+          <select
+            value={breakdownBy}
+            onChange={(e) => { setBreakdownBy(e.target.value as any); setExpandedBreakdowns(new Set()); }}
+            className="border rounded-lg px-2 py-1.5 text-sm text-slate-700"
+          >
+            <option value="">بدون تقسيم</option>
+            <option value="sales">تقسيم بالسيلز</option>
+            <option value="shift">تقسيم بالشيفت</option>
+            <option value="status">تقسيم بحالة الليد</option>
+          </select>
+
           {(filterPlatform || filterBrand || filterAccount || filterStatus || filterActivity) && (
             <button
               onClick={() => { setFilterPlatform(''); setFilterBrand(''); setFilterAccount(''); setFilterStatus(''); setFilterActivity(''); }}
@@ -751,6 +807,11 @@ export default function MediaBuying() {
                         {renderMetricCells(c, 'campaign')}
                       </tr>
 
+                      {/* Breakdown rows for campaign */}
+                      {breakdownBy && isCampaignExpanded(c.id) && (
+                        <BreakdownRows parentId={c.id} level="campaign" by={breakdownBy} params={params} colCount={Object.values(visibleColumns).filter(Boolean).length + 1} />
+                      )}
+
                       {/* Ad Set Rows (nested) */}
                       {isCampaignExpanded(c.id) && c._adSets.map((as: any) => (
                         <Fragment key={as.id}>
@@ -767,6 +828,11 @@ export default function MediaBuying() {
                             </td>
                             {renderMetricCells(as, 'adset')}
                           </tr>
+
+                          {/* Breakdown rows for adset */}
+                          {breakdownBy && isAdSetExpanded(as.id) && (
+                            <BreakdownRows parentId={as.id} level="adset" by={breakdownBy} params={params} colCount={Object.values(visibleColumns).filter(Boolean).length + 1} />
+                          )}
 
                           {/* Ad Rows (leaf) */}
                           {isAdSetExpanded(as.id) && as._ads.map((ad: any) => (

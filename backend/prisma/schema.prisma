@@ -234,6 +234,7 @@ model Lead {
   @@index([assignedToId])
   @@index([createdAt])
   @@index([creativeCode])
+  @@index([utmCampaign])
   @@map("leads")
 }
 
