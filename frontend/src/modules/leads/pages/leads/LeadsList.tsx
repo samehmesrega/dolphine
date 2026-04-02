@@ -74,8 +74,8 @@ function downloadLeadsCsv(leads: Lead[]) {
   URL.revokeObjectURL(url);
 }
 
-async function createLead(payload: { name: string; phone: string; whatsapp?: string; email?: string; address?: string }) {
-  const { data } = await api.post('/leads', { ...payload, source: 'manual' });
+async function createLead(payload: { name: string; phone: string; whatsapp?: string; email?: string; address?: string; source: string }) {
+  const { data } = await api.post('/leads', payload);
   return data.lead as Lead;
 }
 
@@ -146,7 +146,7 @@ export default function LeadsList() {
   const [deleteError, setDeleteError] = useState('');
 
   const [showAddForm, setShowAddForm] = useState(false);
-  const [form, setForm] = useState({ name: '', phone: '', whatsapp: '', email: '', address: '' });
+  const [form, setForm] = useState({ name: '', phone: '', whatsapp: '', email: '', address: '', source: '' });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -221,6 +221,7 @@ export default function LeadsList() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (!form.source) { setError('اختر مصدر الليد'); return; }
     setSubmitting(true);
     try {
       await createLead({
@@ -229,8 +230,9 @@ export default function LeadsList() {
         whatsapp: form.whatsapp.trim() || undefined,
         email: form.email.trim() || undefined,
         address: form.address.trim() || undefined,
+        source: form.source,
       });
-      setForm({ name: '', phone: '', whatsapp: '', email: '', address: '' });
+      setForm({ name: '', phone: '', whatsapp: '', email: '', address: '', source: '' });
       await qc.invalidateQueries({ queryKey: ['leads'] });
     } catch (err: any) {
       setError(err.response?.data?.error || 'فشل إنشاء الليد');
@@ -288,6 +290,19 @@ export default function LeadsList() {
               onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
               required
             />
+            <select
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
+              value={form.source}
+              onChange={(e) => setForm((p) => ({ ...p, source: e.target.value }))}
+              required
+            >
+              <option value="">المصدر</option>
+              <option value="google_sheets">Google Sheets</option>
+              <option value="facebook">فيسبوك</option>
+              <option value="instagram">انستجرام</option>
+              <option value="tiktok">تيك توك</option>
+              <option value="whatsapp">واتساب</option>
+            </select>
             <input
               className="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-colors"
               placeholder="واتساب (اختياري)"
