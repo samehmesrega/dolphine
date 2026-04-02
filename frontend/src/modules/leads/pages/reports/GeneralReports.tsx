@@ -12,11 +12,15 @@ import {
 import api from '../../../../shared/services/api';
 import DateRangePicker, { DateRange } from '../../../../shared/components/DateRangePicker';
 
+function fmtLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function defaultRange(): DateRange {
   const to = new Date();
   const from = new Date();
   from.setDate(from.getDate() - 29);
-  return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
+  return { from: fmtLocal(from), to: fmtLocal(to) };
 }
 
 type GeneralStats = {

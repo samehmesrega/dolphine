@@ -10,8 +10,11 @@ export default function MarketingDashboard() {
   const [dateRange, setDateRange] = useState('30');
 
   const getDateParams = () => {
-    const to = new Date().toISOString();
-    const from = new Date(Date.now() - Number(dateRange) * 24 * 60 * 60 * 1000).toISOString();
+    const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const to = fmt(new Date());
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - Number(dateRange));
+    const from = fmt(fromDate);
     return { from, to };
   };
 

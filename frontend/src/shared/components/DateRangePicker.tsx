@@ -3,7 +3,7 @@ import { useState } from 'react';
 export type DateRange = { from: string; to: string };
 
 function fmt(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function startOfDay(d: Date): Date {
