@@ -136,7 +136,6 @@ export default function MediaBuying() {
   const [syncResult, setSyncResult] = useState<string | null>(null);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [breakdownBy, setBreakdownBy] = useState<'' | 'sales' | 'shift' | 'status'>('');
-  const [expandedBreakdowns, setExpandedBreakdowns] = useState<Set<string>>(new Set());
   const [sortKey, setSortKey] = useState<string>('spend');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(() => {
@@ -518,7 +517,7 @@ export default function MediaBuying() {
 
           <select
             value={breakdownBy}
-            onChange={(e) => { setBreakdownBy(e.target.value as any); setExpandedBreakdowns(new Set()); }}
+            onChange={(e) => setBreakdownBy(e.target.value as any)}
             className="border rounded-lg px-2 py-1.5 text-sm text-slate-700"
           >
             <option value="">بدون تقسيم</option>
