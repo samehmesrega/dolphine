@@ -170,11 +170,9 @@ router.post('/', async (req: Request, res: Response) => {
       },
     });
 
-    const assignment = await getNextAssignedUserId();
-    const assignedToId = assignment.userId;
-    if (!assignedToId && assignment.reason) {
-      console.log(`[Manual Lead] لم يتم تعيين الليد: ${assignment.reason}`);
-    }
+    // الليد اليدوي يتعيّن مباشرة للموظف اللي أضافه
+    const authUser = (req as AuthRequest).user;
+    const assignedToId = authUser?.userId || null;
 
     const lead = await prisma.lead.create({
       data: {
@@ -206,6 +204,11 @@ router.post('/', async (req: Request, res: Response) => {
         },
       });
     }
+
+    // Sync to Google Sheets
+    syncLeadDataToSheet(lead.id).catch((err) => {
+      console.error('[Sheets Sync] New lead sync failed:', err);
+    });
 
     res.status(201).json({ lead });
   } catch (err: unknown) {

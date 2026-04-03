@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../../db';
 import { logger } from '../../../shared/config/logger';
 import { Decimal } from '@prisma/client/runtime/library';
+import { syncLeadDataToSheet } from '../services/googleSheetsWrite';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.post('/', async (req: Request, res: Response) => {
     // Find order in Dolphin by WooCommerce ID
     const order = await prisma.order.findUnique({
       where: { wooCommerceId: wcOrderId },
-      select: { id: true, number: true, status: true, accountsStatus: true },
+      select: { id: true, number: true, status: true, accountsStatus: true, leadId: true },
     });
 
     if (!order) {
@@ -110,6 +111,11 @@ router.post('/', async (req: Request, res: Response) => {
         data: updateData,
       });
     }
+
+    // Sync updated order value to Google Sheets
+    syncLeadDataToSheet(order.leadId).catch((err) => {
+      logger.error({ err }, `[WooCommerce Webhook] Sheets sync failed for order #${order.number}`);
+    });
 
     logger.info(`[WooCommerce Webhook] Updated order #${order.number} (wcId=${wcOrderId}, items=${wcItems.length})`);
     res.status(200).json({ received: true });
