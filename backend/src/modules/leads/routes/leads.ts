@@ -547,6 +547,34 @@ router.post('/:id/communications', async (req: Request, res: Response) => {
   }
 });
 
+// تعديل نوت التواصل
+router.patch('/:id/communications/:commId', async (req: Request, res: Response) => {
+  try {
+    const id = String(req.params.id);
+    const commId = String(req.params.commId);
+    const userId = (req as AuthRequest).user?.userId;
+    if (!userId) { res.status(401).json({ error: 'مطلوب تسجيل الدخول' }); return; }
+
+    const comm = await prisma.communication.findUnique({ where: { id: commId } });
+    if (!comm || comm.leadId !== id) { res.status(404).json({ error: 'سجل التواصل غير موجود' }); return; }
+    if (comm.userId !== userId) { res.status(403).json({ error: 'لا يمكنك تعديل سجل تواصل لموظف آخر' }); return; }
+
+    const { notes } = req.body;
+    if (typeof notes !== 'string') { res.status(400).json({ error: 'الملاحظات مطلوبة' }); return; }
+
+    const updated = await prisma.communication.update({
+      where: { id: commId },
+      data: { notes },
+      include: { user: { select: { id: true, name: true } } },
+    });
+
+    res.json({ communication: updated });
+  } catch (err: unknown) {
+    console.error('Edit communication error:', err);
+    res.status(500).json({ error: 'خطأ في تعديل سجل التواصل' });
+  }
+});
+
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
     const callerId = (req as AuthRequest).user?.userId;

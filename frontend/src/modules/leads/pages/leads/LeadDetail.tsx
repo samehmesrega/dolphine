@@ -61,6 +61,57 @@ const COMM_TYPE_LABELS: Record<string, string> = {
   email: 'إيميل',
 };
 
+function CommRow({ comm: c, leadId, currentUserId }: { comm: Communication; leadId: string; currentUserId?: string }) {
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [editNotes, setEditNotes] = useState(c.notes || '');
+  const [saving, setSaving] = useState(false);
+  const isOwner = c.user?.id === currentUserId;
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await api.patch(`/leads/${leadId}/communications/${c.id}`, { notes: editNotes });
+      qc.invalidateQueries({ queryKey: ['lead', leadId] });
+      setEditing(false);
+    } catch { /* ignore */ }
+    setSaving(false);
+  };
+
+  return (
+    <li className="p-4">
+      <div className="flex justify-between items-start">
+        <span className="font-medium text-sm">{COMM_TYPE_LABELS[c.type] || c.type}</span>
+        <span className="text-slate-500 text-xs">{formatDateTime(c.createdAt)}</span>
+      </div>
+      <p className="text-xs text-slate-500 mt-0.5">من: {c.user?.name}</p>
+      {editing ? (
+        <div className="mt-2 space-y-2">
+          <textarea
+            value={editNotes}
+            onChange={(e) => setEditNotes(e.target.value)}
+            className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            rows={3}
+          />
+          <div className="flex gap-2">
+            <button onClick={handleSave} disabled={saving} className="bg-blue-600 text-white px-3 py-1 rounded text-xs hover:bg-blue-700 disabled:opacity-50">
+              {saving ? 'جاري الحفظ...' : 'حفظ'}
+            </button>
+            <button onClick={() => { setEditing(false); setEditNotes(c.notes || ''); }} className="text-slate-500 text-xs hover:text-slate-700">إلغاء</button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {c.notes && <p className="mt-2 text-sm text-slate-700">{c.notes}</p>}
+          {isOwner && (
+            <button onClick={() => setEditing(true)} className="mt-1 text-xs text-blue-500 hover:text-blue-700">تعديل</button>
+          )}
+        </>
+      )}
+    </li>
+  );
+}
+
 function formatDateTime(iso: string): string {
   const d = new Date(iso);
   const date = d.toLocaleDateString('ar-EG');
@@ -723,14 +774,7 @@ export default function LeadDetailPage() {
         ) : (
           <ul className="divide-y">
             {lead.communications.map((c) => (
-              <li key={c.id} className="p-4">
-                <div className="flex justify-between items-start">
-                  <span className="font-medium text-sm">{COMM_TYPE_LABELS[c.type] || c.type}</span>
-                  <span className="text-slate-500 text-xs">{formatDateTime(c.createdAt)}</span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5">من: {c.user?.name}</p>
-                {c.notes && <p className="mt-2 text-sm text-slate-700">{c.notes}</p>}
-              </li>
+              <CommRow key={c.id} comm={c} leadId={lead.id} currentUserId={currentUser?.id} />
             ))}
           </ul>
         )}
