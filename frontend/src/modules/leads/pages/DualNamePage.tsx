@@ -3,7 +3,8 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { buildAmbigram } from '../engine/AmbigramBuilder.js';
 // @ts-ignore
 import { createScene, fitCameraToObject } from '../engine/SceneManager.js';
-import * as THREE from 'three';
+// @ts-ignore
+import { Color } from 'three';
 
 const COLORS = [
   { name: 'Terracotta', value: '#e8735a' },
@@ -57,7 +58,7 @@ export default function DualNamePage() {
   // Apply color to model
   const applyColor = useCallback((hex: string) => {
     if (!modelRef.current) return;
-    const threeColor = new THREE.Color(hex);
+    const threeColor = new Color(hex);
     modelRef.current.traverse((child: any) => {
       if (child.isMesh && child.material) {
         child.material.color.set(threeColor);
@@ -93,7 +94,7 @@ export default function DualNamePage() {
       }
 
       // Apply selected color
-      const threeColor = new THREE.Color(color);
+      const threeColor = new Color(color);
       group.traverse((child: any) => {
         if (child.isMesh && child.material) {
           child.material.color.set(threeColor);
