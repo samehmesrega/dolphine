@@ -66,6 +66,7 @@ const NAV: NavEntry[] = [
       { to: '/leads/integrations', label: 'الربط والتكامل', permission: 'integrations.manage' },
       { to: '/leads/lead-statuses', label: 'حالات الليد', permission: 'shifts.manage' },
       { to: '/leads/task-rules', label: 'قواعد المهام', permission: 'tasks.manage' },
+      { to: '/leads/dual-name-settings', label: 'إعدادات Dual Name', permission: 'users.manage' },
     ],
   },
   {

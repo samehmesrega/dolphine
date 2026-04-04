@@ -8,7 +8,6 @@ const RolesPage = lazy(() => import('../leads/pages/RolesPage'));
 const ProfilePage = lazy(() => import('../leads/pages/ProfilePage'));
 const PendingUsersPage = lazy(() => import('./pages/PendingUsersPage'));
 const TicketsPage = lazy(() => import('./pages/TicketsPage'));
-const DualNameSettingsPage = lazy(() => import('./pages/DualNameSettingsPage'));
 
 const Loading = () => <div className="p-8 text-center text-slate-400">جاري التحميل...</div>;
 
@@ -23,7 +22,6 @@ export default function SettingsModule() {
           <Route path="roles" element={<RolesPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="tickets" element={<TicketsPage />} />
-          <Route path="dual-name" element={<DualNameSettingsPage />} />
         </Routes>
       </Suspense>
     </SettingsShell>
