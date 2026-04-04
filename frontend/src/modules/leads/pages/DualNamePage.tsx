@@ -78,13 +78,17 @@ export default function DualNamePage() {
     }
   }, []);
 
-  // Apply color to model
+  // Apply color + 3D-printed material look
   const applyColor = useCallback((hex: string) => {
     if (!modelRef.current) return;
     const threeColor = new Color(hex);
     modelRef.current.traverse((child: any) => {
       if (child.isMesh && child.material) {
         child.material.color.set(threeColor);
+        child.material.roughness = 0.8;
+        child.material.metalness = 0.05;
+        child.material.envMapIntensity = 0.3;
+        child.material.needsUpdate = true;
       }
     });
   }, []);
@@ -116,11 +120,15 @@ export default function DualNamePage() {
         return;
       }
 
-      // Apply selected color
+      // Apply selected color + 3D-printed material look
       const threeColor = new Color(color);
       group.traverse((child: any) => {
         if (child.isMesh && child.material) {
           child.material.color.set(threeColor);
+          child.material.roughness = 0.8;
+          child.material.metalness = 0.05;
+          child.material.envMapIntensity = 0.3;
+          child.material.needsUpdate = true;
         }
       });
 
