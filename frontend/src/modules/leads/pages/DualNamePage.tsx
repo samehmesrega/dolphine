@@ -12,32 +12,34 @@ import api from '../../../shared/services/api';
 function applyLayerLines(material: any, layerHeight = 0.2) {
   material.onBeforeCompile = (shader: any) => {
     shader.uniforms.layerHeight = { value: layerHeight };
-    // Add varying to pass world Y position
+    // Compute world Y in vertex shader
     shader.vertexShader = shader.vertexShader.replace(
-      '#include <common>',
-      `#include <common>
-       varying float vWorldY;`
+      'void main() {',
+      `varying float vWorldY;
+       void main() {`
     );
     shader.vertexShader = shader.vertexShader.replace(
-      '#include <worldpos_vertex>',
-      `#include <worldpos_vertex>
-       vWorldY = worldPosition.y;`
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+       vec4 worldPos = modelMatrix * vec4(transformed, 1.0);
+       vWorldY = worldPos.y;`
     );
-    // Darken color at layer boundaries
+    // Darken at layer boundaries in fragment shader
     shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <common>',
-      `#include <common>
-       varying float vWorldY;
-       uniform float layerHeight;`
+      'void main() {',
+      `varying float vWorldY;
+       uniform float layerHeight;
+       void main() {`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <dithering_fragment>',
       `#include <dithering_fragment>
        float layerPos = mod(vWorldY, layerHeight) / layerHeight;
        float line = smoothstep(0.0, 0.15, layerPos) * (1.0 - smoothstep(0.85, 1.0, layerPos));
-       gl_FragColor.rgb *= 0.92 + 0.08 * line;`
+       gl_FragColor.rgb *= 0.88 + 0.12 * line;`
     );
   };
+  material.customProgramCacheKey = () => 'layerLines_v2';
   material.needsUpdate = true;
 }
 
