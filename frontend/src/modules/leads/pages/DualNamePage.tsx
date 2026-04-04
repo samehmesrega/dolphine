@@ -3,10 +3,23 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { buildAmbigram } from '../engine/AmbigramBuilder.js';
 // @ts-ignore
 import { createScene, fitCameraToObject } from '../engine/SceneManager.js';
+import * as THREE from 'three';
+
+const COLORS = [
+  { name: 'Terracotta', value: '#e8735a' },
+  { name: 'أسود', value: '#1a1a1a' },
+  { name: 'ذهبي', value: '#d4a843' },
+  { name: 'فضي', value: '#c0c0c0' },
+  { name: 'أبيض', value: '#f5f5f5' },
+  { name: 'خشبي', value: '#8b6914' },
+  { name: 'أزرق', value: '#2563eb' },
+  { name: 'وردي', value: '#ec4899' },
+];
 
 export default function DualNamePage() {
   const [textA, setTextA] = useState('');
   const [textB, setTextB] = useState('');
+  const [color, setColor] = useState('#e8735a');
   const [generating, setGenerating] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recordProgress, setRecordProgress] = useState(0);
@@ -15,6 +28,7 @@ export default function DualNamePage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<any>(null);
   const modelRef = useRef<any>(null);
+  const watermarkRef = useRef<HTMLDivElement>(null);
 
   // Initialize Three.js scene
   useEffect(() => {
@@ -40,6 +54,22 @@ export default function DualNamePage() {
     }
   }, []);
 
+  // Apply color to model
+  const applyColor = useCallback((hex: string) => {
+    if (!modelRef.current) return;
+    const threeColor = new THREE.Color(hex);
+    modelRef.current.traverse((child: any) => {
+      if (child.isMesh && child.material) {
+        child.material.color.set(threeColor);
+      }
+    });
+  }, []);
+
+  // When color changes, apply it
+  useEffect(() => {
+    applyColor(color);
+  }, [color, applyColor]);
+
   const handleGenerate = async () => {
     if (!textA.trim() || !textB.trim()) return;
     setGenerating(true);
@@ -52,13 +82,23 @@ export default function DualNamePage() {
         textB: textB.trim(),
         fontUrl: '/fonts/OverpassMono-Bold.ttf',
         fontSize: 72,
+        cornerRadius: 5,
+        baseThickness: 2,
       });
 
       if (group.children.length === 0) {
-        setError('لم يتم إنشاء أي شكل. جرّب حروف مختلفة أو خط آخر.');
+        setError('لم يتم إنشاء أي شكل. جرّب حروف مختلفة.');
         setGenerating(false);
         return;
       }
+
+      // Apply selected color
+      const threeColor = new THREE.Color(color);
+      group.traverse((child: any) => {
+        if (child.isMesh && child.material) {
+          child.material.color.set(threeColor);
+        }
+      });
 
       sceneRef.current.scene.add(group);
       fitCameraToObject(sceneRef.current.camera, group, sceneRef.current.controls);
@@ -73,7 +113,14 @@ export default function DualNamePage() {
   const handleRecord = () => {
     if (!sceneRef.current || !modelRef.current || recording) return;
     const canvas = sceneRef.current.renderer.domElement as HTMLCanvasElement;
-    const stream = canvas.captureStream(30);
+
+    // Create a composite canvas with watermark
+    const compositeCanvas = document.createElement('canvas');
+    compositeCanvas.width = canvas.width;
+    compositeCanvas.height = canvas.height;
+    const ctx = compositeCanvas.getContext('2d')!;
+
+    const stream = compositeCanvas.captureStream(30);
     const chunks: Blob[] = [];
     const recorder = new MediaRecorder(stream, {
       mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
@@ -83,6 +130,7 @@ export default function DualNamePage() {
 
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
     recorder.onstop = () => {
+      cancelAnimationFrame(drawFrame);
       const blob = new Blob(chunks, { type: 'video/webm' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -95,12 +143,45 @@ export default function DualNamePage() {
       setRecordProgress(0);
     };
 
+    // Draw frame: 3D canvas + watermark text
+    let drawFrame = 0;
+    const drawComposite = () => {
+      ctx.drawImage(canvas, 0, 0);
+
+      // Watermark background
+      const wmHeight = 56;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.fillRect(0, compositeCanvas.height - wmHeight, compositeCanvas.width, wmHeight);
+
+      // Watermark text
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+
+      ctx.font = '500 13px "Segoe UI", system-ui, sans-serif';
+      ctx.fillText(
+        'هذا الفيديو لمجسم تصويري خاص بيك وليس فيديو للمنتج النهائي',
+        compositeCanvas.width / 2,
+        compositeCanvas.height - 32,
+      );
+
+      ctx.font = '600 14px "Segoe UI", system-ui, sans-serif';
+      ctx.fillStyle = '#f0c040';
+      ctx.fillText(
+        'تم التصميم بواسطة Print IN',
+        compositeCanvas.width / 2,
+        compositeCanvas.height - 12,
+      );
+
+      drawFrame = requestAnimationFrame(drawComposite);
+    };
+
     // Enable auto-rotate during recording
     sceneRef.current.controls.autoRotate = true;
     sceneRef.current.controls.autoRotateSpeed = 4;
     setRecording(true);
     setRecordProgress(0);
     recorder.start();
+    drawComposite();
 
     // Update progress every second
     let elapsed = 0;
@@ -132,7 +213,7 @@ export default function DualNamePage() {
             <input
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               placeholder="SAMEH"
-              maxLength={10}
+              maxLength={15}
               value={textA}
               onChange={(e) => setTextA(e.target.value.toUpperCase())}
             />
@@ -142,10 +223,22 @@ export default function DualNamePage() {
             <input
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
               placeholder="NABIL"
-              maxLength={10}
+              maxLength={15}
               value={textB}
               onChange={(e) => setTextB(e.target.value.toUpperCase())}
             />
+          </div>
+          <div className="w-full sm:w-auto">
+            <label className="block text-xs font-medium text-slate-500 mb-1">اللون</label>
+            <select
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              {COLORS.map((c) => (
+                <option key={c.value} value={c.value}>{c.name}</option>
+              ))}
+            </select>
           </div>
           <div className="flex gap-2 w-full sm:w-auto">
             <button
@@ -171,6 +264,7 @@ export default function DualNamePage() {
       {/* 3D Preview */}
       <div className="flex-1 bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden relative min-h-[400px]">
         <div ref={containerRef} className="w-full h-full" />
+        <div ref={watermarkRef} />
         {generating && (
           <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
             <div className="bg-white rounded-xl px-6 py-4 shadow-lg text-sm text-slate-700">
