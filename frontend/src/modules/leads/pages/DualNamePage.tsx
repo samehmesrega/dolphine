@@ -5,36 +5,40 @@ import { buildAmbigram } from '../engine/AmbigramBuilder.js';
 // @ts-ignore
 import { createScene, fitCameraToObject } from '../engine/SceneManager.js';
 // @ts-ignore
-import { Color, CanvasTexture, RepeatWrapping } from 'three';
+import { Color } from 'three';
 import api from '../../../shared/services/api';
 
-// Generate 3D print layer lines bump map (0.2mm layer height)
-// Model height ~37mm → ~185 layers
-function createLayerLinesBumpMap(): any {
-  const canvas = document.createElement('canvas');
-  canvas.width = 4;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d')!;
-  // Each layer line: subtle gradient (bright top → slight shadow at bottom)
-  const layerPx = 2; // pixels per layer in the texture
-  for (let y = 0; y < 256; y++) {
-    const posInLayer = y % layerPx;
-    const brightness = posInLayer === 0 ? 180 : 210;
-    ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
-    ctx.fillRect(0, y, 4, 1);
-  }
-  const tex = new CanvasTexture(canvas);
-  tex.wrapS = RepeatWrapping;
-  tex.wrapT = RepeatWrapping;
-  // ~185 layers across the model height
-  tex.repeat.set(1, 185);
-  return tex;
-}
-
-let layerBumpMap: any = null;
-function getLayerBumpMap() {
-  if (!layerBumpMap) layerBumpMap = createLayerLinesBumpMap();
-  return layerBumpMap;
+// Apply 3D print layer lines via shader modification (no UV needed)
+function applyLayerLines(material: any, layerHeight = 0.2) {
+  material.onBeforeCompile = (shader: any) => {
+    shader.uniforms.layerHeight = { value: layerHeight };
+    // Add varying to pass world Y position
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <common>',
+      `#include <common>
+       varying float vWorldY;`
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <worldpos_vertex>',
+      `#include <worldpos_vertex>
+       vWorldY = worldPosition.y;`
+    );
+    // Darken color at layer boundaries
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      `#include <common>
+       varying float vWorldY;
+       uniform float layerHeight;`
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <dithering_fragment>',
+      `#include <dithering_fragment>
+       float layerPos = mod(vWorldY, layerHeight) / layerHeight;
+       float line = smoothstep(0.0, 0.15, layerPos) * (1.0 - smoothstep(0.85, 1.0, layerPos));
+       gl_FragColor.rgb *= 0.92 + 0.08 * line;`
+    );
+  };
+  material.needsUpdate = true;
 }
 
 const DEFAULT_COLORS = [
@@ -117,8 +121,7 @@ export default function DualNamePage() {
         child.material.roughness = 0.8;
         child.material.metalness = 0.05;
         child.material.envMapIntensity = 0.3;
-        child.material.bumpMap = getLayerBumpMap();
-        child.material.bumpScale = 0.15;
+        applyLayerLines(child.material, 0.2);
         child.material.needsUpdate = true;
       }
     });
