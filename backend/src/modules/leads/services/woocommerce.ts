@@ -140,9 +140,7 @@ async function wcFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export type WCLineItem =
-  | { product_id: number; quantity: number; price?: string; subtotal?: string; total?: string }
-  | { name: string; quantity: number; price: string; subtotal?: string; total?: string };
+export type WCLineItem = { product_id: number; quantity: number; name?: string; price?: string; subtotal?: string; total?: string };
 
 export type WCOrderPayload = {
   billing: { first_name: string; last_name?: string; address_1?: string; city?: string; phone: string };
@@ -211,6 +209,36 @@ export async function updateWooCommerceOrderStatus(wooId: number, status: string
     method: 'PUT',
     body: JSON.stringify({ status }),
   });
+}
+
+/**
+ * منتج مخصص واحد على ووكومرس — يُستخدم لكل المنتجات اللي مالهاش wooCommerceId
+ * الاسم الحقيقي بيتبعت في name override في الـ line item
+ */
+let _customProductId: number | null = null;
+const CUSTOM_PRODUCT_SLUG = 'dolphin-custom-product';
+
+export async function getCustomProductId(): Promise<number> {
+  if (_customProductId) return _customProductId;
+  // Search by slug
+  const results = await wcFetch<Array<{ id: number }>>(`/products?slug=${CUSTOM_PRODUCT_SLUG}&per_page=1`);
+  if (results.length > 0) {
+    _customProductId = results[0].id;
+    return _customProductId;
+  }
+  // Create once
+  const product = await wcFetch<{ id: number }>('/products', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: 'منتج مخصص',
+      slug: CUSTOM_PRODUCT_SLUG,
+      type: 'simple',
+      regular_price: '0',
+      status: 'private',
+    }),
+  });
+  _customProductId = product.id;
+  return _customProductId;
 }
 
 export async function fetchWooCommerceProducts(page = 1, perPage = 100): Promise<

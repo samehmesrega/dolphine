@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { uploadSingle } from '../../../shared/middleware/upload';
 import { normalizePhone } from '../../../shared/utils/phone';
 import { AuthRequest } from '../../../shared/middleware/auth';
-import { createWooCommerceOrder, isConfigured as isWooConfigured, addWooCommerceOrderNote, updateWooCommerceOrderStatus } from '../services/woocommerce';
+import { createWooCommerceOrder, isConfigured as isWooConfigured, addWooCommerceOrderNote, updateWooCommerceOrderStatus, getCustomProductId } from '../services/woocommerce';
 import { createBostaDelivery, isConfigured as isBostaConfigured, terminateDelivery } from '../services/bosta';
 import { auditLog } from '../services/audit';
 import { verifyTransfer } from '../services/transfer-verification';
@@ -394,12 +394,15 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
         const nameParts = currentOrder.shippingName.trim().split(/\s+/);
         const wooFirstName = nameParts[0] || currentOrder.shippingName;
         const wooLastName = nameParts.slice(1).join(' ') || '';
-        const wooLineItems = currentOrder.orderItems.map((item: { product?: { wooCommerceId?: number | null } | null; productName: string | null; quantity: number; price: unknown }) => {
+        const customProdId = await getCustomProductId();
+        const wooLineItems = currentOrder.orderItems.map((item: { product?: { wooCommerceId?: number | null; name?: string } | null; productName: string | null; quantity: number; price: unknown }) => {
           const wcId = item.product?.wooCommerceId;
           const itemTotal = String(Number(item.price) * item.quantity);
           const unitPrice = String(item.price);
           if (wcId) return { product_id: wcId, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
-          return { name: item.productName || 'منتج', quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
+          // منتج مخصص — نبعت الاسم الحقيقي اللي كتبه السيلز
+          const productName = item.productName || item.product?.name || 'منتج';
+          return { product_id: customProdId, name: productName, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
         });
 
         // Customer note
@@ -953,20 +956,15 @@ router.post('/:id/push-to-woocommerce', async (req: Request, res: Response) => {
     const nameParts = order.shippingName.trim().split(/\s+/);
     const firstName = nameParts[0] || order.shippingName;
     const lastName = nameParts.slice(1).join(' ') || '';
+    const customProdId = await getCustomProductId();
     const lineItems = order.orderItems.map((item) => {
       const wcId = item.product?.wooCommerceId;
       const itemTotal = String(Number(item.price) * item.quantity);
       const unitPrice = String(item.price);
-      if (wcId) {
-        return { product_id: wcId, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
-      }
-      return {
-        name: item.productName || 'منتج',
-        quantity: item.quantity,
-        subtotal: itemTotal,
-        total: itemTotal,
-        price: unitPrice,
-      } as { name: string; quantity: number; subtotal: string; total: string; price: string };
+      if (wcId) return { product_id: wcId, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
+      // منتج مخصص — نبعت الاسم الحقيقي اللي كتبه السيلز
+      const productName = item.productName || item.product?.name || 'منتج';
+      return { product_id: customProdId, name: productName, quantity: item.quantity, subtotal: itemTotal, total: itemTotal, price: unitPrice };
     });
     if (lineItems.length === 0) {
       res.status(400).json({ error: 'الطلب لا يحتوي عناصر' });
