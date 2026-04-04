@@ -140,37 +140,59 @@ export default function DualNamePage() {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       sceneRef.current.controls.autoRotate = false;
+      // Restore camera position
+      cam.position.copy(savedPos);
+      ctrl.target.copy(savedTarget);
+      ctrl.update();
       setRecording(false);
       setRecordProgress(0);
     };
 
+    // Zoom camera closer to model before recording
+    const cam = sceneRef.current.camera;
+    const ctrl = sceneRef.current.controls;
+    const savedPos = cam.position.clone();
+    const savedTarget = ctrl.target.clone();
+    // Move camera closer (60% of current distance)
+    const dir = cam.position.clone().sub(ctrl.target).normalize();
+    const dist = cam.position.distanceTo(ctrl.target) * 0.6;
+    cam.position.copy(ctrl.target.clone().add(dir.multiplyScalar(dist)));
+    ctrl.update();
+
     // Draw frame: 3D canvas + watermark text
     let drawFrame = 0;
+    const w = compositeCanvas.width;
+    const h = compositeCanvas.height;
+    const scale = w / 800; // scale text relative to canvas size
+
     const drawComposite = () => {
       ctx.drawImage(canvas, 0, 0);
 
       // Watermark background
-      const wmHeight = 56;
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.fillRect(0, compositeCanvas.height - wmHeight, compositeCanvas.width, wmHeight);
+      const wmHeight = Math.round(80 * scale);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+      ctx.fillRect(0, h - wmHeight, w, wmHeight);
 
-      // Watermark text
-      ctx.fillStyle = '#ffffff';
+      // Watermark text — clear and readable
       ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
 
-      ctx.font = '500 13px "Segoe UI", system-ui, sans-serif';
+      // Line 1
+      ctx.font = `500 ${Math.round(18 * scale)}px "Segoe UI", "Arial", sans-serif`;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
       ctx.fillText(
         'هذا الفيديو لمجسم تصويري خاص بيك وليس فيديو للمنتج النهائي',
-        compositeCanvas.width / 2,
-        compositeCanvas.height - 32,
+        w / 2,
+        h - wmHeight * 0.6,
       );
 
-      ctx.font = '600 14px "Segoe UI", system-ui, sans-serif';
+      // Line 2
+      ctx.font = `700 ${Math.round(20 * scale)}px "Segoe UI", "Arial", sans-serif`;
       ctx.fillStyle = '#f0c040';
       ctx.fillText(
         'تم التصميم بواسطة Print IN',
-        compositeCanvas.width / 2,
-        compositeCanvas.height - 12,
+        w / 2,
+        h - wmHeight * 0.25,
       );
 
       drawFrame = requestAnimationFrame(drawComposite);
