@@ -5,15 +5,15 @@ import { useQuery } from '@tanstack/react-query';
 import api from '../../../shared/services/api';
 
 const NAV_ITEMS = [
-  { to: '/settings/users', label: 'المستخدمين', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
-  { to: '/settings/pending', label: 'طلبات التسجيل', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z', hasBadge: true },
-  { to: '/settings/roles', label: 'الأدوار والصلاحيات', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+  { to: '/settings/users', label: 'المستخدمين', icon: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z', permission: 'users.manage' },
+  { to: '/settings/pending', label: 'طلبات التسجيل', icon: 'M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z', hasBadge: true, permission: 'users.manage' },
+  { to: '/settings/roles', label: 'الأدوار والصلاحيات', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', permission: 'settings.roles.manage' },
   { to: '/settings/profile', label: 'الملف الشخصي', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
   { to: '/settings/tickets', label: 'التذاكر', icon: 'M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z' },
 ];
 
 export default function SettingsShell({ children }: { children: ReactNode }) {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -63,7 +63,7 @@ export default function SettingsShell({ children }: { children: ReactNode }) {
 
           <div className="border-t border-slate-600 my-2" />
 
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.filter((item) => !item.permission || hasPermission(item.permission)).map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

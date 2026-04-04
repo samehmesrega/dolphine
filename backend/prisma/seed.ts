@@ -62,6 +62,34 @@ async function main() {
       permissions: ['leads.view', 'customers.view', 'orders.view', 'dashboard.view'],
       isDefault: false,
     },
+    {
+      name: 'Accounts',
+      slug: 'accounts',
+      permissions: [
+        'leads.view', 'orders.view', 'orders.edit',
+        'customers.view', 'dashboard.view',
+        'blacklist.manage',
+      ],
+      isDefault: false,
+    },
+    {
+      name: 'Marketing',
+      slug: 'marketing',
+      permissions: [
+        'leads.view', 'dashboard.view', 'reports.view',
+      ],
+      isDefault: false,
+    },
+    {
+      name: 'Operations',
+      slug: 'operations',
+      permissions: [
+        'leads.view', 'orders.view', 'orders.edit',
+        'customers.view', 'dashboard.view',
+        'shifts.manage', 'products.manage',
+      ],
+      isDefault: false,
+    },
   ];
 
   for (const role of leadsRoles) {
