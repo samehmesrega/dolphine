@@ -7,6 +7,7 @@ import {
   isConfigured,
 } from '../services/woocommerce';
 import { normalizePhone } from '../../../shared/utils/phone';
+import { encryptToken } from '../../../shared/utils/token-encryption';
 import { z } from 'zod';
 
 const router = Router();
@@ -60,15 +61,15 @@ router.post('/config', async (req: Request, res: Response) => {
     if (consumerKey != null && consumerKey.trim() !== '') {
       await prisma.integrationSetting.upsert({
         where: { key: 'woocommerce_consumer_key' },
-        update: { value: consumerKey.trim() },
-        create: { key: 'woocommerce_consumer_key', value: consumerKey.trim() },
+        update: { value: encryptToken(consumerKey.trim()) },
+        create: { key: 'woocommerce_consumer_key', value: encryptToken(consumerKey.trim()) },
       });
     }
     if (consumerSecret != null && consumerSecret.trim() !== '') {
       await prisma.integrationSetting.upsert({
         where: { key: 'woocommerce_consumer_secret' },
-        update: { value: consumerSecret.trim() },
-        create: { key: 'woocommerce_consumer_secret', value: consumerSecret.trim() },
+        update: { value: encryptToken(consumerSecret.trim()) },
+        create: { key: 'woocommerce_consumer_secret', value: encryptToken(consumerSecret.trim()) },
       });
     }
     res.json({ success: true });

@@ -281,7 +281,7 @@ const updateUserSchema = z.object({
 });
 
 // PATCH /settings/users/:id — update user
-router.patch('/:id', async (req: AuthRequest, res: Response) => {
+router.patch('/:id', requireManage, async (req: AuthRequest, res: Response) => {
   try {
     const id = String(req.params.id);
     const existing = await prisma.user.findUnique({ where: { id }, include: { role: true } });
@@ -307,7 +307,18 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
       updates.email = parsed.data.email;
     }
     if (parsed.data.password != null) updates.passwordHash = await bcrypt.hash(parsed.data.password, 10);
-    if (parsed.data.roleId != null) updates.roleId = parsed.data.roleId;
+    if (parsed.data.roleId != null) {
+      // Only super_admin can assign super_admin role
+      const targetRole = await prisma.role.findUnique({ where: { id: parsed.data.roleId } });
+      if (targetRole?.slug === 'super_admin') {
+        const callerRole = await getCallerRole(req);
+        if (callerRole?.slug !== 'super_admin') {
+          res.status(403).json({ error: 'فقط المدير العام يمكنه تعيين دور المدير العام' });
+          return;
+        }
+      }
+      updates.roleId = parsed.data.roleId;
+    }
     if (parsed.data.isActive != null) {
       updates.isActive = parsed.data.isActive;
       updates.status = parsed.data.isActive ? 'active' : 'suspended';

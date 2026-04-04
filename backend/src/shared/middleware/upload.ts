@@ -20,8 +20,9 @@ const single = multer({
   storage,
   limits: { fileSize: maxSize },
   fileFilter: (_req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|webp/i.test(file.mimetype);
-    if (allowed) cb(null, true);
+    const mimeAllowed = /jpeg|jpg|png|gif|webp/i.test(file.mimetype);
+    const extAllowed = /\.(jpe?g|png|gif|webp)$/i.test(file.originalname);
+    if (mimeAllowed && extAllowed) cb(null, true);
     else cb(new Error('نوع الملف غير مسموح. استخدم صورة (jpg, png, gif, webp)'));
   },
 }).single('transferImage');

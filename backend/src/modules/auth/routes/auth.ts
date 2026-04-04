@@ -554,8 +554,8 @@ router.post('/forgot-password', async (req: Request, res: Response) => {
     const successMsg = 'لو البريد مسجل عندنا، هتوصلك رسالة لاستعادة كلمة المرور';
 
     const user = await prisma.user.findUnique({ where: { email: String(email).trim().toLowerCase() } });
-    if (!user || user.authMethod === 'google') {
-      // Don't reveal if email exists or is Google-only
+    if (!user || user.authMethod !== 'email') {
+      // Don't reveal if email exists or uses OAuth-only auth
       res.json({ message: successMsg });
       return;
     }

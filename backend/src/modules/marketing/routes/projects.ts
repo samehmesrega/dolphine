@@ -22,7 +22,8 @@ router.get('/', async (_req: AuthRequest, res: Response) => {
 // POST /api/v1/marketing/projects
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const project = await prisma.mktProject.create({ data: req.body });
+    const { name, slug, language, isActive } = req.body;
+    const project = await prisma.mktProject.create({ data: { name, slug, language, isActive } });
     res.status(201).json({ project });
   } catch (err: any) {
     res.status(400).json({ error: err.message });
@@ -32,9 +33,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // PUT /api/v1/marketing/projects/:id
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const { name, slug, language, isActive } = req.body;
     const project = await prisma.mktProject.update({
       where: { id: String(req.params.id) },
-      data: req.body,
+      data: { name, slug, language, isActive },
     });
     res.json({ project });
   } catch (err: any) {

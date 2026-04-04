@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../../../db';
 import { getBostaConfigForUI, isConfigured as isBostaConfigured, getAllowOpenPackage, setAllowOpenPackage, getPackageDescription, setPackageDescription } from '../services/bosta';
 import { config } from '../../../shared/config';
+import { encryptToken } from '../../../shared/utils/token-encryption';
 import { z } from 'zod';
 
 const router = Router();
@@ -52,10 +53,11 @@ router.post('/config', async (req: Request, res: Response) => {
     const { apiKey, baseUrl, enabled } = parsed.data;
 
     if (apiKey != null && apiKey.trim() !== '') {
+      const encryptedKey = encryptToken(apiKey.trim());
       await prisma.integrationSetting.upsert({
         where: { key: 'bosta_api_key' },
-        update: { value: apiKey.trim() },
-        create: { key: 'bosta_api_key', value: apiKey.trim() },
+        update: { value: encryptedKey },
+        create: { key: 'bosta_api_key', value: encryptedKey },
       });
     }
     if (baseUrl != null && baseUrl.trim() !== '') {

@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { prisma } from '../../../db';
 import type { AuthRequest } from '../../../shared/middleware/auth';
+import { requirePermission } from '../../../shared/middleware/auth';
 import { auditLog } from '../services/audit';
 
 const router = Router();
@@ -62,7 +63,7 @@ router.get('/permissions', async (_req: AuthRequest, res: Response) => {
 });
 
 // تحديث صلاحيات دور معين
-router.put('/roles/:id/permissions', async (req: AuthRequest, res: Response) => {
+router.put('/roles/:id/permissions', requirePermission('users.manage'), async (req: AuthRequest, res: Response) => {
   try {
     const roleId = String(req.params.id);
     const { permissionIds } = req.body as { permissionIds: string[] };
@@ -263,6 +264,11 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
       const role = await prisma.role.findUnique({ where: { id: parsed.data.roleId } });
       if (!role) {
         res.status(400).json({ error: 'الدور غير موجود' });
+        return;
+      }
+      // Only super_admin can assign super_admin role
+      if (role.slug === 'super_admin' && callerRole?.slug !== 'super_admin') {
+        res.status(403).json({ error: 'فقط المدير العام يمكنه تعيين دور المدير العام' });
         return;
       }
       updates.roleId = parsed.data.roleId;

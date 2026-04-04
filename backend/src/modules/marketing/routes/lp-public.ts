@@ -143,7 +143,8 @@ router.post('/submit/:landingPageId', async (req: Request, res: Response) => {
 
     res.json({ success: true });
   } catch (err: any) {
-    res.status(500).json({ success: false, error: err.message });
+    console.error('[LP Submit] Error:', err);
+    res.status(500).json({ success: false, error: 'حدث خطأ في معالجة الطلب' });
   }
 });
 

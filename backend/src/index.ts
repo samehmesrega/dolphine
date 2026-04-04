@@ -237,8 +237,8 @@ app.use('/api/orders', authMiddleware, require('./modules/leads/routes/orders').
 app.use('/api/customers', authMiddleware, require('./modules/leads/routes/customers').default);
 app.use('/api/dashboard', authMiddleware, require('./modules/leads/routes/dashboard').default);
 app.use('/api/shifts', authMiddleware, require('./modules/leads/routes/shifts').default);
-app.use('/api/woocommerce', authMiddleware, require('./modules/leads/routes/woocommerce').default);
-app.use('/api/bosta', authMiddleware, require('./modules/leads/routes/bosta').default);
+app.use('/api/woocommerce', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/woocommerce').default);
+app.use('/api/bosta', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/bosta').default);
 app.use('/api/form-connections', authMiddleware, require('./modules/leads/routes/form-connections').default);
 app.use('/api/sheet-connections', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/sheet-connections').default);
 app.use('/api/notifications', authMiddleware, require('./modules/leads/routes/notifications').default);

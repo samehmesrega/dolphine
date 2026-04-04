@@ -5,6 +5,7 @@
 
 import { prisma } from '../../../db';
 import { config } from '../../../shared/config';
+import { decryptToken } from '../../../shared/utils/token-encryption';
 
 const ENV_KEYS = {
   baseUrl: (config.woocommerce.baseUrl || '').replace(/\/$/, ''),
@@ -30,8 +31,13 @@ async function getFromDb(): Promise<WooCommerceConfig | null> {
   });
   const map = new Map(rows.map((r) => [r.key, r.value]));
   const baseUrl = (map.get(DB_KEYS.baseUrl) || '').replace(/\/$/, '');
-  const consumerKey = map.get(DB_KEYS.consumerKey) || '';
-  const consumerSecret = map.get(DB_KEYS.consumerSecret) || '';
+  // Decrypt credentials (try/catch for legacy plaintext values)
+  const rawKey = map.get(DB_KEYS.consumerKey) || '';
+  const rawSecret = map.get(DB_KEYS.consumerSecret) || '';
+  let consumerKey = rawKey;
+  let consumerSecret = rawSecret;
+  if (rawKey) { try { consumerKey = decryptToken(rawKey); } catch { /* legacy plaintext */ } }
+  if (rawSecret) { try { consumerSecret = decryptToken(rawSecret); } catch { /* legacy plaintext */ } }
   if (baseUrl && consumerKey && consumerSecret) return { baseUrl, consumerKey, consumerSecret };
   return null;
 }

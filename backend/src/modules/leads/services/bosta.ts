@@ -6,6 +6,7 @@
 
 import { prisma } from '../../../db';
 import { config } from '../../../shared/config';
+import { decryptToken } from '../../../shared/utils/token-encryption';
 import { Decimal } from '@prisma/client/runtime/library';
 
 // ===== Config =====
@@ -31,7 +32,12 @@ async function getFromDb(): Promise<BostaConfig | null> {
     where: { key: { in: [DB_KEYS.apiKey, DB_KEYS.baseUrl] } },
   });
   const map = new Map(rows.map((r) => [r.key, r.value]));
-  const apiKey = map.get(DB_KEYS.apiKey) || '';
+  const rawKey = map.get(DB_KEYS.apiKey) || '';
+  // Decrypt API key (try/catch for legacy plaintext values)
+  let apiKey = rawKey;
+  if (rawKey) {
+    try { apiKey = decryptToken(rawKey); } catch { /* legacy plaintext */ }
+  }
   const baseUrl = (map.get(DB_KEYS.baseUrl) || '').replace(/\/$/, '');
   if (apiKey && baseUrl) return { apiKey, baseUrl };
   if (apiKey) return { apiKey, baseUrl: ENV_KEYS.baseUrl };

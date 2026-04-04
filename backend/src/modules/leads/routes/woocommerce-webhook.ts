@@ -5,8 +5,10 @@
  */
 
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { prisma } from '../../../db';
 import { logger } from '../../../shared/config/logger';
+import { config } from '../../../shared/config';
 import { Decimal } from '@prisma/client/runtime/library';
 import { syncLeadDataToSheet } from '../services/googleSheetsWrite';
 
@@ -14,6 +16,21 @@ const router = Router();
 
 router.post('/', async (req: Request, res: Response) => {
   try {
+    // Verify WooCommerce webhook signature
+    const wcSecret = config.woocommerce.webhookSecret;
+    if (wcSecret) {
+      const signature = req.headers['x-wc-webhook-signature'] as string;
+      const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      const expected = crypto.createHmac('sha256', wcSecret).update(payload).digest('base64');
+      if (!signature || !crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+        logger.warn('[WooCommerce Webhook] Invalid or missing signature');
+        res.status(401).json({ error: 'Invalid signature' });
+        return;
+      }
+    } else {
+      logger.warn('[WooCommerce Webhook] WOOCOMMERCE_WEBHOOK_SECRET not configured — accepting without verification');
+    }
+
     const body = req.body;
     if (!body || !body.id) {
       res.status(200).json({ received: true });

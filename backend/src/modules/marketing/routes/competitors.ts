@@ -33,8 +33,9 @@ router.get('/', async (req: AuthRequest, res: Response) => {
 // POST /api/v1/marketing/competitors
 router.post('/', async (req: AuthRequest, res: Response) => {
   try {
+    const { title, url, platform, notes, screenshotUrl, competitorName, tags } = req.body;
     const ref = await prisma.competitorReference.create({
-      data: { ...req.body, addedBy: req.user!.userId },
+      data: { title, url, platform, notes, screenshotUrl, competitorName, tags, addedBy: req.user!.userId },
       include: { adder: { select: { id: true, name: true } } },
     });
     res.status(201).json({ reference: ref });
@@ -46,9 +47,10 @@ router.post('/', async (req: AuthRequest, res: Response) => {
 // PUT /api/v1/marketing/competitors/:id
 router.put('/:id', async (req: AuthRequest, res: Response) => {
   try {
+    const { title, url, platform, notes, screenshotUrl, competitorName, tags } = req.body;
     const ref = await prisma.competitorReference.update({
       where: { id: String(req.params.id) },
-      data: req.body,
+      data: { title, url, platform, notes, screenshotUrl, competitorName, tags },
     });
     res.json({ reference: ref });
   } catch (err: any) {

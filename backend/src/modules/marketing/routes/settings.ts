@@ -57,13 +57,15 @@ router.put('/creative-code', async (req: AuthRequest, res: Response) => {
   try {
     const existing = await prisma.creativeCodeConfig.findFirst();
     let config;
+    const { segments, separator, seqDigits } = req.body;
+    const data = { segments, separator, seqDigits };
     if (existing) {
       config = await prisma.creativeCodeConfig.update({
         where: { id: existing.id },
-        data: req.body,
+        data,
       });
     } else {
-      config = await prisma.creativeCodeConfig.create({ data: req.body });
+      config = await prisma.creativeCodeConfig.create({ data });
     }
     res.json({ config });
   } catch (err: any) {

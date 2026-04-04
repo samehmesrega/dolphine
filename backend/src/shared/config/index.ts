@@ -32,6 +32,7 @@ export const config = {
     baseUrl: (process.env.WOOCOMMERCE_BASE_URL || '').replace(/\/$/, ''),
     consumerKey: process.env.WOOCOMMERCE_CONSUMER_KEY || '',
     consumerSecret: process.env.WOOCOMMERCE_CONSUMER_SECRET || '',
+    webhookSecret: process.env.WOOCOMMERCE_WEBHOOK_SECRET || '',
   },
   bosta: {
     apiKey: process.env.BOSTA_API_KEY || '',
