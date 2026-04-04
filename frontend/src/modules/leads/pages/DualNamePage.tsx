@@ -1,25 +1,48 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 // @ts-ignore – engine files are plain JS
 import { buildAmbigram } from '../engine/AmbigramBuilder.js';
 // @ts-ignore
 import { createScene, fitCameraToObject } from '../engine/SceneManager.js';
 // @ts-ignore
 import { Color } from 'three';
+import api from '../../../shared/services/api';
 
-const COLORS = [
-  { name: 'Terracotta', value: '#e8735a' },
-  { name: 'أسود', value: '#1a1a1a' },
-  { name: 'ذهبي', value: '#d4a843' },
-  { name: 'فضي', value: '#c0c0c0' },
-  { name: 'أبيض', value: '#f5f5f5' },
-  { name: 'خشبي', value: '#8b6914' },
-  { name: 'أزرق', value: '#2563eb' },
-  { name: 'وردي', value: '#ec4899' },
+const DEFAULT_COLORS = [
+  { name: 'Terracotta', hex: '#e8735a' },
+  { name: 'أسود', hex: '#1a1a1a' },
+  { name: 'ذهبي', hex: '#d4a843' },
+  { name: 'فضي', hex: '#c0c0c0' },
+  { name: 'أبيض', hex: '#f5f5f5' },
+  { name: 'خشبي', hex: '#8b6914' },
+  { name: 'أزرق', hex: '#2563eb' },
+  { name: 'وردي', hex: '#ec4899' },
 ];
+
+const DEFAULT_WATERMARK = {
+  line1: 'هذا الفيديو لمجسم تصويري خاص بيك وليس فيديو للمنتج النهائي',
+  line2: 'تم التصميم بواسطة Print IN',
+};
 
 export default function DualNamePage() {
   const [textA, setTextA] = useState('');
   const [textB, setTextB] = useState('');
+  const { data: colorsFromSettings } = useQuery({
+    queryKey: ['setting', 'dual_name_colors'],
+    queryFn: async () => {
+      const { data } = await api.get('/integrations/setting/dual_name_colors');
+      return data.value ? JSON.parse(data.value) as { name: string; hex: string }[] : null;
+    },
+  });
+  const { data: watermarkFromSettings } = useQuery({
+    queryKey: ['setting', 'dual_name_watermark'],
+    queryFn: async () => {
+      const { data } = await api.get('/integrations/setting/dual_name_watermark');
+      return data.value ? JSON.parse(data.value) as { line1: string; line2: string } : null;
+    },
+  });
+  const COLORS = colorsFromSettings || DEFAULT_COLORS;
+  const watermark = watermarkFromSettings || DEFAULT_WATERMARK;
   const [color, setColor] = useState('#e8735a');
   const [generating, setGenerating] = useState(false);
   const [recording, setRecording] = useState(false);
@@ -181,7 +204,7 @@ export default function DualNamePage() {
       ctx.font = `500 ${Math.round(18 * scale)}px "Segoe UI", "Arial", sans-serif`;
       ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
       ctx.fillText(
-        'هذا الفيديو لمجسم تصويري خاص بيك وليس فيديو للمنتج النهائي',
+        watermark.line1,
         w / 2,
         h - wmHeight * 0.6,
       );
@@ -190,7 +213,7 @@ export default function DualNamePage() {
       ctx.font = `700 ${Math.round(20 * scale)}px "Segoe UI", "Arial", sans-serif`;
       ctx.fillStyle = '#f0c040';
       ctx.fillText(
-        'تم التصميم بواسطة Print IN',
+        watermark.line2,
         w / 2,
         h - wmHeight * 0.25,
       );
@@ -259,7 +282,7 @@ export default function DualNamePage() {
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
               {COLORS.map((c) => (
-                <option key={c.value} value={c.value}>{c.name}</option>
+                <option key={c.hex} value={c.hex}>{c.name}</option>
               ))}
             </select>
           </div>
