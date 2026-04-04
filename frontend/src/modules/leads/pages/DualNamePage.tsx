@@ -5,8 +5,37 @@ import { buildAmbigram } from '../engine/AmbigramBuilder.js';
 // @ts-ignore
 import { createScene, fitCameraToObject } from '../engine/SceneManager.js';
 // @ts-ignore
-import { Color } from 'three';
+import { Color, CanvasTexture, RepeatWrapping } from 'three';
 import api from '../../../shared/services/api';
+
+// Generate 3D print layer lines bump map (0.2mm layer height)
+// Model height ~37mm → ~185 layers
+function createLayerLinesBumpMap(): any {
+  const canvas = document.createElement('canvas');
+  canvas.width = 4;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d')!;
+  // Each layer line: subtle gradient (bright top → slight shadow at bottom)
+  const layerPx = 2; // pixels per layer in the texture
+  for (let y = 0; y < 256; y++) {
+    const posInLayer = y % layerPx;
+    const brightness = posInLayer === 0 ? 180 : 210;
+    ctx.fillStyle = `rgb(${brightness},${brightness},${brightness})`;
+    ctx.fillRect(0, y, 4, 1);
+  }
+  const tex = new CanvasTexture(canvas);
+  tex.wrapS = RepeatWrapping;
+  tex.wrapT = RepeatWrapping;
+  // ~185 layers across the model height
+  tex.repeat.set(1, 185);
+  return tex;
+}
+
+let layerBumpMap: any = null;
+function getLayerBumpMap() {
+  if (!layerBumpMap) layerBumpMap = createLayerLinesBumpMap();
+  return layerBumpMap;
+}
 
 const DEFAULT_COLORS = [
   { name: 'Terracotta', hex: '#e8735a' },
@@ -88,6 +117,8 @@ export default function DualNamePage() {
         child.material.roughness = 0.8;
         child.material.metalness = 0.05;
         child.material.envMapIntensity = 0.3;
+        child.material.bumpMap = getLayerBumpMap();
+        child.material.bumpScale = 0.15;
         child.material.needsUpdate = true;
       }
     });
