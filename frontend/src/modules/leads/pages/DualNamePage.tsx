@@ -8,38 +8,56 @@ import { createScene, fitCameraToObject } from '../engine/SceneManager.js';
 import { Color } from 'three';
 import api from '../../../shared/services/api';
 
-// Apply 3D print layer lines via shader modification (no UV needed)
+// Apply 3D print layer lines via shader — realistic FDM look
 function applyLayerLines(material: any, layerHeight = 0.2) {
   material.onBeforeCompile = (shader: any) => {
     shader.uniforms.layerHeight = { value: layerHeight };
-    // Compute world Y in vertex shader
+    // Pass world Y + world normal to fragment
     shader.vertexShader = shader.vertexShader.replace(
       'void main() {',
       `varying float vWorldY;
+       varying vec3 vWorldNormal;
        void main() {`
     );
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
-       vec4 worldPos = modelMatrix * vec4(transformed, 1.0);
-       vWorldY = worldPos.y;`
+       vec4 wPos = modelMatrix * vec4(transformed, 1.0);
+       vWorldY = wPos.y;
+       vWorldNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);`
     );
-    // Darken at layer boundaries in fragment shader
     shader.fragmentShader = shader.fragmentShader.replace(
       'void main() {',
       `varying float vWorldY;
+       varying vec3 vWorldNormal;
        uniform float layerHeight;
        void main() {`
     );
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <dithering_fragment>',
       `#include <dithering_fragment>
+       // How vertical is the surface (1.0 = vertical wall, 0.0 = flat top)
+       float verticalness = 1.0 - abs(vWorldNormal.y);
+
+       // Position within current layer (0.0 = bottom edge, 1.0 = top edge)
        float layerPos = mod(vWorldY, layerHeight) / layerHeight;
-       float line = smoothstep(0.0, 0.15, layerPos) * (1.0 - smoothstep(0.85, 1.0, layerPos));
-       gl_FragColor.rgb *= 0.88 + 0.12 * line;`
+
+       // Rounded bead profile: bright center, dark edges (like a half-cylinder)
+       float bead = sin(layerPos * 3.14159);
+
+       // Shadow at layer boundary (bottom of each layer)
+       float shadow = smoothstep(0.0, 0.2, layerPos);
+
+       // Highlight at top of each bead
+       float highlight = pow(bead, 2.0) * 0.15;
+
+       // Combine: shadow at edges + highlight on bead + scale by verticalness
+       float effect = mix(1.0, (0.85 + 0.15 * bead) * shadow + highlight, verticalness * 0.7);
+
+       gl_FragColor.rgb *= effect;`
     );
   };
-  material.customProgramCacheKey = () => 'layerLines_v2';
+  material.customProgramCacheKey = () => 'layerLines_v3';
   material.needsUpdate = true;
 }
 
