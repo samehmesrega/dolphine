@@ -24,6 +24,7 @@ type Lead = {
   status: LeadStatus;
   assignedTo?: { id: string; name: string } | null;
   communications?: Array<{ type: string; notes: string | null; createdAt: string; user: { name: string } }>;
+  _count?: { orders: number };
 };
 
 type User = { id: string; name: string };
@@ -500,8 +501,10 @@ export default function LeadsList() {
                 </td>
               </tr>
             ) : (
-              data!.leads.map((l) => (
-                <tr key={l.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${selectedIds.has(l.id) ? 'bg-blue-50' : ''}`}>
+              data!.leads.map((l) => {
+                const confirmedNoOrder = l.status?.slug === 'confirmed' && (l._count?.orders ?? 0) === 0;
+                return (
+                <tr key={l.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${confirmedNoOrder ? 'bg-red-50' : selectedIds.has(l.id) ? 'bg-blue-50' : ''}`}>
                   {canBulkDelete && (
                     <td className="px-3 py-3">
                       <input type="checkbox" checked={selectedIds.has(l.id)} onChange={() => toggleSelect(l.id)} className="rounded border-slate-300" />
@@ -538,7 +541,8 @@ export default function LeadsList() {
                   <td className="px-4 py-3 text-slate-700 hidden md:table-cell">{l.source}</td>
                   <td className="px-4 py-3 text-slate-700 hidden md:table-cell">{new Date(l.createdAt).toLocaleString('ar-EG')}</td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>

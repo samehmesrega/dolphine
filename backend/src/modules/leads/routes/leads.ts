@@ -100,6 +100,7 @@ router.get('/', async (req: Request, res: Response) => {
             take: 1,
             select: { type: true, notes: true, createdAt: true, user: { select: { name: true } } },
           },
+          _count: { select: { orders: true } },
         },
       }),
     ]);
