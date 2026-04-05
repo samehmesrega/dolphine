@@ -1,14 +1,12 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../../../../shared/services/api';
-import DateRangePicker, { DateRange } from '../../../../shared/components/DateRangePicker';
 
-function defaultRange(): DateRange {
+function currentMonthRange(): { from: string; to: string } {
   const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const to = new Date();
-  const from = new Date();
-  from.setDate(from.getDate() - 29);
-  return { from: fmt(from), to: fmt(to) };
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: fmt(from), to: fmt(now) };
 }
 
 type AgentStat = {
@@ -60,12 +58,12 @@ function RateBar({ value }: { value: number }) {
 }
 
 export default function HallOfFame() {
-  const [range, setRange] = useState<DateRange>(defaultRange());
+  const range = currentMonthRange();
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
 
   const { data: agentsData, isLoading: loadingAgents } = useQuery({
-    queryKey: ['reports', 'agents', range.from, range.to],
+    queryKey: ['reports', 'agents', 'hall-of-fame', range.from, range.to],
     queryFn: async () => {
       const { data } = await api.get('/reports/agents', { params: range });
       return data as { agents: AgentStat[] };
@@ -87,11 +85,6 @@ export default function HallOfFame() {
 
   return (
     <div className="space-y-6">
-      {/* Date Range Filter */}
-      <div className="bg-white rounded-xl shadow p-4">
-        <DateRangePicker value={range} onChange={setRange} />
-      </div>
-
       {loadingAgents ? (
         <div className="py-16 text-center text-slate-500">جاري التحميل...</div>
       ) : !champion || champion.orderCount === 0 ? (
