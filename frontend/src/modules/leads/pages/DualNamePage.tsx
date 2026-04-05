@@ -101,6 +101,14 @@ export default function DualNamePage() {
   const [recording, setRecording] = useState(false);
   const [recordProgress, setRecordProgress] = useState(0);
   const [error, setError] = useState('');
+  const [heartCopied, setHeartCopied] = useState(false);
+
+  const copyHeart = () => {
+    navigator.clipboard.writeText('❤').then(() => {
+      setHeartCopied(true);
+      setTimeout(() => setHeartCopied(false), 1500);
+    });
+  };
 
   const containerRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<any>(null);
@@ -335,6 +343,17 @@ export default function DualNamePage() {
               value={textB}
               onChange={(e) => setTextB(e.target.value.toUpperCase())}
             />
+          </div>
+          <div className="w-auto">
+            <label className="block text-xs font-medium text-slate-500 mb-1 opacity-0 select-none">copy</label>
+            <button
+              type="button"
+              onClick={copyHeart}
+              className="border border-slate-300 rounded-lg px-3 py-2 text-sm hover:bg-pink-50 hover:border-pink-300 transition-colors min-h-[44px]"
+              title="نسخ قلب ❤ للصق في الاسم"
+            >
+              {heartCopied ? '✓ تم النسخ' : '❤ نسخ قلب'}
+            </button>
           </div>
           <div className="w-full sm:w-auto">
             <label className="block text-xs font-medium text-slate-500 mb-1">اللون</label>
