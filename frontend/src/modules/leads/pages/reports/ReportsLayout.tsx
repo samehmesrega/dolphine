@@ -1,9 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom';
 
 const TABS = [
-  { to: '/reports', label: 'تقارير عامة', end: true },
-  { to: '/reports/sales', label: 'تقارير تيم السيلز', end: false },
-  { to: '/reports/hall-of-fame', label: 'لوحة الأبطال', end: false },
+  { to: '/leads/reports', label: 'تقارير عامة', end: true },
+  { to: '/leads/reports/sales', label: 'تقارير تيم السيلز', end: false },
+  { to: '/leads/reports/hall-of-fame', label: 'لوحة الأبطال', end: false },
 ];
 
 export default function ReportsLayout() {
