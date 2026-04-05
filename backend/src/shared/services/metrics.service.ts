@@ -186,6 +186,7 @@ const ORDER_VALUE_EXPR = `COALESCE(SUM(oi.price * oi.quantity), 0) - COALESCE(o.
 export type PerformanceRow = {
   id: string;
   name: string;
+  avatarUrl: string | null;
   totalLeads: number;
   confirmedLeads: number;
   confirmationRate: number;
@@ -193,17 +194,21 @@ export type PerformanceRow = {
   totalOrderValue: number;
   avgOrderValue: number;
   avgItemsPerOrder: number;
+  organicOrderCount: number;
+  organicOrderValue: number;
+  rejectedOrderCount: number;
 };
 
 export async function getAgentPerformance(from: Date, to: Date): Promise<PerformanceRow[]> {
   type Row = {
-    user_id: string; user_name: string;
+    user_id: string; user_name: string; avatar_url: string | null;
     total_leads: bigint; confirmed_leads: bigint; order_count: bigint;
     total_value: unknown; avg_order_value: unknown; avg_items_per_order: unknown;
+    organic_order_count: bigint; organic_order_value: unknown; rejected_order_count: bigint;
   };
   const rows = await prisma.$queryRawUnsafe<Row[]>(`
     WITH period_leads AS (
-      SELECT l.id AS lead_id, l.assigned_to_id, ls.slug AS status_slug
+      SELECT l.id AS lead_id, l.assigned_to_id, ls.slug AS status_slug, l.source AS lead_source
       FROM leads l
       JOIN lead_statuses ls ON ls.id = l.status_id
       WHERE l.assigned_to_id IS NOT NULL
@@ -213,12 +218,13 @@ export async function getAgentPerformance(from: Date, to: Date): Promise<Perform
     period_orders AS (
       SELECT
         o.id AS order_id, pl.assigned_to_id,
+        pl.lead_source, o.accounts_status,
         ${ORDER_VALUE_EXPR} AS order_value,
         COALESCE(SUM(oi.quantity), 0) AS item_count
       FROM period_leads pl
       JOIN orders o ON o.lead_id = pl.lead_id AND o.deleted_at IS NULL
       LEFT JOIN order_items oi ON oi.order_id = o.id
-      GROUP BY o.id, o.discount, pl.assigned_to_id
+      GROUP BY o.id, o.discount, pl.assigned_to_id, pl.lead_source, o.accounts_status
     ),
     lead_stats AS (
       SELECT assigned_to_id,
@@ -231,16 +237,22 @@ export async function getAgentPerformance(from: Date, to: Date): Promise<Perform
         COUNT(*) AS order_count,
         COALESCE(SUM(order_value), 0) AS total_value,
         COALESCE(AVG(order_value), 0) AS avg_order_value,
-        COALESCE(AVG(item_count), 0) AS avg_items_per_order
+        COALESCE(AVG(item_count), 0) AS avg_items_per_order,
+        COUNT(*) FILTER (WHERE lead_source = 'manual') AS organic_order_count,
+        COALESCE(SUM(order_value) FILTER (WHERE lead_source = 'manual'), 0) AS organic_order_value,
+        COUNT(*) FILTER (WHERE accounts_status = 'rejected') AS rejected_order_count
       FROM period_orders GROUP BY assigned_to_id
     )
-    SELECT u.id AS user_id, u.name AS user_name,
+    SELECT u.id AS user_id, u.name AS user_name, u.avatar_url,
       COALESCE(ls.total_leads, 0) AS total_leads,
       COALESCE(ls.confirmed_leads, 0) AS confirmed_leads,
       COALESCE(oa.order_count, 0) AS order_count,
       COALESCE(oa.total_value, 0) AS total_value,
       COALESCE(oa.avg_order_value, 0) AS avg_order_value,
-      COALESCE(oa.avg_items_per_order, 0) AS avg_items_per_order
+      COALESCE(oa.avg_items_per_order, 0) AS avg_items_per_order,
+      COALESCE(oa.organic_order_count, 0) AS organic_order_count,
+      COALESCE(oa.organic_order_value, 0) AS organic_order_value,
+      COALESCE(oa.rejected_order_count, 0) AS rejected_order_count
     FROM users u
     LEFT JOIN lead_stats ls ON ls.assigned_to_id = u.id
     LEFT JOIN order_agg oa ON oa.assigned_to_id = u.id
@@ -252,12 +264,15 @@ export async function getAgentPerformance(from: Date, to: Date): Promise<Perform
     const totalLeads = toN(r.total_leads);
     const confirmedLeads = toN(r.confirmed_leads);
     return {
-      id: r.user_id, name: r.user_name, totalLeads, confirmedLeads,
+      id: r.user_id, name: r.user_name, avatarUrl: r.avatar_url, totalLeads, confirmedLeads,
       confirmationRate: totalLeads > 0 ? Math.round((confirmedLeads / totalLeads) * 100) : 0,
       orderCount: toN(r.order_count),
       totalOrderValue: Math.round(toN(r.total_value) * 100) / 100,
       avgOrderValue: Math.round(toN(r.avg_order_value) * 100) / 100,
       avgItemsPerOrder: Math.round(toN(r.avg_items_per_order) * 10) / 10,
+      organicOrderCount: toN(r.organic_order_count),
+      organicOrderValue: Math.round(toN(r.organic_order_value) * 100) / 100,
+      rejectedOrderCount: toN(r.rejected_order_count),
     };
   });
 }
@@ -322,12 +337,15 @@ export async function getShiftPerformance(from: Date, to: Date): Promise<Perform
     const totalLeads = toN(r.total_leads);
     const confirmedLeads = toN(r.confirmed_leads);
     return {
-      id: r.shift_id, name: r.shift_name, totalLeads, confirmedLeads,
+      id: r.shift_id, name: r.shift_name, avatarUrl: null, totalLeads, confirmedLeads,
       confirmationRate: totalLeads > 0 ? Math.round((confirmedLeads / totalLeads) * 100) : 0,
       orderCount: toN(r.order_count),
       totalOrderValue: Math.round(toN(r.total_value) * 100) / 100,
       avgOrderValue: Math.round(toN(r.avg_order_value) * 100) / 100,
       avgItemsPerOrder: Math.round(toN(r.avg_items_per_order) * 10) / 10,
+      organicOrderCount: 0,
+      organicOrderValue: 0,
+      rejectedOrderCount: 0,
     };
   });
 }

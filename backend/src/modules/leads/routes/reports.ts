@@ -29,11 +29,14 @@ router.get('/agents', async (req: Request, res: Response) => {
       from: (req.query.from as string) || from.toISOString().slice(0, 10),
       to: (req.query.to as string) || to.toISOString().slice(0, 10),
       agents: agents.map(a => ({
-        userId: a.id, userName: a.name,
+        userId: a.id, userName: a.name, avatarUrl: a.avatarUrl,
         totalLeads: a.totalLeads, confirmedLeads: a.confirmedLeads,
         confirmationRate: a.confirmationRate, orderCount: a.orderCount,
         totalOrderValue: a.totalOrderValue, avgOrderValue: a.avgOrderValue,
         avgItemsPerOrder: a.avgItemsPerOrder,
+        organicOrderCount: a.organicOrderCount,
+        organicOrderValue: a.organicOrderValue,
+        rejectedOrderCount: a.rejectedOrderCount,
       })),
     });
   } catch (err) {
@@ -112,6 +115,63 @@ router.get('/general', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[reports/general]', err);
     res.status(500).json({ error: 'خطأ في تحميل التقارير العامة' });
+  }
+});
+
+// GET /api/reports/hall-of-fame?year=2026
+// يرجع أفضل موظف سيلز لكل شهر من بداية السنة
+router.get('/hall-of-fame', async (req: Request, res: Response) => {
+  try {
+    const year = parseInt(req.query.year as string) || new Date().getFullYear();
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0-indexed
+    const currentYear = now.getFullYear();
+
+    const months: { month: number; monthName: string; winner: any | null }[] = [];
+    const MONTH_NAMES = [
+      'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
+      'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+    ];
+
+    // Only process months up to current month (for current year) or all 12 (for past years)
+    const maxMonth = year < currentYear ? 11 : currentMonth;
+
+    const promises = [];
+    for (let m = 0; m <= maxMonth; m++) {
+      const fromStr = `${year}-${String(m + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(year, m + 1, 0).getDate();
+      const toStr = `${year}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      promises.push(
+        parseDateRangeCairo(fromStr, toStr),
+      );
+    }
+
+    const dateRanges = promises;
+    const agentResults = await Promise.all(
+      dateRanges.map(([from, to]) => getAgentPerformance(from, to)),
+    );
+
+    for (let m = 0; m <= maxMonth; m++) {
+      const agents = agentResults[m];
+      // Sort by orderCount (most confirmed orders)
+      const sorted = [...agents].sort((a, b) => b.orderCount - a.orderCount);
+      const top = sorted[0];
+      months.push({
+        month: m + 1,
+        monthName: MONTH_NAMES[m],
+        winner: top && top.orderCount > 0 ? {
+          userId: top.id, userName: top.name, avatarUrl: top.avatarUrl,
+          orderCount: top.orderCount, totalLeads: top.totalLeads,
+          confirmationRate: top.totalLeads > 0 ? Math.round((top.orderCount / top.totalLeads) * 100) : 0,
+          totalOrderValue: top.totalOrderValue,
+        } : null,
+      });
+    }
+
+    res.json({ year, months });
+  } catch (err) {
+    console.error('[reports/hall-of-fame]', err);
+    res.status(500).json({ error: 'خطأ في تحميل لوحة الأبطال' });
   }
 });
 

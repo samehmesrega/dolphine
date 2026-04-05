@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom';
 const TABS = [
   { to: '/reports', label: 'تقارير عامة', end: true },
   { to: '/reports/sales', label: 'تقارير تيم السيلز', end: false },
-  { to: '/reports/marketing', label: 'تقارير الماركتينج', end: false },
+  { to: '/reports/hall-of-fame', label: 'لوحة الأبطال', end: false },
 ];
 
 export default function ReportsLayout() {

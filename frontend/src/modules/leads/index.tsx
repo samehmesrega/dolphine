@@ -12,7 +12,7 @@ import OrdersPending from './pages/orders/OrdersPending';
 import ReportsLayout from './pages/reports/ReportsLayout';
 import GeneralReports from './pages/reports/GeneralReports';
 import SalesReports from './pages/reports/SalesReports';
-import MarketingReports from './pages/reports/MarketingReports';
+import HallOfFame from './pages/reports/HallOfFame';
 import ProductsPage from './pages/ProductsPage';
 import ShiftsPage from './pages/ShiftsPage';
 import IntegrationsPage from './pages/IntegrationsPage';
@@ -42,7 +42,7 @@ export default function LeadsModule() {
       <Route path="reports" element={<ReportsLayout />}>
         <Route index element={<GeneralReports />} />
         <Route path="sales" element={<SalesReports />} />
-        <Route path="marketing" element={<MarketingReports />} />
+        <Route path="hall-of-fame" element={<HallOfFame />} />
       </Route>
       <Route path="products" element={<ProductsPage />} />
       <Route path="shifts" element={<ShiftsPage />} />

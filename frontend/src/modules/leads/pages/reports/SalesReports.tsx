@@ -28,12 +28,16 @@ function RateBar({ value }: { value: number }) {
 type AgentStat = {
   userId: string;
   userName: string;
+  avatarUrl: string | null;
   totalLeads: number;
   confirmedLeads: number;
   confirmationRate: number;
   orderCount: number;
   totalOrderValue: number;
   avgOrderValue: number;
+  organicOrderCount: number;
+  organicOrderValue: number;
+  rejectedOrderCount: number;
 };
 
 type ShiftStat = {
@@ -89,27 +93,38 @@ export default function SalesReports() {
                 <tr className="border-b border-slate-200 text-slate-500 text-xs">
                   <th className="pb-3 pr-2 font-medium text-right">الموظف</th>
                   <th className={TH}>الليدز</th>
-                  <th className={TH}>مؤكد</th>
-                  <th className="pb-3 px-2 font-medium text-right w-36">نسبة التأكيد</th>
                   <th className={TH}>الطلبات</th>
-                  <th className={TH}>القيمة الإجمالية</th>
-                  <th className={TH}>متوسط الطلب</th>
+                  <th className={TH}>قيمة الطلبات</th>
+                  <th className="pb-3 px-2 font-medium text-right w-36">نسبة التأكيد</th>
+                  <th className={TH}>أورجانيك</th>
+                  <th className={TH}>قيمة الأورجانيك</th>
+                  <th className={TH}>مرتجع</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {agentsData.agents.map((a) => (
-                  <tr key={a.userId} className="hover:bg-slate-50">
-                    <td className="py-3 pr-2 font-medium text-slate-800">{a.userName}</td>
-                    <td className={TD}>{a.totalLeads}</td>
-                    <td className={TD}>{a.confirmedLeads}</td>
-                    <td className="py-3 px-2">
-                      <RateBar value={a.confirmationRate} />
-                    </td>
-                    <td className={TD}>{a.orderCount}</td>
-                    <td className={TD}>{a.totalOrderValue.toLocaleString()}</td>
-                    <td className={TD}>{a.avgOrderValue.toLocaleString()}</td>
-                  </tr>
-                ))}
+                {agentsData.agents.map((a) => {
+                  const rate = a.totalLeads > 0 ? Math.round((a.orderCount / a.totalLeads) * 100) : 0;
+                  return (
+                    <tr key={a.userId} className="hover:bg-slate-50">
+                      <td className="py-3 pr-2 font-medium text-slate-800">{a.userName}</td>
+                      <td className={TD}>{a.totalLeads}</td>
+                      <td className={TD}>{a.orderCount}</td>
+                      <td className={TD}>{a.totalOrderValue.toLocaleString()}</td>
+                      <td className="py-3 px-2">
+                        <RateBar value={rate} />
+                      </td>
+                      <td className={TD}>{a.organicOrderCount}</td>
+                      <td className={TD}>{a.organicOrderValue.toLocaleString()}</td>
+                      <td className={TD}>
+                        {a.rejectedOrderCount > 0 ? (
+                          <span className="text-red-600 font-medium">{a.rejectedOrderCount}</span>
+                        ) : (
+                          <span className="text-slate-400">0</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
