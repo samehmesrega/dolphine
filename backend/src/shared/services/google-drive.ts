@@ -1,49 +1,39 @@
 /**
  * Google Drive Upload — رفع الملفات على Google Drive
- * يستخدم نفس Service Account الخاص بـ Google Sheets
- * Env: GOOGLE_SERVICE_ACCOUNT_KEY + GOOGLE_DRIVE_UPLOADS_FOLDER_ID
+ * يستخدم OAuth2 refresh token بتاع يوزر حقيقي (مش service account)
+ * Env: GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET + GOOGLE_DRIVE_REFRESH_TOKEN + GOOGLE_DRIVE_UPLOADS_FOLDER_ID
  */
 
-import { createSign } from 'crypto';
-
 const DRIVE_API = 'https://www.googleapis.com/upload/drive/v3/files';
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 
 let cachedToken: { token: string; expires: number } | null = null;
 
 async function getAccessToken(): Promise<string | null> {
   if (cachedToken && Date.now() < cachedToken.expires) return cachedToken.token;
 
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
-  if (!raw) return null;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+
+  if (!clientId || !clientSecret || !refreshToken) {
+    console.error('[Drive] Missing GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, or GOOGLE_DRIVE_REFRESH_TOKEN');
+    return null;
+  }
 
   try {
-    const json = raw.startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf-8');
-    const creds = JSON.parse(json);
-    if (!creds.client_email || !creds.private_key) return null;
-
-    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
-    const now = Math.floor(Date.now() / 1000);
-    const payload = Buffer.from(JSON.stringify({
-      iss: creds.client_email,
-      scope: DRIVE_SCOPE,
-      aud: creds.token_uri,
-      iat: now,
-      exp: now + 3600,
-    })).toString('base64url');
-
-    const sign = createSign('RSA-SHA256');
-    sign.update(`${header}.${payload}`);
-    const signature = sign.sign(creds.private_key, 'base64url');
-
-    const res = await fetch(creds.token_uri, {
+    const res = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${header}.${payload}.${signature}`,
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
     });
 
     if (!res.ok) {
-      console.error('[Drive] Token exchange failed:', await res.text());
+      console.error('[Drive] Token refresh failed:', await res.text());
       return null;
     }
 
