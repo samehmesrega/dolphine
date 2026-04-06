@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { width: 300px; font-family: 'Segoe UI', Tahoma, sans-serif; background: #f8fafc; color: #1e293b; font-size: 14px; }
+    .container { padding: 16px; }
+    h1 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #0f172a; text-align: center; }
+    .subtitle { text-align: center; font-size: 11px; color: #94a3b8; margin-top: -8px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; font-weight: 500; color: #64748b; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; margin-bottom: 10px; direction: ltr; }
+    input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59,130,246,0.15); }
+    .btn { width: 100%; padding: 10px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-danger { background: #ef4444; color: white; margin-top: 8px; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-toggle { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+    .btn-toggle:hover { background: #e2e8f0; }
+    .error { color: #ef4444; font-size: 12px; margin-bottom: 8px; text-align: center; }
+    .status-card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; text-align: center; }
+    .status-card .name { font-size: 15px; font-weight: 600; color: #0f172a; }
+    .status-card .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; margin-top: 6px; }
+    .badge-active { background: #dcfce7; color: #16a34a; }
+    .badge-paused { background: #fef3c7; color: #d97706; }
+    .actions { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+    #login-view, #status-view { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Dolphin WhatsApp</h1>
+    <p class="subtitle">مراقبة محادثات واتساب ويب</p>
+
+    <!-- Login View -->
+    <div id="login-view">
+      <label>رابط الـ API</label>
+      <input type="url" id="api-url" value="https://dolphine.onrender.com/api" placeholder="https://...">
+      <label>البريد الإلكتروني</label>
+      <input type="email" id="email" placeholder="email@example.com">
+      <label>كلمة المرور</label>
+      <input type="password" id="password" placeholder="••••••••">
+      <div id="error" class="error" style="display:none;"></div>
+      <button class="btn btn-primary" id="login-btn">تسجيل الدخول</button>
+    </div>
+
+    <!-- Status View -->
+    <div id="status-view">
+      <div class="status-card">
+        <div class="name" id="user-name"></div>
+        <div id="status-badge"></div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-toggle" id="toggle-btn"></button>
+        <button class="btn btn-danger" id="logout-btn">تسجيل الخروج</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

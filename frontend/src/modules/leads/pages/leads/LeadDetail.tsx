@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '../../../../shared/services/api';
 import { useAuth } from '../../../auth/context/AuthContext';
+import WhatsappChatsSection from '../../components/WhatsappChatsSection';
 
 type LeadStatus = { id: string; name: string; slug: string };
 type User = { id: string; name: string; role: { slug: string; name: string } };
@@ -779,6 +780,9 @@ export default function LeadDetailPage() {
           </ul>
         )}
       </div>
+
+      {/* WhatsApp Chats */}
+      <WhatsappChatsSection leadId={lead.id} />
 
       {/* UTM Block */}
       {lead.customFields && UTM_FIELDS.some((k) => (lead.customFields as Record<string, unknown>)[k]) && (

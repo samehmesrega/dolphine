@@ -22,6 +22,7 @@ import tasksRoutes from './tasks';
 import taskRulesRoutes from './task-rules';
 import blacklistRoutes from './blacklist';
 import integrationSettingsRoutes from './integration-settings';
+import whatsappMonitorRoutes from './whatsapp-monitor';
 
 const router = Router();
 
@@ -64,5 +65,6 @@ router.use('/tasks', tasksRoutes);
 router.use('/task-rules', requirePermission('tasks.manage'), taskRulesRoutes);
 router.use('/blacklist', requirePermission('blacklist.manage'), blacklistRoutes);
 router.use('/integrations', requirePermission('integrations.manage'), integrationSettingsRoutes);
+router.use('/whatsapp-monitor', requirePermission('leads.view'), whatsappMonitorRoutes);
 
 export default router;
