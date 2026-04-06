@@ -79,6 +79,11 @@ app.use(
         callback(null, true);
         return;
       }
+      // Chrome extensions
+      if (origin.startsWith('chrome-extension://')) {
+        callback(null, true);
+        return;
+      }
       // Production: check allowed origins
       if (config.allowedOrigins.includes(origin)) {
         callback(null, true);
