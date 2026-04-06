@@ -295,14 +295,13 @@
 
   // ──────── Initialization ────────
 
-  async function init() {
-    const storage = await chrome.storage.local.get(['paused', 'token']);
-    if (!storage.token) {
-      LOG('Not logged in — monitoring disabled');
-      return;
-    }
-    paused = storage.paused || false;
-    LOG('Initializing... paused=' + paused);
+  let started = false;
+
+  async function startMonitoring() {
+    if (started) return;
+    started = true;
+
+    LOG('Initializing...');
 
     // Wait for WhatsApp Web to load
     const maxWait = 30000;
@@ -317,9 +316,24 @@
 
     LOG('WhatsApp Monitor ACTIVE');
     startPolling();
+  }
 
-    // Listen for pause/resume
+  async function init() {
+    const storage = await chrome.storage.local.get(['paused', 'token']);
+    paused = storage.paused || false;
+
+    if (storage.token) {
+      startMonitoring();
+    } else {
+      LOG('Not logged in — waiting for login...');
+    }
+
+    // Listen for storage changes (login, pause/resume)
     chrome.storage.onChanged.addListener((changes) => {
+      if (changes.token && changes.token.newValue && !started) {
+        LOG('Token detected — starting monitoring');
+        startMonitoring();
+      }
       if (changes.paused) {
         paused = changes.paused.newValue;
         LOG('Monitoring', paused ? 'PAUSED' : 'RESUMED');
