@@ -177,11 +177,21 @@ export async function buildAmbigram(options) {
     // Load separate inscription font if provided, otherwise use main font
     const inscrFont = inscriptionFontUrl ? await loadFont(inscriptionFontUrl) : font;
 
-    // Calculate font size: 7-word sentence (≈35 chars) ≤ 100 mm, cap at 14
-    const maxInscrW = 100;
+    // Compute expected base width so inscription scales relative to it
+    const lettersW = currentX - spacing;
+    const expectedBaseW = Math.max(lettersW, 0) + basePadding * 2;
+
+    // Inscription width: 30%-80% of base width, large font always
+    const maxInscrW = expectedBaseW * 0.8;
+    const minInscrW = expectedBaseW * 0.3;
     const refWidth = inscrFont.getAdvanceWidth(inscrTrimmed, 72);
-    const inscrFontSize = Math.min(14, refWidth > 0 ? 72 * maxInscrW / refWidth : 14);
-    dbg(`  inscrFontSize: ${inscrFontSize.toFixed(1)}`);
+    let inscrFontSize = refWidth > 0 ? 72 * maxInscrW / refWidth : 20;
+    // Ensure text is at least 30% of base width
+    if (refWidth > 0) {
+      const actualW = refWidth * (inscrFontSize / 72);
+      if (actualW < minInscrW) inscrFontSize = 72 * minInscrW / refWidth;
+    }
+    dbg(`  expectedBaseW: ${expectedBaseW.toFixed(1)}, maxInscrW: ${maxInscrW.toFixed(1)}, inscrFontSize: ${inscrFontSize.toFixed(1)}`);
 
     // Full-string rendering: handles Arabic shaping, RTL, ligatures, kerning
     const result = textToJSCAD(inscrFont, inscrTrimmed, inscrFontSize);
