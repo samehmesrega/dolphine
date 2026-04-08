@@ -249,7 +249,7 @@ export async function buildAmbigram(options) {
     if (orderTrimmed) {
       dbg(`\n--- ORDER NUMBER: "${orderTrimmed}" ---`);
       const orderFont = inscriptionFontUrl ? await loadFont(inscriptionFontUrl) : font;
-      const orderFontSize = 8;
+      const orderFontSize = 10;
       const orderExtrudeH = 1; // 1 mm engrave depth
 
       const orderResult = textToJSCAD(orderFont, orderTrimmed, orderFontSize);
@@ -258,7 +258,15 @@ export async function buildAmbigram(options) {
       if (orderResult) {
         const { shape, bounds } = orderResult;
         const textW = bounds.maxX - bounds.minX;
-        const targetW = 100; // 10 cm
+        // Dynamic target width: fewer chars → bigger (up to 150mm), more chars → smaller (min 70mm)
+        const minW = 70;   // 7 cm
+        const maxW = 150;  // 15 cm
+        const refLen = 6;  // text ≤ 6 chars gets max width
+        const charCount = orderTrimmed.length;
+        const targetW = charCount <= refLen
+          ? maxW
+          : Math.max(minW, maxW - (charCount - refLen) * ((maxW - minW) / 14));
+        dbg(`  orderNum chars=${charCount}, targetW=${targetW.toFixed(0)}mm`);
         const scaleFactor = textW > 0 ? targetW / textW : 1;
         const cx = (bounds.minX + bounds.maxX) / 2;
         const cy = (bounds.minY + bounds.maxY) / 2;
