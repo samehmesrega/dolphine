@@ -105,10 +105,16 @@ export default function DualNamePage() {
   const lastFocusedRef = useRef<'a' | 'b'>('a');
 
   const insertHeart = () => {
+    const heart = '♥';
+    // Insert into last focused input
     if (lastFocusedRef.current === 'a') {
-      setTextA((prev) => prev + '♥');
+      setTextA((prev) => prev + heart);
     } else {
-      setTextB((prev) => prev + '♥');
+      setTextB((prev) => prev + heart);
+    }
+    // Also copy to clipboard for pasting elsewhere
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(heart).catch(() => {});
     }
     setHeartCopied(true);
     setTimeout(() => setHeartCopied(false), 800);
