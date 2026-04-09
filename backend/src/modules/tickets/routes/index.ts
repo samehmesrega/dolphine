@@ -22,7 +22,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { type, description, screenshot, extraImages, pageUrl, userAgent } = req.body;
+    const { type, description, screenshot, extraImages, pageUrl, userAgent, module } = req.body;
 
     if (!type || !description) {
       res.status(400).json({ error: 'النوع والوصف مطلوبان' });
@@ -35,6 +35,9 @@ router.post('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
+    const validModules = ['leads', 'marketing', 'inbox', 'knowledge-base', 'settings', 'general'];
+    const resolvedModule = validModules.includes(module) ? module : 'general';
+
     const ticket = await prisma.ticket.create({
       data: {
         type,
@@ -43,6 +46,7 @@ router.post('/', async (req: AuthRequest, res: Response) => {
         extraImages: Array.isArray(extraImages) && extraImages.length > 0 ? extraImages : undefined,
         pageUrl: pageUrl || null,
         userAgent: userAgent || null,
+        module: resolvedModule,
         createdBy: req.user.userId,
       },
       include: {
@@ -65,7 +69,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    const { type, status, priority } = req.query;
+    const { type, status, priority, module: moduleFilter } = req.query;
 
     const where: any = {};
 
@@ -77,6 +81,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     if (type && typeof type === 'string') where.type = type;
     if (status && typeof status === 'string') where.status = status;
     if (priority && typeof priority === 'string') where.priority = priority;
+    if (moduleFilter && typeof moduleFilter === 'string') where.module = moduleFilter;
 
     const tickets = await prisma.ticket.findMany({
       where,

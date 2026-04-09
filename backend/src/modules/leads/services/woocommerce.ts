@@ -1,62 +1,11 @@
 /**
  * تكامل ووكومرس - رفع الطلبات ومزامنة المنتجات
- * الإعدادات: من قاعدة البيانات (صفحة الربط) أو من متغيرات البيئة
  */
 
-import { prisma } from '../../../db';
-import { config } from '../../../shared/config';
-import { decryptToken } from '../../../shared/utils/token-encryption';
+import { getWooCommerceConfig } from '../../../shared/services/woocommerce-config';
+import type { WooCommerceConfig } from '../../../shared/services/woocommerce-config';
 
-const ENV_KEYS = {
-  baseUrl: (config.woocommerce.baseUrl || '').replace(/\/$/, ''),
-  consumerKey: config.woocommerce.consumerKey || '',
-  consumerSecret: config.woocommerce.consumerSecret || '',
-};
-
-const DB_KEYS = {
-  baseUrl: 'woocommerce_base_url',
-  consumerKey: 'woocommerce_consumer_key',
-  consumerSecret: 'woocommerce_consumer_secret',
-} as const;
-
-export type WooCommerceConfig = {
-  baseUrl: string;
-  consumerKey: string;
-  consumerSecret: string;
-};
-
-async function getFromDb(): Promise<WooCommerceConfig | null> {
-  const rows = await prisma.integrationSetting.findMany({
-    where: { key: { in: [DB_KEYS.baseUrl, DB_KEYS.consumerKey, DB_KEYS.consumerSecret] } },
-  });
-  const map = new Map(rows.map((r) => [r.key, r.value]));
-  const baseUrl = (map.get(DB_KEYS.baseUrl) || '').replace(/\/$/, '');
-  // Decrypt credentials (try/catch for legacy plaintext values)
-  const rawKey = map.get(DB_KEYS.consumerKey) || '';
-  const rawSecret = map.get(DB_KEYS.consumerSecret) || '';
-  let consumerKey = rawKey;
-  let consumerSecret = rawSecret;
-  if (rawKey) { try { consumerKey = decryptToken(rawKey); } catch { /* legacy plaintext */ } }
-  if (rawSecret) { try { consumerSecret = decryptToken(rawSecret); } catch { /* legacy plaintext */ } }
-  if (baseUrl && consumerKey && consumerSecret) return { baseUrl, consumerKey, consumerSecret };
-  return null;
-}
-
-/**
- * جلب الإعدادات: من قاعدة البيانات أولاً، ثم من متغيرات البيئة
- */
-export async function getWooCommerceConfig(): Promise<WooCommerceConfig | null> {
-  const fromDb = await getFromDb();
-  if (fromDb) return fromDb;
-  if (ENV_KEYS.baseUrl && ENV_KEYS.consumerKey && ENV_KEYS.consumerSecret) {
-    return {
-      baseUrl: ENV_KEYS.baseUrl,
-      consumerKey: ENV_KEYS.consumerKey,
-      consumerSecret: ENV_KEYS.consumerSecret,
-    };
-  }
-  return null;
-}
+export { getWooCommerceConfig, type WooCommerceConfig };
 
 function maskSecret(s: string, prefixLen = 5): string {
   if (!s || s.length <= prefixLen) return '••••••••';
@@ -71,25 +20,14 @@ export async function getWooCommerceConfigForUI(): Promise<{
   baseUrl: string;
   consumerKeyMasked: string;
   consumerSecretMasked: string;
-  source: 'db' | 'env';
 }> {
-  const fromDb = await getFromDb();
-  if (fromDb) {
+  const cfg = await getWooCommerceConfig();
+  if (cfg) {
     return {
       configured: true,
-      baseUrl: fromDb.baseUrl,
-      consumerKeyMasked: maskSecret(fromDb.consumerKey),
-      consumerSecretMasked: maskSecret(fromDb.consumerSecret),
-      source: 'db',
-    };
-  }
-  if (ENV_KEYS.baseUrl && ENV_KEYS.consumerKey && ENV_KEYS.consumerSecret) {
-    return {
-      configured: true,
-      baseUrl: ENV_KEYS.baseUrl,
-      consumerKeyMasked: maskSecret(ENV_KEYS.consumerKey),
-      consumerSecretMasked: maskSecret(ENV_KEYS.consumerSecret),
-      source: 'env',
+      baseUrl: cfg.baseUrl,
+      consumerKeyMasked: maskSecret(cfg.consumerKey),
+      consumerSecretMasked: maskSecret(cfg.consumerSecret),
     };
   }
   return {
@@ -97,7 +35,6 @@ export async function getWooCommerceConfigForUI(): Promise<{
     baseUrl: '',
     consumerKeyMasked: '',
     consumerSecretMasked: '',
-    source: 'env',
   };
 }
 

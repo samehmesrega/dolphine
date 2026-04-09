@@ -4,7 +4,6 @@ import type { AuthRequest } from '../../../shared/middleware/auth';
 import { prisma } from '../../../db';
 import * as lpService from '../services/landing-page.service';
 import * as aiLpService from '../services/ai-landing-page.service';
-import { getProductById } from '../../knowledge-base/services/kb-product.service';
 
 const router = Router();
 
@@ -163,7 +162,20 @@ router.post('/generate', async (req: AuthRequest, res: Response) => {
     let resolvedProductPrice = productPrice;
 
     if (kbProductId) {
-      const kbProduct = await getProductById(kbProductId);
+      const kbProduct = await prisma.kbProduct.findUnique({
+        where: { id: kbProductId, isActive: true },
+        include: {
+          media: { orderBy: { orderNum: 'asc' } },
+          pricing: { include: { variation: true }, orderBy: { updatedAt: 'desc' } },
+          variations: { include: { pricing: true }, orderBy: { createdAt: 'desc' } },
+          marketing: true,
+          faqs: { orderBy: { orderNum: 'asc' } },
+          objections: { orderBy: { orderNum: 'asc' } },
+          salesScripts: { orderBy: { orderNum: 'asc' } },
+          afterSales: true,
+          manufacturing: true,
+        },
+      });
       if (kbProduct) {
         productContext = buildProductContext(kbProduct);
         // Use KB product data as fallback if not explicitly provided

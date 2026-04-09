@@ -1,6 +1,6 @@
 import { prisma } from '../../../db';
 import type { KbMediaSource } from '@prisma/client';
-import { getGoogleApiKey } from '../../leads/services/googleSheets';
+import { getGoogleApiKey } from '../../../shared/services/google-api';
 
 const DRIVE_API = 'https://www.googleapis.com/drive/v3/files';
 

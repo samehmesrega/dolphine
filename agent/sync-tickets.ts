@@ -37,6 +37,15 @@ const PRIORITY_LABELS: Record<string, string> = {
   low: 'منخفضة',
 };
 
+const MODULE_LABELS: Record<string, string> = {
+  leads: 'المبيعات',
+  marketing: 'التسويق',
+  inbox: 'الرسائل',
+  'knowledge-base': 'بنك المعلومات',
+  settings: 'الإعدادات',
+  general: 'عام',
+};
+
 async function main() {
   // Create pending directory
   if (!fs.existsSync(PENDING_DIR)) {
@@ -96,10 +105,13 @@ async function main() {
     const statusLabel = STATUS_LABELS[ticket.status] || ticket.status;
     const priorityLabel = ticket.priority ? (PRIORITY_LABELS[ticket.priority] || ticket.priority) : 'غير محددة';
 
+    const moduleLabel = MODULE_LABELS[(ticket as any).module || 'general'] || (ticket as any).module || 'عام';
+
     let md = `# تذكرة: ${typeLabel} — ${shortId}\n\n`;
     md += `| الحقل | القيمة |\n|---|---|\n`;
     md += `| **المعرف** | \`${ticket.id}\` |\n`;
     md += `| **النوع** | ${typeLabel} |\n`;
+    md += `| **الموديول** | ${moduleLabel} (\`${(ticket as any).module || 'general'}\`) |\n`;
     md += `| **الحالة** | ${statusLabel} |\n`;
     md += `| **الأولوية** | ${priorityLabel} |\n`;
     md += `| **المُبلِّغ** | ${ticket.creator.name} (${ticket.creator.email}) |\n`;
@@ -133,26 +145,36 @@ async function main() {
   let summary = `# التذاكر المعلقة (${tickets.length})\n\n`;
   summary += `> آخر تحديث: ${new Date().toISOString().replace('T', ' ').substring(0, 19)}\n\n`;
 
-  // Group by type
-  const byType: Record<string, typeof tickets> = {};
+  // Group by module, then by type
+  const byModule: Record<string, typeof tickets> = {};
   for (const t of tickets) {
-    const type = t.type;
-    if (!byType[type]) byType[type] = [];
-    byType[type].push(t);
+    const mod = (t as any).module || 'general';
+    if (!byModule[mod]) byModule[mod] = [];
+    byModule[mod].push(t);
   }
 
-  for (const [type, group] of Object.entries(byType)) {
-    const typeLabel = TYPE_LABELS[type] || type;
-    summary += `## ${typeLabel} (${group.length})\n\n`;
+  for (const [mod, modTickets] of Object.entries(byModule)) {
+    const moduleLabel = MODULE_LABELS[mod] || mod;
+    summary += `## ${moduleLabel} — \`${mod}\` (${modTickets.length})\n\n`;
 
-    for (const t of group) {
-      const shortId = t.id.substring(0, 8);
-      const statusLabel = STATUS_LABELS[t.status] || t.status;
-      const desc = t.description.substring(0, 80).replace(/\n/g, ' ');
-      summary += `- **[${shortId}](${t.id}.md)** — ${statusLabel} — ${desc}...\n`;
+    // Sub-group by type within module
+    const byType: Record<string, typeof tickets> = {};
+    for (const t of modTickets) {
+      if (!byType[t.type]) byType[t.type] = [];
+      byType[t.type].push(t);
     }
 
-    summary += '\n';
+    for (const [type, group] of Object.entries(byType)) {
+      const typeLabel = TYPE_LABELS[type] || type;
+      summary += `### ${typeLabel} (${group.length})\n\n`;
+      for (const t of group) {
+        const shortId = t.id.substring(0, 8);
+        const statusLabel = STATUS_LABELS[t.status] || t.status;
+        const desc = t.description.substring(0, 80).replace(/\n/g, ' ');
+        summary += `- **[${shortId}](${t.id}.md)** — ${statusLabel} — ${desc}...\n`;
+      }
+      summary += '\n';
+    }
   }
 
   summary += `---\n\n`;

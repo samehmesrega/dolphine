@@ -3,7 +3,7 @@
  * Extracts text from transfer receipt images and parses structured data.
  */
 
-import { getGoogleApiKey } from './googleSheets';
+import { getGoogleApiKey } from '../../../shared/services/google-api';
 
 const VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate';
 

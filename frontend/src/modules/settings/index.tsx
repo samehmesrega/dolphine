@@ -2,10 +2,9 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import SettingsShell from './components/SettingsShell';
 
-// Reuse existing pages from leads (will move files later in cleanup step)
-const UsersPage = lazy(() => import('../leads/pages/UsersPage'));
-const RolesPage = lazy(() => import('../leads/pages/RolesPage'));
-const ProfilePage = lazy(() => import('../leads/pages/ProfilePage'));
+const UsersPage = lazy(() => import('../../shared/pages/UsersPage'));
+const RolesPage = lazy(() => import('../../shared/pages/RolesPage'));
+const ProfilePage = lazy(() => import('../../shared/pages/ProfilePage'));
 const PendingUsersPage = lazy(() => import('./pages/PendingUsersPage'));
 const TicketsPage = lazy(() => import('./pages/TicketsPage'));
 

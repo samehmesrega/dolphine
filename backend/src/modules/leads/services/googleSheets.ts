@@ -3,24 +3,9 @@
  * تستخدم API Key للوصول للشيتات المشاركة علنياً
  */
 
-import { prisma } from '../../../db';
-import { decryptToken } from '../../../shared/utils/token-encryption';
+import { getGoogleApiKey } from '../../../shared/services/google-api';
 
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
-
-/** جلب API Key من إعدادات التكامل (مع فك التشفير) */
-export async function getGoogleApiKey(): Promise<string | null> {
-  const setting = await prisma.integrationSetting.findUnique({
-    where: { key: 'google_sheets_api_key' },
-  });
-  if (!setting?.value) return null;
-  try {
-    return decryptToken(setting.value);
-  } catch {
-    // Legacy plaintext key — return as-is
-    return setting.value;
-  }
-}
 
 /** استخراج spreadsheetId من رابط Google Sheets */
 export function extractSpreadsheetId(url: string): string | null {

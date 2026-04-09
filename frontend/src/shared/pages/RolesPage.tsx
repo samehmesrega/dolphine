@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '../../../shared/services/api';
+import api from '../services/api';
 
 type Permission = {
   id: string;

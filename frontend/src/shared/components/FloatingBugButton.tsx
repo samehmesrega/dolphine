@@ -10,6 +10,12 @@ const TYPE_OPTIONS: { value: TicketType; label: string; emoji: string; color: st
   { value: 'suggestion', label: 'اقتراح', emoji: '\uD83D\uDFE2', color: 'text-green-600', bgColor: 'bg-green-50 border-green-300 hover:bg-green-100' },
 ];
 
+function getCurrentModule(): string {
+  const segment = window.location.pathname.split('/')[1];
+  const validModules = ['leads', 'marketing', 'inbox', 'knowledge-base', 'settings'];
+  return validModules.includes(segment) ? segment : 'general';
+}
+
 export default function FloatingBugButton() {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<TicketType | null>(null);
@@ -96,6 +102,7 @@ export default function FloatingBugButton() {
         extraImages: extraImages.length > 0 ? extraImages : undefined,
         pageUrl: window.location.href,
         userAgent: navigator.userAgent,
+        module: getCurrentModule(),
       });
       setSuccess(true);
       setTimeout(() => {

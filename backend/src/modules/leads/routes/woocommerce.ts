@@ -39,7 +39,6 @@ router.get('/config', async (_req: Request, res: Response) => {
       baseUrl: '',
       consumerKeyMasked: '',
       consumerSecretMasked: '',
-      source: 'env' as const,
     });
   }
 });

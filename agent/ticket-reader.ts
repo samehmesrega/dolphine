@@ -12,6 +12,7 @@ const prisma = new PrismaClient();
 interface TicketQuery {
   status?: string;
   type?: string;
+  module?: string;
   limit?: number;
   id?: string;
 }
@@ -27,6 +28,9 @@ function parseArgs(): TicketQuery {
         break;
       case '--type':
         query.type = args[++i];
+        break;
+      case '--module':
+        query.module = args[++i];
         break;
       case '--limit':
         query.limit = parseInt(args[++i], 10);
@@ -69,9 +73,10 @@ async function main() {
   const where: any = {};
   if (query.status) where.status = query.status;
   if (query.type) where.type = query.type;
+  if (query.module) where.module = query.module;
 
-  // Default: new bugs only
-  if (!query.status && !query.type) {
+  // Default: new bugs only (when no filters at all)
+  if (!query.status && !query.type && !query.module) {
     where.status = 'new';
     where.type = 'bug';
   }

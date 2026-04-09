@@ -4,7 +4,7 @@
  */
 
 import { prisma } from '../../../db';
-import { getWooCommerceConfig } from '../../leads/services/woocommerce';
+import { getWooCommerceConfig } from '../../../shared/services/woocommerce-config';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 

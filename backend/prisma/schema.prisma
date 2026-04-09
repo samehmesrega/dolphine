@@ -1492,6 +1492,7 @@ model Ticket {
   extraImages Json?     @map("extra_images") // array of base64 strings
   pageUrl     String?   @map("page_url")
   userAgent   String?   @map("user_agent")
+  module      String?   @default("general") // leads, marketing, inbox, knowledge-base, settings, general
   status      String    @default("new") // new, reviewing, in_progress, resolved, closed
   priority    String?   // critical, high, medium, low
   createdBy   String    @map("created_by")
@@ -1505,6 +1506,7 @@ model Ticket {
 
   @@index([status])
   @@index([type])
+  @@index([module])
   @@index([createdBy])
   @@map("tickets")
 }
