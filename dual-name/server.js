@@ -16,29 +16,12 @@ const PORT = process.env.PORT || 3001;
 // Slicer profiles directory
 const PROFILES_DIR = join(__dirname, 'slicer-profiles', 'prusa-slicer');
 
-// ── Google Drive upload (Service Account preferred, OAuth2 fallback) ──
+// ── Google Drive upload (OAuth2 preferred, uploads as real user with quota) ──
 const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
 let driveClient = null;
 
-// Try Service Account first (doesn't expire)
-if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-  try {
-    const keyJson = JSON.parse(
-      Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_KEY, 'base64').toString('utf-8')
-    );
-    const auth = new google.auth.GoogleAuth({
-      credentials: keyJson,
-      scopes: ['https://www.googleapis.com/auth/drive.file'],
-    });
-    driveClient = google.drive({ version: 'v3', auth });
-    console.log('Google Drive upload enabled (Service Account)');
-  } catch (e) {
-    console.warn('Service Account setup failed:', e.message);
-  }
-}
-
-// Fallback to OAuth2 if Service Account not available
-if (!driveClient && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN) {
+// OAuth2 first (uploads as real user — has storage quota)
+if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REFRESH_TOKEN) {
   try {
     const oauth2 = new google.auth.OAuth2(
       process.env.GOOGLE_CLIENT_ID,
