@@ -185,7 +185,7 @@ export async function buildAmbigram(options) {
     // sensible absolute range (10–16) so short text doesn't balloon and long
     // text doesn't become microscopic.  As a final safety, if the clamped
     // size still produces text wider than 90% of the base, shrink to fit.
-    const MIN_FONT = 12;
+    const MIN_FONT = 16;
     const MAX_FONT = 22;
     const targetInscrW   = expectedBaseW * 0.80;
     const hardMaxInscrW  = expectedBaseW * 0.92;
