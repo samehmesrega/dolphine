@@ -101,7 +101,9 @@ export async function processBatch(sheetUrl, options, onProgress) {
     await new Promise(r => setTimeout(r, 0)); // yield to main thread for UI updates
     const [orderNum, color, textA, textB, inscription, padBeforeStr, padAfterStr] = dataRows[i];
     const colorPart = color ? `-${safe(color)}` : '';
-    const filename = `DN-${safe(orderNum || String(i + 1))}-${safe(textA)}-${safe(textB)}${colorPart}.stl`;
+    const baseName = `DN-${safe(orderNum || String(i + 1))}-${safe(textA)}-${safe(textB)}${colorPart}`;
+    const filename = `${baseName}.stl`;
+    const gcodeFilename = `${baseName}.gcode`;
 
     const entry = {
       order: orderNum || String(i + 1),
@@ -133,7 +135,6 @@ export async function processBatch(sheetUrl, options, onProgress) {
       });
 
       blob = exportToSTLBlob(model, !!inscription);
-      zip.file(filename, blob);
       entry.stl = true;
 
       // Dispose geometries to free memory
@@ -165,6 +166,14 @@ export async function processBatch(sheetUrl, options, onProgress) {
       const result = await res.json();
       entry.gcode = result.gcode;
       entry.drive = result.drive;
+
+      // Add gcode to ZIP if slicing succeeded
+      if (result.gcode && result.gcodeBase64) {
+        const binary = atob(result.gcodeBase64);
+        const bytes = new Uint8Array(binary.length);
+        for (let j = 0; j < binary.length; j++) bytes[j] = binary.charCodeAt(j);
+        zip.file(gcodeFilename, bytes);
+      }
 
       if (!result.gcode) {
         entry.failedAt = 'G-code';

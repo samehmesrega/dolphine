@@ -224,6 +224,11 @@ app.post('/api/slice-and-upload', upload.single('stl'), async (req, res) => {
 
     result.gcode = true;
 
+    // Read gcode and include in response (base64) so client can add to ZIP
+    const gcodeBuf = await readFile(gcodePath);
+    result.gcodeBase64 = gcodeBuf.toString('base64');
+    result.gcodeFilename = gcodeFilename;
+
     // Upload to Google Drive
     const driveResult = await uploadToDrive(gcodePath, gcodeFilename);
     result.drive = driveResult.success;
