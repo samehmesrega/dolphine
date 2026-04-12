@@ -9,6 +9,7 @@ import { createWooCommerceOrder, isConfigured as isWooConfigured, addWooCommerce
 import { createBostaDelivery, isConfigured as isBostaConfigured, terminateDelivery } from '../services/bosta';
 import { auditLog } from '../services/audit';
 import { verifyTransfer } from '../services/transfer-verification';
+import { parseDateRangeCairo } from '../../../shared/services/metrics.service';
 import { syncLeadDataToSheet } from '../services/googleSheetsWrite';
 import { uploadFileToDrive } from '../../../shared/services/google-drive';
 import * as fs from 'fs';
@@ -195,6 +196,34 @@ router.get('/fraud-stats', async (_req: Request, res: Response) => {
   } catch (err: unknown) {
     console.error('Fraud stats error:', err);
     res.status(500).json({ error: 'خطأ في تحميل إحصائيات الحماية' });
+  }
+});
+
+// ==========================================
+// Export orders as JSON (frontend generates CSV)
+// ==========================================
+router.get('/export', async (req: Request, res: Response) => {
+  try {
+    const [from, to] = parseDateRangeCairo(
+      req.query.from as string | undefined,
+      req.query.to as string | undefined,
+    );
+    const orders = await prisma.order.findMany({
+      where: {
+        deletedAt: null,
+        createdAt: { gte: from, lte: to },
+      },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        lead: { select: { id: true, name: true, phone: true, assignedTo: { select: { name: true } } } },
+        customer: { select: { id: true, name: true, phone: true } },
+        orderItems: { include: { product: { select: { name: true } } } },
+      },
+    });
+    res.json({ total: orders.length, orders });
+  } catch (err: unknown) {
+    console.error('Orders export error:', err);
+    res.status(500).json({ error: 'خطأ في تصدير الطلبات' });
   }
 });
 

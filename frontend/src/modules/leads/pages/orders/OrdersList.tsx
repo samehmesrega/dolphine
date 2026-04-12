@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../../../shared/services/api';
 import { useAuth } from '../../../auth/context/AuthContext';
+import DateRangePicker, { type DateRange } from '../../../../shared/components/DateRangePicker';
 
 type Order = {
   id: string;
@@ -36,6 +37,79 @@ const ACCOUNTS_STATUS_STYLE: Record<string, string> = {
   rejected: 'bg-red-50 text-red-700 border-red-200',
 };
 
+const PAYMENT_LABELS: Record<string, string> = { full: 'كامل', partial: 'جزئي' };
+
+type ExportOrder = Order & {
+  discount?: number | null;
+  discountReason?: string | null;
+  partialAmount?: number | null;
+  shippingGovernorate?: string | null;
+  shippingCity?: string | null;
+  shippingAddress?: string | null;
+  notes?: string | null;
+  trackingNumber?: string | null;
+  bostaStatus?: string | null;
+  rejectedReason?: string | null;
+  lead?: { id: string; name: string; phone?: string; assignedTo?: { name: string } | null } | null;
+  customer?: { id: string; name: string; phone: string } | null;
+};
+
+function downloadOrdersCsv(orders: ExportOrder[]) {
+  const headers = [
+    'رقم الطلب', 'التاريخ', 'حالة الحسابات', 'نوع الدفع',
+    'اسم الشحن', 'تليفون الشحن', 'المحافظة', 'المدينة', 'العنوان',
+    'ملاحظات', 'الخصم', 'سبب الخصم', 'المبلغ الجزئي',
+    'رقم التتبع', 'حالة بوسطة', 'سبب الرفض',
+    'اسم الليد', 'الموظف المسؤول', 'اسم العميل', 'تليفون العميل',
+    'المنتج', 'الكمية', 'السعر', 'الإجمالي',
+  ];
+
+  const rows: string[][] = [];
+  for (const o of orders) {
+    const subtotal = o.orderItems.reduce((s, i) => s + i.quantity * Number(i.price), 0);
+    const total = subtotal - Number(o.discount ?? 0);
+    const items = o.orderItems.length > 0 ? o.orderItems : [{ productName: '', product: undefined, quantity: 0, price: 0, notes: '' } as any];
+    for (const item of items) {
+      rows.push([
+        String(o.wooCommerceId ?? o.number),
+        new Date(o.createdAt).toLocaleString('ar-EG'),
+        ACCOUNTS_STATUS_LABELS[o.accountsStatus] ?? o.accountsStatus,
+        PAYMENT_LABELS[o.paymentType] ?? o.paymentType,
+        o.shippingName,
+        o.shippingPhone,
+        o.shippingGovernorate ?? '',
+        o.shippingCity ?? '',
+        o.shippingAddress ?? '',
+        o.notes ?? '',
+        String(o.discount ?? 0),
+        o.discountReason ?? '',
+        String(o.partialAmount ?? 0),
+        o.trackingNumber ?? '',
+        o.bostaStatus ?? '',
+        o.rejectedReason ?? '',
+        o.lead?.name ?? '',
+        o.lead?.assignedTo?.name ?? '',
+        o.customer?.name ?? '',
+        o.customer?.phone ?? '',
+        item.product?.name ?? item.productName ?? '',
+        String(item.quantity),
+        String(item.price),
+        String(total),
+      ]);
+    }
+  }
+
+  const BOM = '\uFEFF';
+  const csv = BOM + [headers.join(','), ...rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `orders-report-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function OrdersList({ defaultStatus, defaultAccountsStatus }: { defaultStatus?: string; defaultAccountsStatus?: string }) {
   const qc = useQueryClient();
   const { user: currentUser } = useAuth();
@@ -45,6 +119,25 @@ export default function OrdersList({ defaultStatus, defaultAccountsStatus }: { d
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [deleteError, setDeleteError] = useState('');
+  const [dateRange, setDateRange] = useState<DateRange>({ from: '', to: '' });
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (!dateRange.from || !dateRange.to) return;
+    setExporting(true);
+    try {
+      const { data } = await api.get('/orders/export', { params: { from: dateRange.from, to: dateRange.to } });
+      if (!data.orders?.length) {
+        alert('لا توجد طلبات في هذه الفترة');
+        return;
+      }
+      downloadOrdersCsv(data.orders);
+    } catch {
+      alert('خطأ في تصدير الطلبات');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const queryParams = useMemo(
     () => ({
@@ -109,7 +202,7 @@ export default function OrdersList({ defaultStatus, defaultAccountsStatus }: { d
         </h1>
       </div>
 
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 mb-4 space-y-3">
         <div className="flex flex-wrap gap-3 items-center">
           {!defaultAccountsStatus && (
             <select
@@ -127,6 +220,21 @@ export default function OrdersList({ defaultStatus, defaultAccountsStatus }: { d
             </select>
           )}
           <span className="text-slate-500 text-sm">الإجمالي: {data?.total ?? '--'}</span>
+        </div>
+
+        <div className="border-t border-slate-100 pt-3">
+          <p className="text-sm font-medium text-slate-600 mb-2">تصدير تقرير الطلبات</p>
+          <DateRangePicker value={dateRange} onChange={setDateRange} />
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={!dateRange.from || !dateRange.to || exporting}
+              className="bg-gradient-to-br from-[#0040a1] to-[#0056d2] text-white px-5 py-2 rounded-xl text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+            >
+              {exporting ? 'جاري التصدير...' : 'تصدير CSV'}
+            </button>
+          </div>
         </div>
       </div>
 
