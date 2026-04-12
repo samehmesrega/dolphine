@@ -13,8 +13,11 @@ import fs from 'fs';
 
 import { config } from './shared/config';
 import { logger } from './shared/config/logger';
+import { redis } from './shared/config/redis';
+import { prisma } from './db';
 import { globalErrorHandler } from './shared/middleware/error-handler';
 import { authMiddleware, requirePermission, requireModule } from './shared/middleware/auth';
+import RedisStore from 'rate-limit-redis';
 import type { AuthRequest } from './shared/middleware/auth';
 import type { Response as ExpressResponse, NextFunction } from 'express';
 
@@ -102,11 +105,18 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ===== Rate Limiting =====
+// Redis-backed rate limiting (shared across instances)
+const redisStore = new RedisStore({
+  // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
+  sendCommand: (...args: string[]) => redis.call(...args),
+});
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisStore,
   message: { error: 'طلبات كثيرة جداً، حاول بعد قليل' },
 });
 
@@ -115,6 +125,11 @@ const authLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisStore({
+    // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
+    sendCommand: (...args: string[]) => redis.call(...args),
+    prefix: 'rl:auth:',
+  }),
   message: { error: 'محاولات تسجيل دخول كثيرة، حاول بعد 15 دقيقة' },
 });
 
@@ -123,6 +138,11 @@ const webhookLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisStore({
+    // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
+    sendCommand: (...args: string[]) => redis.call(...args),
+    prefix: 'rl:webhook:',
+  }),
   message: { error: 'طلبات ويب هوك كثيرة جداً' },
 });
 
@@ -131,6 +151,11 @@ const metaWebhookLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
+  store: new RedisStore({
+    // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
+    sendCommand: (...args: string[]) => redis.call(...args),
+    prefix: 'rl:meta:',
+  }),
   message: { error: 'Meta webhook rate limit exceeded' },
 });
 
@@ -144,12 +169,33 @@ if (!fs.existsSync(uploadDir)) {
 app.use('/uploads', express.static(uploadDir));
 
 // ===== Health Check =====
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({
-    status: 'ok',
+app.get('/health', async (_req: Request, res: Response) => {
+  const checks: Record<string, string> = {};
+
+  // Check database
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    checks.database = 'ok';
+  } catch {
+    checks.database = 'down';
+  }
+
+  // Check Redis
+  try {
+    await redis.ping();
+    checks.redis = 'ok';
+  } catch {
+    checks.redis = 'down';
+  }
+
+  const allOk = Object.values(checks).every((v) => v === 'ok');
+
+  res.status(allOk ? 200 : 503).json({
+    status: allOk ? 'ok' : 'degraded',
     app: 'dolphin-platform',
     version: '2.0.0',
     modules: ['auth', 'leads', 'marketing', 'inbox'],
+    checks,
   });
 });
 
@@ -269,7 +315,17 @@ if (process.env.NODE_ENV === 'production') {
 // ===== Global Error Handler =====
 app.use(globalErrorHandler);
 
-app.listen(config.port, () => {
+// ===== Process-Level Error Handlers =====
+process.on('unhandledRejection', (reason) => {
+  logger.error({ err: reason }, 'Unhandled Promise Rejection');
+});
+
+process.on('uncaughtException', (err) => {
+  logger.fatal({ err }, 'Uncaught Exception — shutting down');
+  process.exit(1);
+});
+
+const server = app.listen(config.port, () => {
   logger.info(`Dolphin Platform API running on port ${config.port}`);
 
   // Start Meta Ads auto-sync (every 2 hours)
@@ -279,3 +335,23 @@ app.listen(config.port, () => {
     logger.warn(`[AutoSync] Failed to start scheduler: ${err.message}`);
   });
 });
+
+// ===== Graceful Shutdown =====
+async function gracefulShutdown(signal: string) {
+  logger.info(`${signal} received — shutting down gracefully`);
+  server.close(() => {
+    logger.info('HTTP server closed');
+  });
+  try {
+    await prisma.$disconnect();
+    logger.info('Prisma disconnected');
+  } catch { /* best effort */ }
+  try {
+    redis.disconnect();
+    logger.info('Redis disconnected');
+  } catch { /* best effort */ }
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));

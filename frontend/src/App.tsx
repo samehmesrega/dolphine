@@ -13,6 +13,7 @@ import SlackCallback from './modules/auth/pages/SlackCallback';
 import Register from './modules/auth/pages/Register';
 import ForgotPassword from './modules/auth/pages/ForgotPassword';
 import ResetPassword from './modules/auth/pages/ResetPassword';
+import NotFoundPage from './shared/pages/NotFoundPage';
 
 const LeadsModule = lazy(() => import('./modules/leads'));
 const MarketingModule = lazy(() => import('./modules/marketing'));
@@ -147,6 +148,9 @@ function AppRoutes() {
         <Route path="/tasks" element={<Navigate to="/leads/tasks" replace />} />
         <Route path="/task-rules" element={<Navigate to="/leads/task-rules" replace />} />
       </Route>
+
+      {/* 404 catch-all */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

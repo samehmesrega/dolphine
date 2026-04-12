@@ -118,23 +118,37 @@ export async function getNextAssignedUserId(): Promise<AssignmentResult> {
   }
 
   // 4. حساب الـ index التالي (Round Robin بالتوالي + reset يومي)
-  let lastIndex = matchedShift.lastAssignedIndex;
+  // نستخدم transaction مع SELECT FOR UPDATE لمنع race condition
+  // لو webhook جالهم 2 leads في نفس اللحظة، كل واحد هياخد index مختلف
+  const shiftId = matchedShift.id;
+  const chosenUserId = await prisma.$transaction(async (tx) => {
+    // قفل الصف عشان ما حدش تاني يقرأه في نفس الوقت
+    const [freshShift] = await tx.$queryRaw<{ lastAssignedIndex: number; lastAssignedDate: string | null }[]>`
+      SELECT "lastAssignedIndex", "lastAssignedDate"
+      FROM "Shift"
+      WHERE "id" = ${shiftId}
+      FOR UPDATE
+    `;
 
-  // لو يوم جديد → نرجع من الأول
-  if (matchedShift.lastAssignedDate !== dateStr) {
-    lastIndex = -1;
-  }
+    let lastIndex = freshShift.lastAssignedIndex;
 
-  const nextIndex = (lastIndex + 1) % candidates.length;
-  const chosenUserId = candidates[nextIndex];
+    // لو يوم جديد → نرجع من الأول
+    if (freshShift.lastAssignedDate !== dateStr) {
+      lastIndex = -1;
+    }
 
-  // 5. حدّث الـ shift بالـ index الجديد + التاريخ
-  await prisma.shift.update({
-    where: { id: matchedShift.id },
-    data: {
-      lastAssignedIndex: nextIndex,
-      lastAssignedDate: dateStr,
-    },
+    const nextIndex = (lastIndex + 1) % candidates.length;
+
+    // 5. حدّث الـ shift بالـ index الجديد + التاريخ
+    await tx.shift.update({
+      where: { id: shiftId },
+      data: {
+        lastAssignedIndex: nextIndex,
+        lastAssignedDate: dateStr,
+      },
+    });
+
+    return candidates[nextIndex];
   });
 
   return { userId: chosenUserId };

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api';
 
@@ -12,6 +12,8 @@ type MyProfile = {
 
 export default function ProfilePage() {
   const qc = useQueryClient();
+  const savedTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(savedTimer.current), []);
   const [form, setForm] = useState({ name: '', whatsappNumber: '', password: '', confirmPassword: '' });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
@@ -51,7 +53,7 @@ export default function ProfilePage() {
       setSaved(true);
       setError('');
       setForm((p) => ({ ...p, password: '', confirmPassword: '' }));
-      setTimeout(() => setSaved(false), 3000);
+      savedTimer.current = setTimeout(() => setSaved(false), 3000);
     },
     onError: (err: any) => {
       setError(err.message || err.response?.data?.error || 'فشل الحفظ');

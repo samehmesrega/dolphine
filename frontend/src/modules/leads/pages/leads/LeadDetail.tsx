@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import api from '../../../../shared/services/api';
@@ -75,7 +75,9 @@ function CommRow({ comm: c, leadId, currentUserId }: { comm: Communication; lead
       await api.patch(`/leads/${leadId}/communications/${c.id}`, { notes: editNotes });
       qc.invalidateQueries({ queryKey: ['lead', leadId] });
       setEditing(false);
-    } catch { /* ignore */ }
+    } catch {
+      alert('حدث خطأ أثناء حفظ الملاحظات');
+    }
     setSaving(false);
   };
 
@@ -123,13 +125,16 @@ function formatDateTime(iso: string): string {
 
 function CopyBtn({ value }: { value: string }) {
   const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(timer.current), []);
   return (
     <button
       type="button"
       onClick={() => {
         navigator.clipboard.writeText(value).catch(() => {});
         setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        clearTimeout(timer.current);
+        timer.current = setTimeout(() => setCopied(false), 1500);
       }}
       className="mr-1.5 text-slate-400 hover:text-amber-500 transition text-xs px-1 py-0.5 rounded border border-transparent hover:border-slate-200"
       title="نسخ"

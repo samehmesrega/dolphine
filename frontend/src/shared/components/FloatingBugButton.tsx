@@ -27,6 +27,8 @@ export default function FloatingBugButton() {
   const [success, setSuccess] = useState(false);
   const [capturingScreenshot, setCapturingScreenshot] = useState(false);
   const modalRef = useRef<HTMLDivElement>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(() => () => timersRef.current.forEach(clearTimeout), []);
 
   // Check if user is logged in
   const token = localStorage.getItem('dolphin_token');
@@ -63,7 +65,7 @@ export default function FloatingBugButton() {
     setScreenshotPreview(null);
     setSuccess(false);
     // Capture screenshot when modal opens
-    setTimeout(() => captureScreenshot(), 100);
+    timersRef.current.push(setTimeout(() => captureScreenshot(), 100));
   };
 
   const handleClose = () => {
@@ -105,9 +107,9 @@ export default function FloatingBugButton() {
         module: getCurrentModule(),
       });
       setSuccess(true);
-      setTimeout(() => {
+      timersRef.current.push(setTimeout(() => {
         handleClose();
-      }, 2000);
+      }, 2000));
     } catch (err) {
       console.error('Failed to submit ticket:', err);
       alert('حدث خطأ أثناء إرسال البلاغ');
