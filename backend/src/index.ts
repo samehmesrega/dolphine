@@ -317,6 +317,11 @@ process.on('unhandledRejection', (reason) => {
 });
 
 process.on('uncaughtException', (err) => {
+  // Redis ECONNREFUSED errors should not crash the server
+  if (err && typeof err === 'object' && 'code' in err && (err as any).code === 'ECONNREFUSED') {
+    logger.warn({ err }, 'Connection refused (non-fatal)');
+    return;
+  }
   logger.fatal({ err }, 'Uncaught Exception — shutting down');
   process.exit(1);
 });
