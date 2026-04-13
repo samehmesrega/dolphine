@@ -105,18 +105,26 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // ===== Rate Limiting =====
-// Redis-backed rate limiting (shared across instances)
-const redisStore = new RedisStore({
-  // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
-  sendCommand: (...args: string[]) => redis.call(...args),
-});
+// Redis-backed in production, in-memory fallback for dev (when Redis is down)
+function makeRedisStore(prefix?: string) {
+  try {
+    if (redis.status === 'ready' || redis.status === 'connecting') {
+      return new RedisStore({
+        // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
+        sendCommand: (...args: string[]) => redis.call(...args),
+        ...(prefix ? { prefix } : {}),
+      });
+    }
+  } catch { /* fallback to in-memory */ }
+  return undefined; // express-rate-limit defaults to in-memory
+}
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
-  store: redisStore,
+  store: makeRedisStore(),
   message: { error: 'طلبات كثيرة جداً، حاول بعد قليل' },
 });
 
@@ -125,11 +133,7 @@ const authLimiter = rateLimit({
   max: 20,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
-    sendCommand: (...args: string[]) => redis.call(...args),
-    prefix: 'rl:auth:',
-  }),
+  store: makeRedisStore('rl:auth:'),
   message: { error: 'محاولات تسجيل دخول كثيرة، حاول بعد 15 دقيقة' },
 });
 
@@ -138,11 +142,7 @@ const webhookLimiter = rateLimit({
   max: 60,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
-    sendCommand: (...args: string[]) => redis.call(...args),
-    prefix: 'rl:webhook:',
-  }),
+  store: makeRedisStore('rl:webhook:'),
   message: { error: 'طلبات ويب هوك كثيرة جداً' },
 });
 
@@ -151,11 +151,7 @@ const metaWebhookLimiter = rateLimit({
   max: 300,
   standardHeaders: true,
   legacyHeaders: false,
-  store: new RedisStore({
-    // @ts-expect-error - ioredis client compatible with rate-limit-redis sendCommand
-    sendCommand: (...args: string[]) => redis.call(...args),
-    prefix: 'rl:meta:',
-  }),
+  store: makeRedisStore('rl:meta:'),
   message: { error: 'Meta webhook rate limit exceeded' },
 });
 
@@ -188,10 +184,10 @@ app.get('/health', async (_req: Request, res: Response) => {
     checks.redis = 'down';
   }
 
-  const allOk = Object.values(checks).every((v) => v === 'ok');
+  const dbOk = checks.database === 'ok';
 
-  res.status(allOk ? 200 : 503).json({
-    status: allOk ? 'ok' : 'degraded',
+  res.status(dbOk ? 200 : 503).json({
+    status: dbOk ? (checks.redis === 'ok' ? 'ok' : 'degraded') : 'down',
     app: 'dolphin-platform',
     version: '2.0.0',
     modules: ['auth', 'leads', 'marketing', 'inbox'],
