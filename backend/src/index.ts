@@ -329,11 +329,21 @@ process.on('uncaughtException', (err) => {
 const server = app.listen(config.port, () => {
   logger.info(`Dolphin Platform API running on port ${config.port}`);
 
-  // Start Meta Ads auto-sync (every 2 hours)
-  import('./modules/marketing/services/meta-ads.service').then((metaService) => {
-    metaService.startAutoSyncScheduler(2);
+  // Start BullMQ background jobs (replaces old setInterval approach)
+  import('./shared/jobs/queues').then(({ setupRepeatableJobs }) => {
+    return setupRepeatableJobs();
   }).catch((err) => {
-    logger.warn(`[AutoSync] Failed to start scheduler: ${err.message}`);
+    logger.warn({ err }, '[Jobs] Failed to setup queues — falling back to setInterval');
+    // Fallback: لو Redis واقع، نستخدم الطريقة القديمة
+    import('./modules/marketing/services/meta-ads.service').then((metaService) => {
+      metaService.startAutoSyncScheduler(2);
+    }).catch(() => {});
+  });
+
+  import('./shared/jobs/workers').then(({ startWorkers }) => {
+    startWorkers();
+  }).catch((err) => {
+    logger.warn({ err }, '[Workers] Failed to start workers');
   });
 });
 
@@ -343,6 +353,10 @@ async function gracefulShutdown(signal: string) {
   server.close(() => {
     logger.info('HTTP server closed');
   });
+  try {
+    const { stopWorkers } = await import('./shared/jobs/workers');
+    await stopWorkers();
+  } catch { /* best effort */ }
   try {
     await prisma.$disconnect();
     logger.info('Prisma disconnected');
