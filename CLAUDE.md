@@ -2,26 +2,43 @@
 
 دليل عمل لـ Claude Code عند التعامل مع كود المشروع.
 
-## Project Overview
+## Git & Code Navigation
 
-Dolphin Platform — نظام إدارة داخلي لشركة Digitics المصرية. يشمل إدارة العملاء المحتملين (CRM)، التسويق، صندوق الوارد (Messenger/Instagram)، بنك المعلومات، والتذاكر. المشروع **pnpm monorepo** يتكون من backend و frontend ومشاريع مساعدة. منشور على **Render.com** على `dolphin-platform.onrender.com`.
-
-## Git & Codebase Rules
-
-- تأكد من الـ repo/branch قبل أي تعديل. الـ main branch هو `main` مش `master`
-- دايماً عمل commit و push تلقائي بعد أي تغيير إلا لو اتقالك غير كدا
+- دايماً تأكد من الـ repository والـ branch والـ file paths الصح **قبل** أي تعديل. لو مش متأكد أنهي codebase أو directory فيه الكود الشغال — **اسأل الأول**
+- الـ default branch هو `main` مش `master`. دايماً اعمل push على `main` إلا لو اتقالك غير كدا
+- دايماً عمل commit و push بعد أي تغيير إلا لو اتقالك غير كدا
 - TypeScript لازم يعمل compile نظيف قبل الـ commit
 
 ## Development Principles
 
-- ما تعقدش الحلول. ابدأ بأبسط طريقة
+- ابدأ بأبسط حل ممكن. **ما تعملش over-engineer** (مثلاً: ما تقترحش VPS لما local يكفي، ما تبنيش من الصفر لما نسخ الملفات يحل الموضوع). اسأل قبل ما تضيف تعقيد
 - ما تبنيش من الصفر لو تقدر تنسخ أو تعيد استخدام كود موجود
 - اسأل قبل ما تختار architecture معقد
+
+## Deployment & Production
+
+- لما تصلح مشكلة في الـ production، **جرب التغييرات locally الأول** قبل ما تعمل deploy
+- ما تستخدمش destructive flags (زي `--accept-data-loss`) بدون موافقة صريحة من المستخدم
+- خلّي بالك من تغييرات البنية التحتية (Redis, rate limiting, env vars) — ممكن توقع الـ production
 
 ## Communication & Accuracy
 
 - لو المستخدم شارك screenshot أو mockup، اشتغل على اللي ظاهر فيه بس
-- ما تفترضش قيود platform (زي الـ 24h messaging window) — تحقق الأول
+- ما تفترضش قيود platform — تحقق الأول
+
+## External APIs
+
+- لما تشتغل مع APIs خارجية (Meta, WhatsApp, Google)، **تحقق من القواعد الخاصة بكل platform** قبل ما تقولها
+- الـ 24-hour messaging window بتخص **WhatsApp API بس** — مش Messenger أو Instagram DMs
+
+## Domain Knowledge
+
+- الـ stack الأساسي: TypeScript (backend + frontend)
+- لما تعمل WooCommerce integrations، استخدم **منتج واحد generic/reusable** بدل ما تعمل منتجات فردية تملأ المتجر
+
+## Project Overview
+
+Dolphin Platform — نظام إدارة داخلي لشركة Digitics المصرية. يشمل إدارة العملاء المحتملين (CRM)، التسويق، صندوق الوارد (Messenger/Instagram)، بنك المعلومات، والتذاكر. المشروع **pnpm monorepo** يتكون من backend و frontend ومشاريع مساعدة. منشور على **Render.com** على `dolphin-platform.onrender.com`.
 
 ---
 
