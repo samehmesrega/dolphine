@@ -275,7 +275,7 @@ app.use('/api/webhooks/woocommerce', webhookLimiter, require('./modules/leads/ro
 // === Backwards compatibility: /api/* routes redirect to /api/v1/* ===
 // This ensures the existing frontend works while we migrate
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/lead-statuses', authMiddleware, requirePermission('lead_statuses.manage'), require('./modules/leads/routes/lead-statuses').default);
+app.use('/api/lead-statuses', authMiddleware, requirePermission('leads.view'), require('./modules/leads/routes/lead-statuses').default);
 app.use('/api/leads', authMiddleware, requirePermission('leads.view'), require('./modules/leads/routes/leads').default);
 app.use('/api/users', authMiddleware, requireUsersAccess, require('./modules/leads/routes/users').default);
 app.use('/api/products', authMiddleware, requirePermission('products.view'), require('./modules/leads/routes/products').default);
