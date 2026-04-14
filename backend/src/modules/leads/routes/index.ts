@@ -46,7 +46,7 @@ function requireUsersAccess(
   next();
 }
 
-router.use('/lead-statuses', requirePermission('lead_statuses.manage'), leadStatusesRoutes);
+router.use('/lead-statuses', requirePermission('leads.view'), leadStatusesRoutes);
 router.use('/leads', requirePermission('leads.view'), leadsRoutes);
 router.use('/users', requireUsersAccess, usersRoutes);
 router.use('/products', requirePermission('products.view'), productsRoutes);

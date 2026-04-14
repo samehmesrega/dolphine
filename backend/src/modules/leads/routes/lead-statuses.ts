@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../../../db';
 import { z } from 'zod';
+import { requirePermission } from '../../../shared/middleware/auth';
 
 const router = Router();
 
@@ -27,7 +28,7 @@ const upsertSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requirePermission('lead_statuses.manage'), async (req: Request, res: Response) => {
   try {
     const parsed = upsertSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -67,7 +68,7 @@ const patchSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', requirePermission('lead_statuses.manage'), async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
     const parsed = patchSchema.safeParse(req.body);
@@ -98,7 +99,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 });
 
 // حذف ناعم: تعطيل فقط
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requirePermission('lead_statuses.manage'), async (req: Request, res: Response) => {
   try {
     const id = String(req.params.id);
     const existing = await prisma.leadStatus.findUnique({ where: { id } });
