@@ -15,6 +15,16 @@
 - ما تبنيش من الصفر لو تقدر تنسخ أو تعيد استخدام كود موجود
 - اسأل قبل ما تختار architecture معقد
 
+## Production Infrastructure
+
+- **Hosting**: Render.com (`dolphin-platform.onrender.com`)
+- **Database**: Neon PostgreSQL — **مش** Docker المحلي. الـ production `DATABASE_URL` بيشاور على Neon
+- **Redis**: Render Redis instance
+- الـ Docker Compose (`docker compose up -d`) هو **للتطوير المحلي بس** — مش production
+- لما تعمل `db:push` أو `db:migrate`، تأكد إنك شغال على الـ `DATABASE_URL` الصح (لوكال ولا production)
+- أي تغيير schema في production بيأثر على **داتا حقيقية** — راجع كويس قبل ما تنفذ
+- لما تقرأ logs أو تشخّص مشاكل، افتكر إن الـ production بيئة مختلفة عن اللوكال (env vars مختلفة، Neon مش Docker PostgreSQL)
+
 ## Deployment & Production
 
 - لما تصلح مشكلة في الـ production، **جرب التغييرات locally الأول** قبل ما تعمل deploy
