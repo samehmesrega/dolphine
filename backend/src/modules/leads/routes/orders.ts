@@ -589,16 +589,15 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
 // حذف جميع الطلبات
 router.post('/delete-all', async (req: Request, res: Response) => {
   try {
-    const callerId = (req as AuthRequest).user?.userId;
-    if (callerId) {
-      const callerUser = await prisma.user.findUnique({
-        where: { id: callerId },
-        include: { role: true },
-      });
-      if (!callerUser || !['super_admin', 'admin'].includes(callerUser.role?.slug ?? '')) {
-        res.status(403).json({ error: 'ليس لديك صلاحية' });
-        return;
-      }
+    const authReq = req as AuthRequest;
+    if (!authReq.user) {
+      res.status(401).json({ error: 'غير مصرح' });
+      return;
+    }
+    // delete-all مقصور على الأدمن فقط
+    if (!authReq.user.permissions.includes('*')) {
+      res.status(403).json({ error: 'ليس لديك صلاحية' });
+      return;
     }
     await prisma.task.updateMany({ where: { orderId: { not: null } }, data: { orderId: null } });
     const result = await prisma.order.deleteMany();
@@ -612,17 +611,15 @@ router.post('/delete-all', async (req: Request, res: Response) => {
 // حذف مجمّع للطلبات
 router.post('/bulk-delete', async (req: Request, res: Response) => {
   try {
-    const callerId = (req as AuthRequest).user?.userId;
-    if (callerId) {
-      const callerUser = await prisma.user.findUnique({
-        where: { id: callerId },
-        include: { role: true },
-      });
-      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
-      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
-        res.status(403).json({ error: 'ليس لديك صلاحية حذف الطلبات' });
-        return;
-      }
+    const authReq = req as AuthRequest;
+    if (!authReq.user) {
+      res.status(401).json({ error: 'غير مصرح' });
+      return;
+    }
+    const perms = authReq.user.permissions;
+    if (!perms.includes('*') && !perms.includes('orders.delete')) {
+      res.status(403).json({ error: 'ليس لديك صلاحية حذف الطلبات' });
+      return;
     }
     const { orderIds } = req.body as { orderIds?: string[] };
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
@@ -668,17 +665,15 @@ router.post('/bulk-delete', async (req: Request, res: Response) => {
 // حذف طلب واحد
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const callerId = (req as AuthRequest).user?.userId;
-    if (callerId) {
-      const callerUser = await prisma.user.findUnique({
-        where: { id: callerId },
-        include: { role: true },
-      });
-      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
-      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
-        res.status(403).json({ error: 'ليس لديك صلاحية حذف الطلبات' });
-        return;
-      }
+    const authReq = req as AuthRequest;
+    if (!authReq.user) {
+      res.status(401).json({ error: 'غير مصرح' });
+      return;
+    }
+    const perms = authReq.user.permissions;
+    if (!perms.includes('*') && !perms.includes('orders.delete')) {
+      res.status(403).json({ error: 'ليس لديك صلاحية حذف الطلبات' });
+      return;
     }
     const id = String(req.params.id);
     const order = await prisma.order.findUnique({ where: { id } });

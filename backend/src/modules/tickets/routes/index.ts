@@ -4,13 +4,12 @@ import type { AuthRequest } from '../../../shared/middleware/auth';
 
 const router = Router();
 
-// Helper: check if user is admin/super_admin
-function isAdmin(user: AuthRequest['user']): boolean {
+// Helper: check if user has ticket management permission
+function isTicketManager(user: AuthRequest['user']): boolean {
   if (!user) return false;
   return (
     user.permissions.includes('*') ||
-    user.roleSlug === 'admin' ||
-    user.roleSlug === 'super_admin'
+    user.permissions.includes('tickets.manage')
   );
 }
 
@@ -74,7 +73,7 @@ router.get('/', async (req: AuthRequest, res: Response) => {
     const where: any = {};
 
     // Non-admin users can only see their own tickets
-    if (!isAdmin(req.user)) {
+    if (!isTicketManager(req.user)) {
       where.createdBy = req.user.userId;
     }
 
@@ -127,7 +126,7 @@ router.get('/:id', async (req: AuthRequest, res: Response) => {
     }
 
     // Non-admin can only see their own tickets
-    if (!isAdmin(req.user) && ticket.createdBy !== req.user.userId) {
+    if (!isTicketManager(req.user) && ticket.createdBy !== req.user.userId) {
       res.status(403).json({ error: 'غير مسموح' });
       return;
     }
@@ -147,7 +146,7 @@ router.patch('/:id', async (req: AuthRequest, res: Response) => {
       return;
     }
 
-    if (!isAdmin(req.user)) {
+    if (!isTicketManager(req.user)) {
       res.status(403).json({ error: 'غير مسموح — للمديرين فقط' });
       return;
     }
@@ -224,7 +223,7 @@ router.post('/:id/comments', async (req: AuthRequest, res: Response) => {
     }
 
     // Non-admin can only comment on their own tickets
-    if (!isAdmin(req.user) && ticket.createdBy !== req.user.userId) {
+    if (!isTicketManager(req.user) && ticket.createdBy !== req.user.userId) {
       res.status(403).json({ error: 'غير مسموح' });
       return;
     }

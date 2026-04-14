@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { requirePermission } from '../../../shared/middleware/auth';
 import productsRouter from './products';
 import mediaRouter from './media';
 import suppliersRouter from './suppliers';
@@ -13,6 +14,9 @@ import afterSalesRouter from './after-sales';
 import salesScriptsRouter from './sales-scripts';
 
 const router = Router();
+
+// كل routes بنك المعلومات تتطلب صلاحية عرض على الأقل
+router.use(requirePermission('kb.view'));
 
 // Products CRUD + search
 router.use('/products', productsRouter);

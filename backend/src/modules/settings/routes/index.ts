@@ -14,8 +14,7 @@ function requireSettingsAccess(req: any, res: any, next: any) {
     req.user.permissions.includes('*') ||
     req.user.permissions.includes('users.manage') ||
     req.user.permissions.includes('settings.users.manage') ||
-    req.user.permissions.includes('settings.users.view') ||
-    req.user.roleSlug === 'sales_manager';
+    req.user.permissions.includes('settings.users.view');
   if (!allowed) {
     res.status(403).json({ error: 'غير مسموح' });
     return;

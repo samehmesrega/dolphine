@@ -225,6 +225,12 @@ async function main() {
     { name: 'إدارة التكامل', slug: 'integrations.manage', module: 'leads', description: 'إعدادات الربط مع الخدمات الخارجية' },
     { name: 'إدارة المستخدمين', slug: 'users.manage', module: 'leads', description: 'إضافة وتعديل المستخدمين وأدوارهم' },
     { name: 'Dual Name', slug: 'dual-name.access', module: 'dual-name', description: 'الوصول لمولد الأسماء المزدوجة ثلاثية الأبعاد' },
+    { name: 'إدارة حالات الليد', slug: 'lead_statuses.manage', module: 'leads', description: 'إنشاء وتعديل وحذف حالات الليدز' },
+    { name: 'تعيين ليد', slug: 'leads.assign', module: 'leads', description: 'تعيين ليد لموظف آخر' },
+    { name: 'حذف طلب', slug: 'orders.delete', module: 'leads', description: 'حذف الطلبات من النظام' },
+    { name: 'حذف عميل', slug: 'customers.delete', module: 'leads', description: 'حذف العملاء من النظام' },
+    { name: 'عرض المنتجات', slug: 'products.view', module: 'leads', description: 'عرض قائمة المنتجات' },
+    { name: 'إدارة التذاكر', slug: 'tickets.manage', module: 'tickets', description: 'إدارة حالة وأولوية التذاكر وتعيينها' },
   ];
 
   for (const perm of leadsPermissions) {
@@ -258,7 +264,7 @@ async function main() {
   if (salesManagerRole) {
     const smPerms = ['leads.view', 'leads.create', 'leads.edit', 'leads.delete', 'orders.view', 'orders.create', 'orders.edit',
       'customers.view', 'customers.edit', 'shifts.manage', 'dashboard.view', 'reports.view', 'products.manage', 'tasks.manage',
-      'blacklist.manage', 'users.manage'];
+      'blacklist.manage', 'users.manage', 'lead_statuses.manage', 'leads.assign', 'orders.delete', 'customers.delete', 'products.view'];
     for (const slug of smPerms) {
       const permission = await prisma.permission.findUnique({ where: { slug } });
       if (permission) {

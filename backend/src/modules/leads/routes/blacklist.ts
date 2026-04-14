@@ -1,11 +1,11 @@
 /**
  * Blacklisted Phones routes
  * GET    / — list all blacklisted phones
- * POST   / — add phone (accounts, admin, sales_manager, super_admin)
- * DELETE /:id — remove phone (same permissions)
+ * POST   / — add phone (requires blacklist.manage — enforced by index router)
+ * DELETE /:id — remove phone (same)
  */
 
-import { Router, Request, Response } from 'express';
+import { Router, Response } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../../db';
 import { AuthRequest } from '../../../shared/middleware/auth';
@@ -13,25 +13,8 @@ import { normalizePhone } from '../../../shared/utils/phone';
 
 const router = Router();
 
-const ALLOWED_ROLE_SLUGS = ['super_admin', 'admin', 'accounts', 'sales_manager'];
-
-async function checkPermission(req: Request): Promise<{ allowed: boolean; userId: string | null; error?: string }> {
-  const authReq = req as AuthRequest;
-  const userId = authReq.user?.userId;
-  if (!userId) return { allowed: false, userId: null, error: 'مطلوب تسجيل الدخول' };
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { role: true },
-  });
-  if (!user || !ALLOWED_ROLE_SLUGS.includes(user.role?.slug ?? '')) {
-    return { allowed: false, userId, error: 'ليس لديك صلاحية' };
-  }
-  return { allowed: true, userId };
-}
-
 // GET / — list all blacklisted phones
-router.get('/', async (_req: Request, res: Response) => {
+router.get('/', async (_req, res: Response) => {
   try {
     const phones = await prisma.blacklistedPhone.findMany({
       orderBy: { createdAt: 'desc' },
@@ -52,11 +35,11 @@ const addPhoneSchema = z.object({
   reason: z.string().optional(),
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', async (req: AuthRequest, res: Response) => {
   try {
-    const { allowed, userId, error } = await checkPermission(req);
-    if (!allowed) {
-      res.status(userId ? 403 : 401).json({ error });
+    const userId = req.user?.userId;
+    if (!userId) {
+      res.status(401).json({ error: 'مطلوب تسجيل الدخول' });
       return;
     }
 
@@ -80,7 +63,7 @@ router.post('/', async (req: Request, res: Response) => {
       data: {
         phone,
         reason,
-        addedBy: userId!,
+        addedBy: userId,
       },
       include: {
         creator: { select: { id: true, name: true } },
@@ -95,14 +78,8 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // DELETE /:id — remove phone
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', async (req: AuthRequest, res: Response) => {
   try {
-    const { allowed, userId, error } = await checkPermission(req);
-    if (!allowed) {
-      res.status(userId ? 403 : 401).json({ error });
-      return;
-    }
-
     const id = String(req.params.id);
     const entry = await prisma.blacklistedPhone.findUnique({ where: { id } });
     if (!entry) {

@@ -41,8 +41,7 @@ function requireUsersAccess(
   }
   const allowed =
     req.user.permissions.includes('*') ||
-    req.user.permissions.includes('users.manage') ||
-    req.user.roleSlug === 'sales_manager';
+    req.user.permissions.includes('users.manage');
   if (!allowed) {
     res.status(403).json({ error: 'غير مسموح' });
     return;
@@ -276,25 +275,25 @@ app.use('/api/webhooks/woocommerce', webhookLimiter, require('./modules/leads/ro
 // === Backwards compatibility: /api/* routes redirect to /api/v1/* ===
 // This ensures the existing frontend works while we migrate
 app.use('/api/auth', authLimiter, authRoutes);
-app.use('/api/lead-statuses', authMiddleware, require('./modules/leads/routes/lead-statuses').default);
-app.use('/api/leads', authMiddleware, require('./modules/leads/routes/leads').default);
+app.use('/api/lead-statuses', authMiddleware, requirePermission('lead_statuses.manage'), require('./modules/leads/routes/lead-statuses').default);
+app.use('/api/leads', authMiddleware, requirePermission('leads.view'), require('./modules/leads/routes/leads').default);
 app.use('/api/users', authMiddleware, requireUsersAccess, require('./modules/leads/routes/users').default);
-app.use('/api/products', authMiddleware, require('./modules/leads/routes/products').default);
-app.use('/api/orders', authMiddleware, require('./modules/leads/routes/orders').default);
-app.use('/api/customers', authMiddleware, require('./modules/leads/routes/customers').default);
-app.use('/api/dashboard', authMiddleware, require('./modules/leads/routes/dashboard').default);
-app.use('/api/shifts', authMiddleware, require('./modules/leads/routes/shifts').default);
+app.use('/api/products', authMiddleware, requirePermission('products.view'), require('./modules/leads/routes/products').default);
+app.use('/api/orders', authMiddleware, requirePermission('orders.view'), require('./modules/leads/routes/orders').default);
+app.use('/api/customers', authMiddleware, requirePermission('customers.view'), require('./modules/leads/routes/customers').default);
+app.use('/api/dashboard', authMiddleware, requirePermission('dashboard.view'), require('./modules/leads/routes/dashboard').default);
+app.use('/api/shifts', authMiddleware, requirePermission('shifts.manage'), require('./modules/leads/routes/shifts').default);
 app.use('/api/woocommerce', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/woocommerce').default);
 app.use('/api/bosta', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/bosta').default);
-app.use('/api/form-connections', authMiddleware, require('./modules/leads/routes/form-connections').default);
+app.use('/api/form-connections', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/form-connections').default);
 app.use('/api/sheet-connections', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/sheet-connections').default);
 app.use('/api/notifications', authMiddleware, require('./modules/leads/routes/notifications').default);
-app.use('/api/audit-logs', authMiddleware, require('./modules/leads/routes/audit-logs').default);
+app.use('/api/audit-logs', authMiddleware, requirePermission('audit.view'), require('./modules/leads/routes/audit-logs').default);
 app.use('/api/reports', authMiddleware, requirePermission('reports.view'), require('./modules/leads/routes/reports').default);
 app.use('/api/tasks', authMiddleware, require('./modules/leads/routes/tasks').default);
-app.use('/api/task-rules', authMiddleware, require('./modules/leads/routes/task-rules').default);
-app.use('/api/blacklist', authMiddleware, require('./modules/leads/routes/blacklist').default);
-app.use('/api/integrations', authMiddleware, require('./modules/leads/routes/integration-settings').default);
+app.use('/api/task-rules', authMiddleware, requirePermission('tasks.manage'), require('./modules/leads/routes/task-rules').default);
+app.use('/api/blacklist', authMiddleware, requirePermission('blacklist.manage'), require('./modules/leads/routes/blacklist').default);
+app.use('/api/integrations', authMiddleware, requirePermission('integrations.manage'), require('./modules/leads/routes/integration-settings').default);
 
 
 // ===== Frontend Static Files (Production) =====

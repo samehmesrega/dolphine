@@ -38,8 +38,7 @@ function requireUsersAccess(
   }
   const allowed =
     req.user.permissions.includes('*') ||
-    req.user.permissions.includes('users.manage') ||
-    req.user.roleSlug === 'sales_manager';
+    req.user.permissions.includes('users.manage');
   if (!allowed) {
     res.status(403).json({ error: 'غير مسموح' });
     return;
@@ -50,7 +49,7 @@ function requireUsersAccess(
 router.use('/lead-statuses', requirePermission('lead_statuses.manage'), leadStatusesRoutes);
 router.use('/leads', requirePermission('leads.view'), leadsRoutes);
 router.use('/users', requireUsersAccess, usersRoutes);
-router.use('/products', requirePermission('leads.view'), productsRoutes);
+router.use('/products', requirePermission('products.view'), productsRoutes);
 router.use('/orders', requirePermission('orders.view'), ordersRoutes);
 router.use('/customers', requirePermission('customers.view'), customersRoutes);
 router.use('/dashboard', requirePermission('dashboard.view'), dashboardRoutes);

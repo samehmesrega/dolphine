@@ -36,7 +36,7 @@ function NavIcon({ name, className = 'w-5 h-5' }: { name: string; className?: st
 }
 
 // ============ تعريف القائمة مع الأيقونات ============
-type ChildItem = { to: string; label: string; permission?: string; allowRoleSlugs?: string[] };
+type ChildItem = { to: string; label: string; permission?: string };
 type SimpleEntry = { type: 'item'; to: string; label: string; icon: string; permission?: string };
 type GroupEntry = { type: 'group'; label: string; icon: string; children: ChildItem[] };
 type NavEntry = SimpleEntry | GroupEntry;
@@ -64,7 +64,7 @@ const NAV: NavEntry[] = [
     children: [
       { to: '/leads/shifts', label: 'شيفتات', permission: 'shifts.manage' },
       { to: '/leads/integrations', label: 'الربط والتكامل', permission: 'integrations.manage' },
-      { to: '/leads/lead-statuses', label: 'حالات الليد', permission: 'shifts.manage' },
+      { to: '/leads/lead-statuses', label: 'حالات الليد', permission: 'lead_statuses.manage' },
       { to: '/leads/task-rules', label: 'قواعد المهام', permission: 'tasks.manage' },
       { to: '/leads/dual-name-settings', label: 'إعدادات Dual Name', permission: 'users.manage' },
     ],
@@ -75,7 +75,7 @@ const NAV: NavEntry[] = [
     icon: 'shield',
     children: [
       { to: '/leads/roles', label: 'الأدوار والصلاحيات', permission: 'users.manage' },
-      { to: '/leads/blacklist', label: 'الأرقام المحظورة', allowRoleSlugs: ['accounts', 'admin', 'super_admin', 'sales_manager'] },
+      { to: '/leads/blacklist', label: 'الأرقام المحظورة', permission: 'blacklist.manage' },
     ],
   },
   { type: 'item', to: '/leads/dual-name', label: 'Dual Name', icon: 'dualName' },
@@ -86,18 +86,15 @@ const NAV: NavEntry[] = [
 function GroupNav({
   group,
   hasPermission,
-  roleSlug,
   onNavigate,
 }: {
   group: GroupEntry;
   hasPermission: (p: string) => boolean;
-  roleSlug?: string;
   onNavigate?: () => void;
 }) {
   const location = useLocation();
   const visibleChildren = group.children.filter((c) => {
     if (!c.permission) return true;
-    if (c.allowRoleSlugs?.includes(roleSlug ?? '')) return true;
     return hasPermission(c.permission);
   });
   if (!visibleChildren.length) return null;
@@ -155,19 +152,16 @@ function GroupNav({
 function GroupIcon({
   group,
   hasPermission,
-  roleSlug,
   onNavigate,
 }: {
   group: GroupEntry;
   hasPermission: (p: string) => boolean;
-  roleSlug?: string;
   onNavigate?: () => void;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
   const visibleChildren = group.children.filter((c) => {
     if (!c.permission) return true;
-    if (c.allowRoleSlugs?.includes(roleSlug ?? '')) return true;
     return hasPermission(c.permission);
   });
   if (!visibleChildren.length) return null;
@@ -195,7 +189,6 @@ function GroupIcon({
 // ============ Sidebar ============
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}) {
   const { user, logout, hasPermission } = useAuth();
-  const roleSlug = user?.role?.slug;
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(() => {
     try { return localStorage.getItem('sidebar_collapsed') === 'true'; } catch { return false; }
@@ -291,9 +284,9 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
             );
           }
           if (collapsed) {
-            return <GroupIcon key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} onNavigate={onNavigate} />;
+            return <GroupIcon key={i} group={entry} hasPermission={hasPermission} onNavigate={onNavigate} />;
           }
-          return <GroupNav key={i} group={entry} hasPermission={hasPermission} roleSlug={roleSlug} onNavigate={onNavigate} />;
+          return <GroupNav key={i} group={entry} hasPermission={hasPermission} onNavigate={onNavigate} />;
         })}
 
         <div className="border-t border-slate-800 my-2" />
@@ -320,7 +313,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
               className={({ isActive }) => `p-2 rounded-lg transition ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
               <NavIcon name="userCircle" />
             </NavLink>
-            {(hasPermission('users.manage') || hasPermission('*') || ['admin', 'super_admin', 'sales_manager'].includes(roleSlug ?? '')) && (
+            {(hasPermission('users.manage') || hasPermission('settings.users.view')) && (
               <NavLink to="/settings" title="الإعدادات" onClick={onNavigate}
                 className={({ isActive }) => `p-2 rounded-lg transition ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}>
                 <NavIcon name="cog" />
@@ -340,7 +333,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void } = {}
                 className={({ isActive }) => `text-sm ${isActive ? 'text-amber-400' : 'text-slate-400 hover:text-slate-200'}`}>
                 ملفي الشخصي
               </NavLink>
-              {(hasPermission('users.manage') || hasPermission('*') || ['admin', 'super_admin', 'sales_manager'].includes(roleSlug ?? '')) && (
+              {(hasPermission('users.manage') || hasPermission('settings.users.view')) && (
                 <>
                   <span className="text-slate-700">·</span>
                   <NavLink to="/settings" onClick={onNavigate}

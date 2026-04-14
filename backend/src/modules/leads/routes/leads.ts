@@ -244,17 +244,13 @@ type LeadUpdateData = {
 // حذف مجمّع للليدز
 router.post('/bulk-delete', async (req: Request, res: Response) => {
   try {
-    const callerId = (req as AuthRequest).user?.userId;
-    if (!callerId) {
+    const authReq = req as AuthRequest;
+    if (!authReq.user) {
       res.status(401).json({ error: 'غير مصرح' });
       return;
     }
-    const callerUser = await prisma.user.findUnique({
-      where: { id: callerId },
-      include: { role: true },
-    });
-    const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
-    if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
+    const perms = authReq.user.permissions;
+    if (!perms.includes('*') && !perms.includes('leads.delete')) {
       res.status(403).json({ error: 'ليس لديك صلاحية حذف الليدز' });
       return;
     }
@@ -578,17 +574,15 @@ router.patch('/:id/communications/:commId', async (req: Request, res: Response) 
 
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
-    const callerId = (req as AuthRequest).user?.userId;
-    if (callerId) {
-      const callerUser = await prisma.user.findUnique({
-        where: { id: callerId },
-        include: { role: true },
-      });
-      const allowedSlugs = ['super_admin', 'admin', 'sales_manager'];
-      if (!callerUser || !allowedSlugs.includes(callerUser.role?.slug ?? '')) {
-        res.status(403).json({ error: 'ليس لديك صلاحية حذف الليدز' });
-        return;
-      }
+    const authReq = req as AuthRequest;
+    if (!authReq.user) {
+      res.status(401).json({ error: 'غير مصرح' });
+      return;
+    }
+    const perms = authReq.user.permissions;
+    if (!perms.includes('*') && !perms.includes('leads.delete')) {
+      res.status(403).json({ error: 'ليس لديك صلاحية حذف الليدز' });
+      return;
     }
     const id = String(req.params.id);
     const lead = await prisma.lead.findUnique({ where: { id }, include: { orders: { take: 1 } } });
