@@ -159,6 +159,12 @@ export async function processBatch(sheetUrl, options, onProgress) {
       form.append('profile', options.profile || 'optimized');
       form.append('filename', filename);
       if (inscription) form.append('hasInscription', '1');
+      // TEMPORARY: tuning UI — remove once speeds are finalized
+      if (options.slicerOverrides && Object.keys(options.slicerOverrides).length > 0) {
+        form.append('overrides', JSON.stringify(options.slicerOverrides));
+      }
+      if (options.autoScale === false) form.append('autoScale', '0');
+      // END TEMPORARY
 
       const res = await fetch('/api/slice-and-upload', { method: 'POST', body: form });
       if (!res.ok) throw new Error('Server error');

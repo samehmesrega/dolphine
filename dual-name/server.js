@@ -16,6 +16,32 @@ const PORT = process.env.PORT || 3001;
 // Slicer profiles directory
 const PROFILES_DIR = join(__dirname, 'slicer-profiles', 'prusa-slicer');
 
+// TEMPORARY: tuning UI override allowlist — remove when no longer needed
+const ALLOWED_SPEED_KEYS = new Set([
+  'perimeter_speed', 'external_perimeter_speed', 'infill_speed',
+  'solid_infill_speed', 'top_solid_infill_speed', 'first_layer_speed',
+  'travel_speed', 'max_print_speed', 'support_material_speed'
+]);
+const ALLOWED_FILL_PATTERNS = new Set(['gyroid', 'rectilinear', 'grid']);
+
+async function writeOverridesIni(overrides) {
+  const lines = [];
+  for (const [key, value] of Object.entries(overrides || {})) {
+    if (ALLOWED_SPEED_KEYS.has(key)) {
+      const n = Number(value);
+      if (Number.isFinite(n) && n >= 10 && n <= 500) lines.push(`${key} = ${n}`);
+    } else if (key === 'fill_pattern' && ALLOWED_FILL_PATTERNS.has(value)) {
+      lines.push(`fill_pattern = ${value}`);
+    }
+    // silently ignore anything else — security: prevent ini injection
+  }
+  if (lines.length === 0) return null;
+  const path = join(tmpdir(), `slicer-overrides-${Date.now()}-${Math.random().toString(36).slice(2)}.ini`);
+  await writeFile(path, lines.join('\n') + '\n');
+  return path;
+}
+// END TEMPORARY
+
 // ── Google Drive upload (OAuth2 preferred, uploads as real user with quota) ──
 const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
 let driveClient = null;
@@ -51,7 +77,7 @@ async function uploadToDrive(filePath, filename) {
 }
 
 // ── Run PrusaSlicer to produce G-code ──
-async function runSlicer(profileName, stlPath, gcodePath) {
+async function runSlicer(profileName, stlPath, gcodePath, overridesPath = null) {
   const profilePath = join(PROFILES_DIR, `${profileName}.ini`);
   const supportPath = join(PROFILES_DIR, 'support-override.ini');
 
@@ -59,6 +85,7 @@ async function runSlicer(profileName, stlPath, gcodePath) {
     '--export-gcode',
     '--load', profilePath,
     '--load', supportPath,
+    ...(overridesPath ? ['--load', overridesPath] : []),
     '--center', '112.5,112.5',
     '--output', gcodePath,
     stlPath
@@ -168,15 +195,26 @@ app.post('/api/slice', upload.single('stl'), async (req, res) => {
     ? req.body.filename.replace(/\.stl$/i, '.gcode')
     : 'output.gcode';
   const gcodePath = rawPath + '.gcode';
+  let overridesPath = null;
 
   try {
     await rename(rawPath, stlPath);
 
-    const targetX = 192, targetZ = 37;
-    const targetY = req.body.hasInscription ? 48 : 42;
-    await scaleSTL(stlPath, targetX, targetY, targetZ);
+    // TEMPORARY: tuning UI overrides — remove once speeds are finalized
+    if (req.body.overrides) {
+      try {
+        overridesPath = await writeOverridesIni(JSON.parse(req.body.overrides));
+      } catch { /* invalid JSON — ignore */ }
+    }
+    const autoScale = req.body.autoScale !== '0';
+    if (autoScale) {
+      const targetX = 192, targetZ = 37;
+      const targetY = req.body.hasInscription ? 48 : 42;
+      await scaleSTL(stlPath, targetX, targetY, targetZ);
+    }
+    // END TEMPORARY
 
-    await runSlicer(profile, stlPath, gcodePath);
+    await runSlicer(profile, stlPath, gcodePath, overridesPath);
 
     // Upload to Google Drive (must finish before cleanup deletes the file)
     await uploadToDrive(gcodePath, gcodeFilename);
@@ -196,6 +234,7 @@ app.post('/api/slice', upload.single('stl'), async (req, res) => {
     unlink(rawPath).catch(() => {});
     unlink(stlPath).catch(() => {});
     unlink(gcodePath).catch(() => {});
+    if (overridesPath) unlink(overridesPath).catch(() => {});
   }
 });
 
@@ -212,15 +251,26 @@ app.post('/api/slice-and-upload', upload.single('stl'), async (req, res) => {
   const gcodePath = rawPath + '.gcode';
 
   const result = { gcode: false, drive: false, driveError: '' };
+  let overridesPath = null;
 
   try {
     await rename(rawPath, stlPath);
 
-    const targetX = 192, targetZ = 37;
-    const targetY = req.body.hasInscription ? 48 : 42;
-    await scaleSTL(stlPath, targetX, targetY, targetZ);
+    // TEMPORARY: tuning UI overrides — remove once speeds are finalized
+    if (req.body.overrides) {
+      try {
+        overridesPath = await writeOverridesIni(JSON.parse(req.body.overrides));
+      } catch { /* invalid JSON — ignore */ }
+    }
+    const autoScale = req.body.autoScale !== '0';
+    if (autoScale) {
+      const targetX = 192, targetZ = 37;
+      const targetY = req.body.hasInscription ? 48 : 42;
+      await scaleSTL(stlPath, targetX, targetY, targetZ);
+    }
+    // END TEMPORARY
 
-    await runSlicer(profile, stlPath, gcodePath);
+    await runSlicer(profile, stlPath, gcodePath, overridesPath);
 
     result.gcode = true;
 
@@ -242,6 +292,7 @@ app.post('/api/slice-and-upload', upload.single('stl'), async (req, res) => {
     unlink(rawPath).catch(() => {});
     unlink(stlPath).catch(() => {});
     unlink(gcodePath).catch(() => {});
+    if (overridesPath) unlink(overridesPath).catch(() => {});
   }
 });
 
