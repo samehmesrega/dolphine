@@ -20,7 +20,10 @@ const state = {
   orderNumber: '',
   padBefore: 0,
   padAfter: 0,
-  currentModel:  null
+  currentModel:  null,
+  // TEMPORARY: tuning UI defaults
+  autoScale: true,
+  slicerOverrides: {}
 };
 
 // Initialize UI
