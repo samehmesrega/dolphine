@@ -163,7 +163,13 @@ export async function processBatch(sheetUrl, options, onProgress) {
       if (options.slicerOverrides && Object.keys(options.slicerOverrides).length > 0) {
         form.append('overrides', JSON.stringify(options.slicerOverrides));
       }
-      if (options.autoScale === false) form.append('autoScale', '0');
+      if (options.autoScale === false) {
+        form.append('autoScale', '0');
+        const cs = options.customScale || {};
+        if (cs.x > 0) form.append('customScaleX', String(cs.x));
+        if (cs.y > 0) form.append('customScaleY', String(cs.y));
+        if (cs.z > 0) form.append('customScaleZ', String(cs.z));
+      }
       // END TEMPORARY
 
       const res = await fetch('/api/slice-and-upload', { method: 'POST', body: form });

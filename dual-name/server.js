@@ -211,6 +211,16 @@ app.post('/api/slice', upload.single('stl'), async (req, res) => {
       const targetX = 192, targetZ = 37;
       const targetY = req.body.hasInscription ? 48 : 42;
       await scaleSTL(stlPath, targetX, targetY, targetZ);
+    } else {
+      // Custom dimensions: apply only if all 3 are present and within range
+      const clamp = n => Math.max(1, Math.min(300, n));
+      const cx = parseFloat(req.body.customScaleX);
+      const cy = parseFloat(req.body.customScaleY);
+      const cz = parseFloat(req.body.customScaleZ);
+      if ([cx, cy, cz].every(n => Number.isFinite(n) && n > 0)) {
+        await scaleSTL(stlPath, clamp(cx), clamp(cy), clamp(cz));
+      }
+      // else: skip scaling entirely (use STL as-is)
     }
     // END TEMPORARY
 
@@ -267,6 +277,16 @@ app.post('/api/slice-and-upload', upload.single('stl'), async (req, res) => {
       const targetX = 192, targetZ = 37;
       const targetY = req.body.hasInscription ? 48 : 42;
       await scaleSTL(stlPath, targetX, targetY, targetZ);
+    } else {
+      // Custom dimensions: apply only if all 3 are present and within range
+      const clamp = n => Math.max(1, Math.min(300, n));
+      const cx = parseFloat(req.body.customScaleX);
+      const cy = parseFloat(req.body.customScaleY);
+      const cz = parseFloat(req.body.customScaleZ);
+      if ([cx, cy, cz].every(n => Number.isFinite(n) && n > 0)) {
+        await scaleSTL(stlPath, clamp(cx), clamp(cy), clamp(cz));
+      }
+      // else: skip scaling entirely (use STL as-is)
     }
     // END TEMPORARY
 

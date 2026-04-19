@@ -102,6 +102,14 @@ export function createInputPanel(container, callbacks) {
             Auto-Scale to 192&times;42&times;37mm
           </label>
         </div>
+        <div class="panel-section hidden" id="custom-scale-group">
+          <label style="font-size:12px; color:var(--color-text-muted, #888);">Custom dimensions (mm) &mdash; leave 0 for original size</label>
+          <div style="display:flex; gap:6px; margin-top:4px;">
+            <input type="number" id="custom-scale-x" placeholder="X" value="50" min="0" max="300" step="1" style="flex:1; min-width:0;" />
+            <input type="number" id="custom-scale-y" placeholder="Y" value="30" min="0" max="300" step="1" style="flex:1; min-width:0;" />
+            <input type="number" id="custom-scale-z" placeholder="Z" value="20" min="0" max="300" step="1" style="flex:1; min-width:0;" />
+          </div>
+        </div>
         <!-- END TEMPORARY -->
       </div>
     </details>
@@ -193,9 +201,26 @@ export function createInputPanel(container, callbacks) {
   let padBefore = 0, padAfter = 0;
 
   // TEMPORARY: tuning UI elements — remove once speeds are finalized
-  const autoScaleInput  = container.querySelector('#auto-scale');
-  const speedInputs     = Array.from(container.querySelectorAll('input[data-speed-key]'));
-  const infillPattern   = container.querySelector('#infill-pattern');
+  const autoScaleInput   = container.querySelector('#auto-scale');
+  const customScaleGroup = container.querySelector('#custom-scale-group');
+  const customScaleX     = container.querySelector('#custom-scale-x');
+  const customScaleY     = container.querySelector('#custom-scale-y');
+  const customScaleZ     = container.querySelector('#custom-scale-z');
+  const speedInputs      = Array.from(container.querySelectorAll('input[data-speed-key]'));
+  const infillPattern    = container.querySelector('#infill-pattern');
+
+  function syncCustomScaleVisibility() {
+    if (!customScaleGroup || !autoScaleInput) return;
+    customScaleGroup.classList.toggle('hidden', autoScaleInput.checked);
+  }
+
+  function collectCustomScale() {
+    return {
+      x: customScaleX ? Number(customScaleX.value) || 0 : 0,
+      y: customScaleY ? Number(customScaleY.value) || 0 : 0,
+      z: customScaleZ ? Number(customScaleZ.value) || 0 : 0
+    };
+  }
 
   function collectSlicerOverrides() {
     const overrides = {};
@@ -237,6 +262,7 @@ export function createInputPanel(container, callbacks) {
       padAfter,
       // TEMPORARY: tuning UI state
       autoScale:      autoScaleInput ? autoScaleInput.checked : true,
+      customScale:    collectCustomScale(),
       slicerOverrides: collectSlicerOverrides()
     });
   }
@@ -282,7 +308,15 @@ export function createInputPanel(container, callbacks) {
   });
 
   // TEMPORARY: tuning UI listeners — remove once speeds are finalized
-  if (autoScaleInput) autoScaleInput.addEventListener('change', emitChange);
+  if (autoScaleInput) {
+    autoScaleInput.addEventListener('change', () => {
+      syncCustomScaleVisibility();
+      emitChange();
+    });
+  }
+  [customScaleX, customScaleY, customScaleZ].forEach(el => {
+    if (el) el.addEventListener('input', emitChange);
+  });
   speedInputs.forEach(input => input.addEventListener('input', emitChange));
   if (infillPattern) infillPattern.addEventListener('change', emitChange);
   // END TEMPORARY
@@ -359,6 +393,7 @@ export function createInputPanel(container, callbacks) {
         padAfter,
         // TEMPORARY: tuning UI state
         autoScale:    autoScaleInput ? autoScaleInput.checked : true,
+        customScale:  collectCustomScale(),
         slicerOverrides: collectSlicerOverrides()
       };
     },
