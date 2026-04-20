@@ -167,7 +167,7 @@ export async function buildAmbigram(options) {
 
   // ── Inscription (flat text on base, readable from above) ──
   let inscrDepthExtra = 0;   // extra depth the base plate needs in +Z
-  const inscrExtrudeH = 2;   // 2 mm raised above base surface
+  const inscrExtrudeH = 3;   // 3 mm raised above base surface
   const lettersCenterX = (currentX - spacing) / 2;
   const inscrTrimmed = inscriptionText.trim();
 
