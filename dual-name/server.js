@@ -116,7 +116,8 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.
 }
 
 async function uploadToDrive(filePath, filename) {
-  if (!driveClient || !DRIVE_FOLDER_ID) return { success: false, reason: 'Drive not configured' };
+  if (!driveClient) return { success: false, reason: 'Drive client not initialized (check GOOGLE_CLIENT_ID/SECRET/REFRESH_TOKEN env vars)' };
+  if (!DRIVE_FOLDER_ID) return { success: false, reason: 'GOOGLE_DRIVE_FOLDER_ID env var is not set' };
   try {
     await driveClient.files.create({
       requestBody: { name: filename, parents: [DRIVE_FOLDER_ID] },
@@ -125,8 +126,10 @@ async function uploadToDrive(filePath, filename) {
     console.log(`Uploaded to Drive: ${filename}`);
     return { success: true };
   } catch (e) {
-    console.error('Drive upload failed:', e.message);
-    return { success: false, reason: e.message };
+    // Surface full Google API error details (e.g. invalid_grant, File not found, Insufficient Permission)
+    const detail = e.errors?.[0]?.message || e.response?.data?.error?.message || e.message;
+    console.error('Drive upload failed:', detail);
+    return { success: false, reason: detail };
   }
 }
 
@@ -220,6 +223,43 @@ app.get('/api/slicer-status', async (_req, res) => {
   const slicerOk = await checkSlicerAvailable();
   const driveOk = !!(driveClient && DRIVE_FOLDER_ID);
   res.json({ slicer: slicerOk, drive: driveOk });
+});
+
+// ── Drive diagnostic — tells you exactly what's wrong with the Drive setup ──
+app.get('/api/drive-diagnostic', async (_req, res) => {
+  const env = {
+    GOOGLE_CLIENT_ID: !!process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: !!process.env.GOOGLE_CLIENT_SECRET,
+    GOOGLE_REFRESH_TOKEN: !!process.env.GOOGLE_REFRESH_TOKEN,
+    GOOGLE_DRIVE_FOLDER_ID: !!process.env.GOOGLE_DRIVE_FOLDER_ID
+  };
+  const missing = Object.entries(env).filter(([_, v]) => !v).map(([k]) => k);
+  if (missing.length > 0) {
+    return res.json({ ok: false, stage: 'env', missing, env });
+  }
+  if (!driveClient) {
+    return res.json({ ok: false, stage: 'init', reason: 'driveClient not initialized despite env vars being set' });
+  }
+  // Try a minimal operation: get folder metadata
+  try {
+    const meta = await driveClient.files.get({
+      fileId: DRIVE_FOLDER_ID,
+      fields: 'id, name, mimeType, trashed'
+    });
+    if (meta.data.trashed) {
+      return res.json({ ok: false, stage: 'folder', reason: 'Folder is in trash', folder: meta.data });
+    }
+    return res.json({ ok: true, env, folder: meta.data });
+  } catch (e) {
+    const detail = e.errors?.[0]?.message || e.response?.data?.error?.message || e.message;
+    const code = e.code || e.response?.status;
+    let hint = null;
+    if (/invalid_grant/i.test(detail)) hint = 'Refresh token expired or revoked. Re-authorize and update GOOGLE_REFRESH_TOKEN.';
+    else if (/File not found/i.test(detail)) hint = 'GOOGLE_DRIVE_FOLDER_ID points to a folder that does not exist or you cannot access.';
+    else if (/Insufficient Permission|insufficientPermissions/i.test(detail)) hint = 'OAuth scope is too narrow. Re-authorize with drive.file or drive scope.';
+    else if (code === 403 && /quota/i.test(detail)) hint = 'Drive storage quota exceeded.';
+    return res.json({ ok: false, stage: 'api', code, reason: detail, hint });
+  }
 });
 
 // ── Color rules ──
