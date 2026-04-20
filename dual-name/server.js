@@ -1,7 +1,7 @@
 import express from 'express';
 import multer from 'multer';
 import { execFile } from 'child_process';
-import { readFile, writeFile, rename, unlink, readdir } from 'fs/promises';
+import { readFile, writeFile, mkdir, rename, unlink, readdir } from 'fs/promises';
 import { createReadStream } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -16,20 +16,36 @@ const PORT = process.env.PORT || 3001;
 // Slicer profiles directory
 const PROFILES_DIR = join(__dirname, 'slicer-profiles', 'prusa-slicer');
 
-// TEMPORARY: tuning UI override allowlist — remove when no longer needed
-const ALLOWED_SPEED_KEYS = new Set([
-  'perimeter_speed', 'external_perimeter_speed', 'infill_speed',
-  'solid_infill_speed', 'top_solid_infill_speed', 'first_layer_speed',
-  'travel_speed', 'max_print_speed', 'support_material_speed'
-]);
+// Slicer override allowlist with per-key ranges. Used by both the tuning UI
+// (single-print overrides) and color rules (batch-mode per-color overrides).
+const ALLOWED_OVERRIDE_KEYS = {
+  perimeter_speed:             { min: 10,   max: 500 },
+  external_perimeter_speed:    { min: 10,   max: 500 },
+  infill_speed:                { min: 10,   max: 500 },
+  solid_infill_speed:          { min: 10,   max: 500 },
+  top_solid_infill_speed:      { min: 10,   max: 500 },
+  first_layer_speed:           { min: 10,   max: 500 },
+  travel_speed:                { min: 10,   max: 500 },
+  max_print_speed:             { min: 10,   max: 500 },
+  support_material_speed:      { min: 10,   max: 500 },
+  temperature:                 { min: 150,  max: 280 },
+  first_layer_temperature:     { min: 150,  max: 280 },
+  bed_temperature:             { min: 0,    max: 120 },
+  first_layer_bed_temperature: { min: 0,    max: 120 },
+  min_fan_speed:               { min: 0,    max: 100 },
+  max_fan_speed:               { min: 0,    max: 100 },
+  layer_height:                { min: 0.05, max: 0.5 },
+  first_layer_height:          { min: 0.05, max: 0.5 }
+};
 const ALLOWED_FILL_PATTERNS = new Set(['gyroid', 'rectilinear', 'grid']);
 
 async function writeOverridesIni(overrides) {
   const lines = [];
   for (const [key, value] of Object.entries(overrides || {})) {
-    if (ALLOWED_SPEED_KEYS.has(key)) {
+    if (ALLOWED_OVERRIDE_KEYS[key]) {
       const n = Number(value);
-      if (Number.isFinite(n) && n >= 10 && n <= 500) lines.push(`${key} = ${n}`);
+      const { min, max } = ALLOWED_OVERRIDE_KEYS[key];
+      if (Number.isFinite(n) && n >= min && n <= max) lines.push(`${key} = ${n}`);
     } else if (key === 'fill_pattern' && ALLOWED_FILL_PATTERNS.has(value)) {
       lines.push(`fill_pattern = ${value}`);
     }
@@ -40,7 +56,45 @@ async function writeOverridesIni(overrides) {
   await writeFile(path, lines.join('\n') + '\n');
   return path;
 }
-// END TEMPORARY
+
+// ── Color rules: per-color slicer settings applied automatically in batch mode ──
+const COLOR_RULES_PATH = join(__dirname, 'data', 'color-rules.json');
+
+async function readColorRules() {
+  try { return JSON.parse(await readFile(COLOR_RULES_PATH, 'utf8')); }
+  catch { return { rules: [] }; }
+}
+
+async function writeColorRules(data) {
+  await mkdir(dirname(COLOR_RULES_PATH), { recursive: true });
+  await writeFile(COLOR_RULES_PATH, JSON.stringify(data, null, 2));
+}
+
+function validateRule(rule) {
+  if (!rule || typeof rule.color !== 'string' || !rule.color.trim()) return null;
+  const cleaned = {
+    id: typeof rule.id === 'string' && rule.id
+      ? rule.id
+      : `rule-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    color: rule.color.trim(),
+    enabled: rule.enabled !== false,
+    settings: {}
+  };
+  for (const [key, value] of Object.entries(rule.settings || {})) {
+    if (key === 'fill_pattern' && ALLOWED_FILL_PATTERNS.has(value)) {
+      cleaned.settings[key] = value;
+    } else if (key === 'baseThickness') {
+      const n = Number(value);
+      if (Number.isFinite(n) && n >= 1 && n <= 5) cleaned.settings[key] = n;
+    } else if (ALLOWED_OVERRIDE_KEYS[key]) {
+      const n = Number(value);
+      const { min, max } = ALLOWED_OVERRIDE_KEYS[key];
+      if (Number.isFinite(n) && n >= min && n <= max) cleaned.settings[key] = n;
+    }
+    // anything else silently dropped (security)
+  }
+  return cleaned;
+}
 
 // ── Google Drive upload (OAuth2 preferred, uploads as real user with quota) ──
 const DRIVE_FOLDER_ID = process.env.GOOGLE_DRIVE_FOLDER_ID;
@@ -166,6 +220,18 @@ app.get('/api/slicer-status', async (_req, res) => {
   const slicerOk = await checkSlicerAvailable();
   const driveOk = !!(driveClient && DRIVE_FOLDER_ID);
   res.json({ slicer: slicerOk, drive: driveOk });
+});
+
+// ── Color rules ──
+app.get('/api/color-rules', async (_req, res) => {
+  res.json(await readColorRules());
+});
+
+app.put('/api/color-rules', express.json({ limit: '100kb' }), async (req, res) => {
+  const rules = Array.isArray(req.body?.rules) ? req.body.rules : [];
+  const validated = rules.map(validateRule).filter(r => r !== null);
+  await writeColorRules({ rules: validated });
+  res.json({ rules: validated });
 });
 
 // ── List available profiles ──

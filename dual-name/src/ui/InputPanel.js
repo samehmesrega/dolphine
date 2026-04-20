@@ -1,4 +1,5 @@
 import { FONT_FILE } from '../fonts/curated-fonts.js';
+import { openColorRulesModal } from './ColorRulesModal.js';
 
 const BATCH_SHEET_URL = 'https://docs.google.com/spreadsheets/d/19qQRLE1jzPR9Obtf4e8kcMdap_3GP32NotlntD38aKk/edit?gid=0#gid=0';
 
@@ -68,6 +69,7 @@ export function createInputPanel(container, callbacks) {
 
     <div class="panel-actions">
       <button id="btn-batch" class="btn-secondary">Generate from Google Sheet</button>
+      <button id="btn-color-rules" class="btn-secondary" style="margin-top:6px;">Manage Color Rules</button>
     </div>
     <div id="batch-progress" class="batch-progress hidden">
       <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
@@ -355,6 +357,8 @@ export function createInputPanel(container, callbacks) {
   btnBatch.addEventListener('click', () => {
     if (callbacks.onBatchGenerate) callbacks.onBatchGenerate(BATCH_SHEET_URL);
   });
+  const btnColorRules = container.querySelector('#btn-color-rules');
+  if (btnColorRules) btnColorRules.addEventListener('click', () => openColorRulesModal());
   // Track which name input was last focused
   let lastFocusedInput = textAInput;
   textAInput.addEventListener('focus', () => { lastFocusedInput = textAInput; });
