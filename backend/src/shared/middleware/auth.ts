@@ -39,7 +39,6 @@ export async function authMiddleware(
           include: { rolePermissions: { include: { permission: true } } },
         },
         userPermissions: { include: { permission: true } },
-        moduleAccess: { include: { module: true } },
       },
     });
 
@@ -62,23 +61,29 @@ export async function authMiddleware(
     // Safe role access — handle null/missing role (e.g., pending users)
     const roleSlug = user.role?.slug ?? 'pending';
     let permissions: string[];
+    let modules: string[];
     if ((roleSlug === 'super_admin' || user.isSuperAdmin) && user.role) {
       permissions = ['*'];
+      const distinct = await prisma.permission.findMany({
+        distinct: ['module'],
+        select: { module: true },
+      });
+      modules = distinct.map((d) => d.module);
     } else if (user.role) {
-      const rolePerms = new Set(
-        user.role.rolePermissions?.map((rp) => rp.permission.slug) ?? []
-      );
-      for (const up of user.userPermissions ?? []) {
-        if (up.grant) rolePerms.add(up.permission.slug);
-        else rolePerms.delete(up.permission.slug);
+      const effective = new Map<string, string>(); // slug → module
+      for (const rp of user.role.rolePermissions ?? []) {
+        effective.set(rp.permission.slug, rp.permission.module);
       }
-      permissions = Array.from(rolePerms);
+      for (const up of user.userPermissions ?? []) {
+        if (up.grant) effective.set(up.permission.slug, up.permission.module);
+        else effective.delete(up.permission.slug);
+      }
+      permissions = Array.from(effective.keys());
+      modules = Array.from(new Set(effective.values()));
     } else {
-      // No role assigned — zero permissions
       permissions = [];
+      modules = [];
     }
-
-    const modules = user.moduleAccess?.map((ma) => ma.module.slug) ?? ['leads'];
 
     req.user = {
       userId: user.id,

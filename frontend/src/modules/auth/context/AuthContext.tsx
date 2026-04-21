@@ -7,6 +7,7 @@ export interface User {
   name: string;
   role: { id?: string; name: string; slug: string };
   permissions?: string[];
+  modules?: string[];
 }
 
 interface AuthContextType {
@@ -15,6 +16,7 @@ interface AuthContextType {
   login: (token: string, user: User) => void;
   logout: () => void;
   hasPermission: (slug: string) => boolean;
+  hasModuleAccess: (slug: string) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -35,7 +37,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const refreshUser = () => {
       api.get('/auth/me')
         .then(({ data }) => {
-          const u = { ...data.user, permissions: data.user.permissions ?? [] };
+          const u = {
+            ...data.user,
+            permissions: data.user.permissions ?? [],
+            modules: data.user.modules ?? [],
+          };
           setUser(u);
           localStorage.setItem('dolphin_user', JSON.stringify(u));
         })
@@ -55,7 +61,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = (newToken: string, newUser: User) => {
     setToken(newToken);
-    const u = { ...newUser, permissions: newUser.permissions ?? [] };
+    const u = {
+      ...newUser,
+      permissions: newUser.permissions ?? [],
+      modules: newUser.modules ?? [],
+    };
     setUser(u);
     localStorage.setItem('dolphin_token', newToken);
     localStorage.setItem('dolphin_user', JSON.stringify(u));
@@ -75,8 +85,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return perms.includes(slug);
   };
 
+  const hasModuleAccess = (slug: string) => {
+    if (user?.permissions?.includes('*')) return true;
+    return user?.modules?.includes(slug) ?? false;
+  };
+
   return (
-    <AuthContext.Provider value={{ token, user, login, logout, hasPermission }}>
+    <AuthContext.Provider value={{ token, user, login, logout, hasPermission, hasModuleAccess }}>
       {children}
     </AuthContext.Provider>
   );

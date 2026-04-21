@@ -25,6 +25,30 @@ function getPermissions(
   return Array.from(set);
 }
 
+/** يحسب الموديولات المتاحة للمستخدم من صلاحياته (Permission.module) */
+async function getModules(
+  role: { slug: string; rolePermissions?: { permission: { slug: string; module: string } }[] } | null,
+  userPerms: { grant: boolean; permission: { slug: string; module: string } }[] = [],
+): Promise<string[]> {
+  if (!role) return [];
+  if (role.slug === 'super_admin') {
+    const distinct = await prisma.permission.findMany({
+      distinct: ['module'],
+      select: { module: true },
+    });
+    return distinct.map((d) => d.module);
+  }
+  const effective = new Map<string, string>(); // slug → module
+  for (const rp of role.rolePermissions ?? []) {
+    effective.set(rp.permission.slug, rp.permission.module);
+  }
+  for (const up of userPerms) {
+    if (up.grant) effective.set(up.permission.slug, up.permission.module);
+    else effective.delete(up.permission.slug);
+  }
+  return Array.from(new Set(effective.values()));
+}
+
 router.post('/login', async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
@@ -76,6 +100,7 @@ router.post('/login', async (req: Request, res: Response) => {
     );
 
     const permissions = getPermissions(user.role, user.userPermissions);
+    const modules = await getModules(user.role, user.userPermissions);
 
     res.json({
       token,
@@ -87,6 +112,7 @@ router.post('/login', async (req: Request, res: Response) => {
           ? { id: user.role.id, name: user.role.name, slug: user.role.slug }
           : { id: '', name: 'Pending', slug: 'pending' },
         permissions,
+        modules,
       },
     });
   } catch (err: unknown) {
@@ -127,6 +153,7 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response) => {
       user: {
         ...user,
         permissions: req.user!.permissions,
+        modules: req.user!.modules,
       },
     });
   } catch (err: unknown) {
@@ -282,6 +309,7 @@ router.post('/google', async (req: Request, res: Response) => {
         { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
       );
       const permissions = getPermissions(user.role, user.userPermissions);
+      const modules = await getModules(user.role, user.userPermissions);
       res.json({
         token,
         user: {
@@ -293,6 +321,7 @@ router.post('/google', async (req: Request, res: Response) => {
             ? { id: user.role.id, name: user.role.name, slug: user.role.slug }
             : { id: '', name: 'Pending', slug: 'pending' },
           permissions,
+          modules,
         },
       });
     } else {
@@ -445,6 +474,7 @@ router.post('/slack/callback', async (req: Request, res: Response) => {
         { expiresIn: config.jwt.expiresIn } as jwt.SignOptions
       );
       const permissions = getPermissions(user.role, user.userPermissions);
+      const modules = await getModules(user.role, user.userPermissions);
       res.json({
         token,
         user: {
@@ -456,6 +486,7 @@ router.post('/slack/callback', async (req: Request, res: Response) => {
             ? { id: user.role.id, name: user.role.name, slug: user.role.slug }
             : { id: '', name: 'Pending', slug: 'pending' },
           permissions,
+          modules,
         },
       });
     } else {
