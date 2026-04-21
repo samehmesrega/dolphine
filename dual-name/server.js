@@ -121,7 +121,8 @@ async function uploadToDrive(filePath, filename) {
   try {
     await driveClient.files.create({
       requestBody: { name: filename, parents: [DRIVE_FOLDER_ID] },
-      media: { mimeType: 'application/octet-stream', body: createReadStream(filePath) }
+      media: { mimeType: 'application/octet-stream', body: createReadStream(filePath) },
+      supportsAllDrives: true  // allow uploading to Shared Drives
     });
     console.log(`Uploaded to Drive: ${filename}`);
     return { success: true };
@@ -244,7 +245,8 @@ app.get('/api/drive-diagnostic', async (_req, res) => {
   try {
     const meta = await driveClient.files.get({
       fileId: DRIVE_FOLDER_ID,
-      fields: 'id, name, mimeType, trashed'
+      fields: 'id, name, mimeType, trashed, driveId',
+      supportsAllDrives: true  // allow lookup in Shared Drives
     });
     if (meta.data.trashed) {
       return res.json({ ok: false, stage: 'folder', reason: 'Folder is in trash', folder: meta.data });
