@@ -215,6 +215,7 @@ export default function OrderDetailPage() {
                 <img
                   src={order.transferImage.startsWith('http') ? order.transferImage : `/uploads/${order.transferImage}`}
                   alt="صورة التحويل"
+                  loading="lazy"
                   className="max-w-full max-h-[400px] rounded-lg border border-slate-200 object-contain"
                 />
               </a>

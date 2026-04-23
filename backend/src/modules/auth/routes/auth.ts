@@ -540,46 +540,6 @@ router.post('/slack/callback', async (req: Request, res: Response) => {
   }
 });
 
-// ===== GOOGLE DRIVE OAUTH (one-time setup for refresh token) =====
-
-router.get('/google/drive-callback', async (req: Request, res: Response) => {
-  try {
-    const code = req.query.code as string;
-    if (!code) { res.status(400).send('Missing code'); return; }
-
-    const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: config.google.clientId,
-        client_secret: config.google.clientSecret,
-        code,
-        redirect_uri: `${config.appUrl}/api/auth/google/drive-callback`,
-        grant_type: 'authorization_code',
-      }),
-    });
-    const data = await tokenRes.json() as any;
-
-    if (data.error) {
-      res.status(400).json({ error: data.error, description: data.error_description });
-      return;
-    }
-
-    // Show the refresh token — copy it to Render env vars
-    res.send(`
-      <div dir="rtl" style="font-family:system-ui;max-width:600px;margin:40px auto;padding:20px">
-        <h2>تم بنجاح!</h2>
-        <p>انسخ الـ Refresh Token ده وحطه في Render Environment Variables:</p>
-        <p><strong>Key:</strong> GOOGLE_DRIVE_REFRESH_TOKEN</p>
-        <textarea style="width:100%;height:100px;font-family:monospace;font-size:12px" readonly>${data.refresh_token || 'مفيش refresh_token — جرب تاني مع prompt=consent'}</textarea>
-        <p style="color:green;margin-top:10px">بعد ما تحطه على Render، الصور هتترفع على Drive تلقائي.</p>
-      </div>
-    `);
-  } catch (err: any) {
-    res.status(500).send('Error: ' + err.message);
-  }
-});
-
 // ===== EMAIL VERIFICATION =====
 
 router.get('/verify-email/:token', async (req: Request, res: Response) => {

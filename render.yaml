@@ -32,6 +32,12 @@ services:
         sync: false
       - key: TOKEN_ENCRYPTION_KEY
         generateValue: true
+      - key: UPLOAD_DIR
+        value: /app/uploads
+    disk:
+      name: dolphin-uploads
+      mountPath: /app/uploads
+      sizeGB: 5
 
 databases:
   - name: dolphin-db

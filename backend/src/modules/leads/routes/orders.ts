@@ -11,7 +11,7 @@ import { auditLog } from '../services/audit';
 import { verifyTransfer } from '../services/transfer-verification';
 import { parseDateRangeCairo } from '../../../shared/services/metrics.service';
 import { syncLeadDataToSheet } from '../services/googleSheetsWrite';
-import { uploadFileToDrive } from '../../../shared/services/google-drive';
+import { config } from '../../../shared/config';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -329,24 +329,11 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
       leadCustomerId = foundLead.customerId;
     }
 
-    // Upload transfer image to Google Drive (persistent) instead of local filesystem
+    // Transfer image persists on Render disk (mountPath: /app/uploads)
     let transferImage: string | undefined;
     const uploadedFile = (req as Request & { file?: { filename: string; path: string; mimetype: string } }).file;
     if (uploadedFile) {
-      try {
-        const fileBuffer = fs.readFileSync(uploadedFile.path);
-        const driveUrl = await uploadFileToDrive(fileBuffer, uploadedFile.filename, uploadedFile.mimetype);
-        if (driveUrl) {
-          transferImage = driveUrl;
-        } else {
-          // Fallback to local filename if Drive upload fails
-          transferImage = uploadedFile.filename;
-        }
-        // Clean up local file
-        fs.unlink(uploadedFile.path, () => {});
-      } catch {
-        transferImage = uploadedFile.filename;
-      }
+      transferImage = uploadedFile.filename;
     }
 
     // New fields from body
@@ -703,6 +690,13 @@ router.delete('/:id', async (req: Request, res: Response) => {
     }
 
     await prisma.order.delete({ where: { id } });
+
+    // Cleanup transfer image file from disk (local filename only, not external URLs)
+    if (order.transferImage && !order.transferImage.startsWith('http')) {
+      const filePath = path.resolve(config.upload.dir, order.transferImage);
+      fs.unlink(filePath, () => {});
+    }
+
     res.status(204).send();
   } catch (err: unknown) {
     console.error('Delete order error:', err);
