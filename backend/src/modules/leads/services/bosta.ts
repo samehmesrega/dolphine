@@ -111,39 +111,62 @@ export async function isConfigured(): Promise<boolean> {
 
 // ===== API Fetch Wrapper =====
 
+const BOSTA_TIMEOUT_MS = 25_000;
+const BOSTA_MAX_ATTEMPTS = 3;
+
 async function bostaFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const cfg = await getBostaConfig();
   if (!cfg) throw new Error('إعدادات بوسطة غير مكتملة (أدخل البيانات من صفحة الربط أو متغيرات البيئة)');
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const url = `${cfg.baseUrl}/${path}`;
+  let lastErr: unknown;
 
-  try {
-    const url = `${cfg.baseUrl}/${path}`;
-    const res = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': cfg.apiKey,
-        ...options.headers,
-      },
-    });
+  for (let attempt = 1; attempt <= BOSTA_MAX_ATTEMPTS; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), BOSTA_TIMEOUT_MS);
 
-    if (!res.ok) {
-      const text = await res.text();
-      let errMsg = text;
-      try {
-        const j = JSON.parse(text);
-        errMsg = j.message || j.errorCode || text;
-      } catch {}
-      throw new Error(`بوسطة: ${res.status} ${errMsg}`);
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': cfg.apiKey,
+          ...options.headers,
+        },
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        let errMsg = text;
+        try {
+          const j = JSON.parse(text);
+          errMsg = j.message || j.errorCode || text;
+        } catch {}
+        // 5xx is worth retrying (transient); 4xx is not
+        if (res.status >= 500 && attempt < BOSTA_MAX_ATTEMPTS) {
+          lastErr = new Error(`بوسطة: ${res.status} ${errMsg}`);
+          await new Promise((r) => setTimeout(r, 1000 * attempt));
+          continue;
+        }
+        throw new Error(`بوسطة: ${res.status} ${errMsg}`);
+      }
+
+      return res.json() as Promise<T>;
+    } catch (err) {
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : '';
+      const isAbort = err instanceof Error && err.name === 'AbortError';
+      const isNetwork = msg.includes('fetch failed') || msg.includes('ECONN') || msg.includes('ETIMEDOUT');
+      const retryable = isAbort || isNetwork;
+      if (!retryable || attempt === BOSTA_MAX_ATTEMPTS) throw err;
+      await new Promise((r) => setTimeout(r, 1000 * attempt));
+    } finally {
+      clearTimeout(timeout);
     }
-
-    return res.json() as Promise<T>;
-  } finally {
-    clearTimeout(timeout);
   }
+
+  throw lastErr instanceof Error ? lastErr : new Error('بوسطة: فشل غير متوقع');
 }
 
 // ===== Delivery Functions =====
