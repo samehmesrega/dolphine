@@ -106,42 +106,49 @@ export default function CreateOrderPage() {
   const [items, setItems] = useState<OrderItemInput[]>([
     { productId: '', productName: '', quantity: 1, price: 0, notes: '' },
   ]);
-  const [transferFile, setTransferFile] = useState<File | null>(null);
-  const [transferPreview, setTransferPreview] = useState<string | null>(null);
+  const [transferFiles, setTransferFiles] = useState<File[]>([]);
+  const [transferPreviews, setTransferPreviews] = useState<string[]>([]);
   const [senderPhone, setSenderPhone] = useState('');
   const [noTransferImage, setNoTransferImage] = useState(false);
   const [noImageReason, setNoImageReason] = useState('');
 
-  // Ctrl+V paste handler
+  const addTransferFiles = useCallback((newFiles: File[]) => {
+    if (newFiles.length === 0) return;
+    setTransferFiles((prev) => [...prev, ...newFiles]);
+    setTransferPreviews((prev) => [...prev, ...newFiles.map((f) => URL.createObjectURL(f))]);
+  }, []);
+
+  const removeTransferFile = useCallback((index: number) => {
+    setTransferFiles((prev) => prev.filter((_, i) => i !== index));
+    setTransferPreviews((prev) => {
+      const url = prev[index];
+      if (url) URL.revokeObjectURL(url);
+      return prev.filter((_, i) => i !== index);
+    });
+  }, []);
+
+  // Ctrl+V paste handler — appends pasted images
   const handlePaste = useCallback((e: ClipboardEvent) => {
     if (noTransferImage) return;
     const items = e.clipboardData?.items;
     if (!items) return;
+    const pasted: File[] = [];
     for (const item of Array.from(items)) {
       if (item.type.startsWith('image/')) {
-        e.preventDefault();
         const file = item.getAsFile();
-        if (file) {
-          setTransferFile(file);
-          setTransferPreview(URL.createObjectURL(file));
-        }
-        break;
+        if (file) pasted.push(file);
       }
     }
-  }, [noTransferImage]);
+    if (pasted.length > 0) {
+      e.preventDefault();
+      addTransferFiles(pasted);
+    }
+  }, [noTransferImage, addTransferFiles]);
 
   useEffect(() => {
     document.addEventListener('paste', handlePaste);
     return () => document.removeEventListener('paste', handlePaste);
   }, [handlePaste]);
-
-  // Update preview when file changes via input
-  useEffect(() => {
-    if (transferFile && !transferPreview) {
-      setTransferPreview(URL.createObjectURL(transferFile));
-    }
-    if (!transferFile) setTransferPreview(null);
-  }, [transferFile]);
 
   const [discount, setDiscount] = useState(0);
   const [discountReason, setDiscountReason] = useState('');
@@ -248,8 +255,8 @@ export default function CreateOrderPage() {
       setError('أضف صنف واحد على الأقل');
       return;
     }
-    // Validation: either (transferImage + senderPhone) OR (noTransferImage + noImageReason) required
-    const hasImage = !!transferFile;
+    // Validation: either (transferImages + senderPhone) OR (noTransferImage + noImageReason) required
+    const hasImage = transferFiles.length > 0;
     const hasPhone = !!senderPhone.trim();
     if (!hasImage || !hasPhone) {
       if (!noTransferImage) {
@@ -262,7 +269,7 @@ export default function CreateOrderPage() {
       }
     }
     fd.append('items', JSON.stringify(validItems));
-    if (transferFile) fd.append('transferImage', transferFile);
+    for (const f of transferFiles) fd.append('transferImages', f);
     if (senderPhone.trim()) fd.append('senderPhone', senderPhone.trim());
     if (noTransferImage) fd.append('noTransferImage', 'true');
     if (noImageReason.trim()) fd.append('noImageReason', noImageReason.trim());
@@ -586,27 +593,33 @@ export default function CreateOrderPage() {
             </div>
 
             <div>
-              <label className="block text-sm text-slate-600 mb-1">صورة التحويل</label>
+              <label className="block text-sm text-slate-600 mb-1">صور التحويل (تقدر ترفع أكتر من صورة)</label>
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 className="w-full border rounded-lg px-3 py-2"
                 onChange={(e) => {
-                  const f = e.target.files?.[0] ?? null;
-                  setTransferFile(f);
-                  setTransferPreview(f ? URL.createObjectURL(f) : null);
+                  const files = Array.from(e.target.files ?? []);
+                  addTransferFiles(files);
+                  e.target.value = ''; // allow re-adding same file
                 }}
                 disabled={noTransferImage}
               />
-              <p className="text-xs text-slate-400 mt-1">أو اضغط <kbd className="px-1 py-0.5 bg-slate-100 border rounded text-xs">Ctrl+V</kbd> للصق من الحافظة</p>
-              {transferPreview && (
-                <div className="mt-2 relative inline-block">
-                  <img src={transferPreview} alt="معاينة" className="max-h-32 rounded-lg border border-slate-200" />
-                  <button
-                    type="button"
-                    onClick={() => { setTransferFile(null); setTransferPreview(null); }}
-                    className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
-                  >✕</button>
+              <p className="text-xs text-slate-400 mt-1">أو اضغط <kbd className="px-1 py-0.5 bg-slate-100 border rounded text-xs">Ctrl+V</kbd> للصق صور من الحافظة (تقدر تلصق أكتر من مرة)</p>
+              {transferPreviews.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {transferPreviews.map((url, i) => (
+                    <div key={url} className="relative">
+                      <img src={url} alt={`معاينة ${i + 1}`} className="max-h-32 rounded-lg border border-slate-200" />
+                      <button
+                        type="button"
+                        onClick={() => removeTransferFile(i)}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                        aria-label="حذف الصورة"
+                      >✕</button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -618,7 +631,11 @@ export default function CreateOrderPage() {
                 checked={noTransferImage}
                 onChange={(e) => {
                   setNoTransferImage(e.target.checked);
-                  if (e.target.checked) setTransferFile(null);
+                  if (e.target.checked) {
+                    transferPreviews.forEach((u) => URL.revokeObjectURL(u));
+                    setTransferFiles([]);
+                    setTransferPreviews([]);
+                  }
                 }}
                 className="mt-1 rounded border-slate-300"
               />

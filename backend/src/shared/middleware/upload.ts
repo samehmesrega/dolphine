@@ -16,19 +16,26 @@ const storage = multer.diskStorage({
 
 const maxSize = config.upload.maxSizeMB * 1024 * 1024;
 
-const single = multer({
+const imageFilter = (_req: unknown, file: Express.Multer.File, cb: (err: Error | null, accept?: boolean) => void) => {
+  const mimeAllowed = /jpeg|jpg|png|gif|webp/i.test(file.mimetype);
+  const extAllowed = /\.(jpe?g|png|gif|webp)$/i.test(file.originalname);
+  if (mimeAllowed && extAllowed) cb(null, true);
+  else cb(new Error('نوع الملف غير مسموح. استخدم صورة (jpg, png, gif, webp)'));
+};
+
+// Accepts multiple transfer images under field name "transferImages",
+// plus a single legacy field "transferImage" for backward compatibility.
+const multi = multer({
   storage,
   limits: { fileSize: maxSize },
-  fileFilter: (_req, file, cb) => {
-    const mimeAllowed = /jpeg|jpg|png|gif|webp/i.test(file.mimetype);
-    const extAllowed = /\.(jpe?g|png|gif|webp)$/i.test(file.originalname);
-    if (mimeAllowed && extAllowed) cb(null, true);
-    else cb(new Error('نوع الملف غير مسموح. استخدم صورة (jpg, png, gif, webp)'));
-  },
-}).single('transferImage');
+  fileFilter: imageFilter,
+}).fields([
+  { name: 'transferImages', maxCount: 10 },
+  { name: 'transferImage', maxCount: 1 },
+]);
 
 export const uploadSingle: RequestHandler = (req, res, next) => {
-  single(req, res, (err: unknown) => {
+  multi(req, res, (err: unknown) => {
     if (err) {
       const e = err as { code?: string; message?: string };
       if (e.code === 'LIMIT_FILE_SIZE')

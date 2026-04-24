@@ -382,7 +382,8 @@ model Order {
   wooCommerceId       Int?      @unique @map("woo_commerce_id")
   status              String
   paymentType         String    @map("payment_type")
-  transferImage       String?   @map("transfer_image")
+  transferImage       String?   @map("transfer_image") // legacy single-image field
+  transferImages      String[]  @default([]) @map("transfer_images")
   shippingName        String    @map("shipping_name")
   shippingPhone       String    @map("shipping_phone")
   shippingGovernorate String?   @map("shipping_governorate")

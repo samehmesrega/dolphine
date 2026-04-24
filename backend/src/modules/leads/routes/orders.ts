@@ -329,12 +329,15 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
       leadCustomerId = foundLead.customerId;
     }
 
-    // Transfer image persists on Render disk (mountPath: /app/uploads)
-    let transferImage: string | undefined;
-    const uploadedFile = (req as Request & { file?: { filename: string; path: string; mimetype: string } }).file;
-    if (uploadedFile) {
-      transferImage = uploadedFile.filename;
-    }
+    // Transfer images persist on Render disk (mountPath: /app/uploads)
+    const uploadedFiles = (req as Request & { files?: Record<string, Array<{ filename: string; path: string; mimetype: string }>> }).files;
+    const filesArray = [
+      ...(uploadedFiles?.transferImages ?? []),
+      ...(uploadedFiles?.transferImage ?? []),
+    ];
+    const transferImages = filesArray.map((f) => f.filename);
+    // Keep legacy single field in sync with the first image (until column is dropped)
+    const transferImage: string | undefined = transferImages[0];
 
     // New fields from body
     const senderPhone = typeof body.senderPhone === 'string' ? body.senderPhone.trim() || undefined : undefined;
@@ -350,6 +353,7 @@ router.post('/', uploadSingle, async (req: Request, res: Response) => {
           accountsStatus: 'pending',
           paymentType,
           transferImage,
+          transferImages,
           senderPhone,
           noTransferImage,
           noImageReason,
@@ -691,10 +695,14 @@ router.delete('/:id', async (req: Request, res: Response) => {
 
     await prisma.order.delete({ where: { id } });
 
-    // Cleanup transfer image file from disk (local filename only, not external URLs)
-    if (order.transferImage && !order.transferImage.startsWith('http')) {
-      const filePath = path.resolve(config.upload.dir, order.transferImage);
-      fs.unlink(filePath, () => {});
+    // Cleanup transfer image files from disk (local filenames only, not external URLs)
+    const filesToDelete = [
+      ...(order.transferImages ?? []),
+      ...(order.transferImage ? [order.transferImage] : []),
+    ];
+    for (const f of filesToDelete) {
+      if (f.startsWith('http')) continue;
+      fs.unlink(path.resolve(config.upload.dir, f), () => {});
     }
 
     res.status(204).send();

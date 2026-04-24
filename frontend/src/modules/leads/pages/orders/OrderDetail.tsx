@@ -28,6 +28,7 @@ type Order = {
   wooCommerceId?: number | null;
   paymentType: string;
   transferImage?: string | null;
+  transferImages?: string[];
   shippingName: string;
   shippingPhone: string;
   shippingAddress?: string | null;
@@ -208,19 +209,59 @@ export default function OrderDetailPage() {
               </div>
             )}
           </dl>
-          {order.transferImage && (
-            <div className="mt-4">
-              <span className="text-slate-500 text-sm block mb-2">صورة التحويل</span>
-              <a href={order.transferImage.startsWith('http') ? order.transferImage : `/uploads/${order.transferImage}`} target="_blank" rel="noreferrer">
-                <img
-                  src={order.transferImage.startsWith('http') ? order.transferImage : `/uploads/${order.transferImage}`}
-                  alt="صورة التحويل"
-                  loading="lazy"
-                  className="max-w-full max-h-[400px] rounded-lg border border-slate-200 object-contain"
-                />
-              </a>
-            </div>
-          )}
+          {(() => {
+            const images = order.transferImages?.length
+              ? order.transferImages
+              : order.transferImage ? [order.transferImage] : [];
+            const imageUrl = (img: string) => img.startsWith('http') ? img : `/uploads/${img}`;
+            const imageCount = images.length;
+
+            return (
+              <>
+                {imageCount > 0 && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-slate-500 text-sm">
+                        {imageCount > 1 ? `صور التحويل (${imageCount})` : 'صورة التحويل'}
+                      </span>
+                      {order.senderPhone && (
+                        <span className="text-sm text-slate-700">
+                          رقم المحوّل: <span className="font-mono font-medium">{order.senderPhone}</span>
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-3">
+                      {images.map((img, i) => (
+                        <a key={`${img}-${i}`} href={imageUrl(img)} target="_blank" rel="noreferrer">
+                          <img
+                            src={imageUrl(img)}
+                            alt={`صورة التحويل ${i + 1}`}
+                            loading="lazy"
+                            className="max-h-[300px] rounded-lg border border-slate-200 object-contain"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {imageCount === 0 && order.noTransferImage && (
+                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-sm text-amber-900 font-medium">بدون صورة تحويل</p>
+                    {order.noImageReason && (
+                      <p className="text-sm text-amber-800 mt-1">
+                        <span className="text-amber-700">السبب:</span> {order.noImageReason}
+                      </p>
+                    )}
+                    {order.senderPhone && (
+                      <p className="text-sm text-amber-800 mt-1">
+                        <span className="text-amber-700">رقم المحوّل:</span> <span className="font-mono">{order.senderPhone}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          })()}
           {order.notes && <p className="mt-4 text-slate-600 text-sm">{order.notes}</p>}
           {order.rejectedReason && (
             <p className="mt-4 p-3 bg-red-50 text-red-800 rounded text-sm">سبب الرفض: {order.rejectedReason}</p>
