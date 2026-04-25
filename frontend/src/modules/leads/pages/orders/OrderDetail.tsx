@@ -213,7 +213,8 @@ export default function OrderDetailPage() {
             const images = order.transferImages?.length
               ? order.transferImages
               : order.transferImage ? [order.transferImage] : [];
-            const imageUrl = (img: string) => img.startsWith('http') ? img : `/uploads/${img}`;
+            const apiBase = import.meta.env.VITE_API_BASE_URL || '';
+            const imageUrl = (img: string) => img.startsWith('http') ? img : `${apiBase}/uploads/${img}`;
             const imageCount = images.length;
 
             return (
